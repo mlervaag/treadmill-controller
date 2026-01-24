@@ -100,6 +100,8 @@ npm start
 
 **Det er alt!** Serveren kjører på din PC, og Web Bluetooth fungerer via localhost.
 
+📚 **Se også**: [Web Bluetooth oppsett guide](docs/WEB_BLUETOOTH_SETUP.md) for mer informasjon
+
 ### Avansert: Raspberry Pi deployment (Multi-enhet tilgang)
 
 Hvis du vil kjøre serveren på en Raspberry Pi og få tilgang fra flere enheter (PC, mobil, tablet) på hjemmenetverket:
@@ -121,12 +123,12 @@ cd treadmill-controller
 
 2. **Deploy til Raspberry Pi**:
 ```powershell
-.\deploy-to-pi.ps1
+.\scripts\deploy-to-pi.ps1
 ```
 
 3. **Aktiver HTTPS** (nødvendig for Web Bluetooth):
 ```powershell
-.\enable-https.ps1
+.\scripts\enable-https.ps1
 ```
 
 4. **Åpne i nettleser**:
@@ -137,13 +139,13 @@ cd treadmill-controller
 #### Daglig bruk
 ```powershell
 # Start server
-.\start-server.ps1
+.\scripts\start-server.ps1
 
 # Stopp server (spar strøm)
-.\stop-server.ps1
+.\scripts\stop-server.ps1
 
 # Backup database
-.\backup-database.ps1
+.\scripts\backup-database.ps1
 ```
 
 #### Fordeler med Raspberry Pi-oppsett
@@ -151,6 +153,8 @@ cd treadmill-controller
 - ✅ Sentralisert data - alle enheter ser samme historikk
 - ✅ Kan slå av/på serveren for å spare strøm
 - ✅ Automatisk backup-løsning
+
+📚 **Se også**: [Hjemmebruk guide](docs/HOME_USAGE_GUIDE.md) for daglig bruk og vedlikehold
 
 </details>
 
@@ -225,19 +229,22 @@ treadmill-controller/
 ├── .gitignore                 # Git ignore-fil
 ├── LICENSE                    # ISC lisens
 ├── README.md                  # Denne filen
-├── HOME_USAGE_GUIDE.md        # Guide for hjemmebruk
-├── deploy-to-pi.ps1           # Deploy til Raspberry Pi
-├── enable-https.ps1           # Aktiver HTTPS med SSL-sertifikat
-├── start-server.ps1           # Start server på Pi
-├── stop-server.ps1            # Stopp server på Pi
-├── backup-database.ps1        # Backup database fra Pi
-├── restore-database.ps1       # Gjenopprett database til Pi
-├── data/
+├── scripts/                   # PowerShell deployment scripts
+│   ├── deploy-to-pi.ps1       # Deploy til Raspberry Pi
+│   ├── enable-https.ps1       # Aktiver HTTPS med SSL-sertifikat
+│   ├── start-server.ps1       # Start server på Pi
+│   ├── stop-server.ps1        # Stopp server på Pi
+│   ├── backup-database.ps1    # Backup database fra Pi
+│   └── restore-database.ps1   # Gjenopprett database til Pi
+├── docs/                      # Dokumentasjon
+│   ├── HOME_USAGE_GUIDE.md    # Guide for hjemmebruk
+│   └── WEB_BLUETOOTH_SETUP.md # Web Bluetooth oppsett
+├── data/                      # Database (git-ignored)
 │   └── treadmill.db           # SQLite database (opprettes automatisk)
 ├── certs/                     # SSL-sertifikater (git-ignored)
 │   ├── server.key             # Private key
 │   └── server.crt             # Self-signed certificate
-└── public/
+└── public/                    # Frontend filer
     ├── index.html             # Hovedside med full UI
     ├── style.css              # Moderne, responsiv styling
     ├── app.js                 # Frontend logikk og UI-kontroll
@@ -321,7 +328,7 @@ distance_km, heart_rate
 - ❌ Firefox støtter ikke Web Bluetooth
 - ❌ iOS støtter ikke Web Bluetooth (bruk Android eller desktop)
 - ✅ **Lokal bruk**: Bruk `http://localhost:3001` (ikke IP-adresse)
-- ✅ **Raspberry Pi**: Bruk HTTPS (`.\enable-https.ps1` hvis ikke aktivert) og godta sertifikatadvarsel
+- ✅ **Raspberry Pi**: Bruk HTTPS (`.\scripts\enable-https.ps1` hvis ikke aktivert) og godta sertifikatadvarsel
 - ✅ Sjekk Bluetooth-tillatelser i nettleseren
 
 ### Port 3001 er opptatt

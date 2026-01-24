@@ -17,7 +17,7 @@ Du har nå et **perfekt oppsett** for hjemmebruk med multi-enhet støtte!
 For at Web Bluetooth skal fungere må du aktivere HTTPS:
 
 ```powershell
-.\enable-https.ps1
+.\scripts\enable-https.ps1
 ```
 
 Dette gjøres **kun én gang**. Skriptet:
@@ -37,7 +37,7 @@ Dette gjøres **kun én gang**. Skriptet:
 
 ### Start Server (før trening)
 ```powershell
-.\start-server.ps1
+.\scripts\start-server.ps1
 ```
 Serveren starter på ca 3 sekunder. Åpne deretter:
 - **Windows**: https://192.168.1.12:3001 i Chrome/Edge
@@ -48,7 +48,7 @@ Serveren starter på ca 3 sekunder. Åpne deretter:
 
 ### Stopp Server (etter trening)
 ```powershell
-.\stop-server.ps1
+.\scripts\stop-server.ps1
 ```
 **Sparer strøm** på Raspberry Pi når du ikke bruker appen.
 
@@ -58,7 +58,7 @@ Serveren starter på ca 3 sekunder. Åpne deretter:
 
 ### Ta Backup (før større endringer)
 ```powershell
-.\backup-database.ps1
+.\scripts\backup-database.ps1
 ```
 - Lager backup i `.\backups\` mappen
 - Timestamp i filnavn: `treadmill-backup-2026-01-24_1430.db`
@@ -66,7 +66,7 @@ Serveren starter på ca 3 sekunder. Åpne deretter:
 
 ### Gjenopprett fra Backup
 ```powershell
-.\restore-database.ps1
+.\scripts\restore-database.ps1
 ```
 - Velg backup fra liste
 - Bekrefter før overskriving
@@ -79,25 +79,25 @@ Serveren starter på ca 3 sekunder. Åpne deretter:
 ### Scenario 1: Quick Workout (mest vanlig for deg)
 ```powershell
 # 1. Start server
-.\start-server.ps1
+.\scripts\start-server.ps1
 
 # 2. Åpne https://192.168.1.12:3001 i browser
 # 3. Koble til tredemølle
 # 4. Tren!
 
 # 5. Stopp server når ferdig (sparer strøm)
-.\stop-server.ps1
+.\scripts\stop-server.ps1
 ```
 
 ### Scenario 2: Helg med flere økter
 ```powershell
 # Fredag kveld:
-.\start-server.ps1
+.\scripts\start-server.ps1
 
 # Tren lørdag og søndag uten å stoppe server
 
 # Søndag kveld:
-.\stop-server.ps1
+.\scripts\stop-server.ps1
 ```
 
 ### Scenario 3: 24/7 Drift (hvis du endrer mening)
@@ -107,7 +107,7 @@ restart: "unless-stopped"  # Istedenfor "no"
 ```
 Deretter:
 ```powershell
-.\deploy-to-pi.ps1
+.\scripts\deploy-to-pi.ps1
 ```
 
 ---
@@ -115,7 +115,7 @@ Deretter:
 ## 🔧 Vedlikehold
 
 ### Månedlig
-1. **Ta backup**: `.\backup-database.ps1`
+1. **Ta backup**: `.\scripts\backup-database.ps1`
 2. **Sjekk diskplass** på Pi:
    ```powershell
    ssh pi@192.168.1.12 'df -h'
@@ -124,10 +124,10 @@ Deretter:
 ### Ved Oppdateringer
 ```powershell
 # 1. Ta backup først
-.\backup-database.ps1
+.\scripts\backup-database.ps1
 
 # 2. Deploy ny versjon
-.\deploy-to-pi.ps1
+.\scripts\deploy-to-pi.ps1
 
 # 3. Test at alt fungerer
 # 4. Slett gamle backups (behold siste 5-10)
@@ -231,8 +231,8 @@ Vurder **oppgradering** kun hvis:
 - 📊 Sentralisert data på én server
 
 ### Daglig Bruk:
-1. `.\start-server.ps1`
+1. `.\scripts\start-server.ps1`
 2. Tren på https://192.168.1.12:3001
-3. `.\stop-server.ps1`
+3. `.\scripts\stop-server.ps1`
 
 **Det er alt!** 🎉

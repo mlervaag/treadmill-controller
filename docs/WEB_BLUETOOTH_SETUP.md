@@ -19,7 +19,7 @@ Den fungerer **IKKE** med:
 På din Windows PC, kjør:
 
 ```powershell
-.\enable-https.ps1
+.\scripts\enable-https.ps1
 ```
 
 Dette skriptet:
@@ -59,12 +59,12 @@ Nå vil "Koble til Tredemølle"-knappen fungere uten feil!
 
 ```powershell
 # Start server på Pi
-.\start-server.ps1
+.\scripts\start-server.ps1
 
 # Åpne i browser: https://192.168.1.12:3001
 
 # Stopp server når ferdig (spar strøm)
-.\stop-server.ps1
+.\scripts\stop-server.ps1
 ```
 
 ---
@@ -101,7 +101,7 @@ Du kan fortsatt se historikk og statistikk, men ikke koble til tredemøllen.
 **Årsak:** Du bruker HTTP via IP-adresse
 
 **Løsning:**
-1. Kjør `.\enable-https.ps1` for å aktivere HTTPS
+1. Kjør `.\scripts\enable-https.ps1` for å aktivere HTTPS
 2. Åpne `https://192.168.1.12:3001` (ikke `http://`)
 3. Godta sertifikatadvarselen
 
@@ -128,8 +128,8 @@ WebSocket server running on wss://0.0.0.0:3001
 
 **Hvis ikke, restart serveren:**
 ```powershell
-.\stop-server.ps1
-.\start-server.ps1
+.\scripts\stop-server.ps1
+.\scripts\start-server.ps1
 ```
 
 ### "Sertifikatet er utløpt"
@@ -141,7 +141,7 @@ Self-signed sertifikater er gyldige i 365 dager. For å fornye:
 ssh pi@192.168.1.12 'rm ~/treadmill-controller/certs/server.*'
 
 # Generer nye
-.\enable-https.ps1
+.\scripts\enable-https.ps1
 ```
 
 ---
