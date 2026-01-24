@@ -191,6 +191,8 @@ Hvis du har satt opp Raspberry Pi-deployment:
 - **📋 Økter**: Liste over alle økter med mulighet til å se detaljer eller slette
 - **📈 Trender**: Ukentlig og månedlig utvikling
 
+---
+
 ## 🔧 FTMS (Fitness Machine Service)
 
 Applikasjonen bruker Bluetooth Low Energy FTMS-standarden, samme som brukes av Zwift, Kinomap, Peloton, etc.
