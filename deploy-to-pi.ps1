@@ -24,17 +24,10 @@ try {
 Write-Host "📁 Creating application directory on Pi..." -ForegroundColor Yellow
 ssh "${PI_USER}@${PI_HOST}" "mkdir -p ${APP_DIR}"
 
-# Copy files using SCP (since rsync may not be available on Windows)
+# Copy files using SCP
 Write-Host "📦 Copying files to Pi..." -ForegroundColor Yellow
 
-# Create a temporary directory with only necessary files
-$tempDir = "$env:TEMP\treadmill-controller-deploy"
-if (Test-Path $tempDir) {
-    Remove-Item -Recurse -Force $tempDir
-}
-New-Item -ItemType Directory -Path $tempDir | Out-Null
-
-# Copy necessary files
+# Files to copy
 $filesToCopy = @(
     "server.js",
     "package.json",
@@ -47,35 +40,30 @@ $filesToCopy = @(
 
 foreach ($file in $filesToCopy) {
     if (Test-Path $file) {
-        Copy-Item $file $tempDir\
+        Write-Host "  Copying $file..." -ForegroundColor Gray
+        scp $file "${PI_USER}@${PI_HOST}:${APP_DIR}/"
     }
 }
 
 # Copy public directory
-Copy-Item -Recurse public $tempDir\
-
-# Use SCP to transfer
-Write-Host "Uploading files..." -ForegroundColor Yellow
-scp -r "$tempDir\*" "${PI_USER}@${PI_HOST}:${APP_DIR}/"
-
-# Clean up temp directory
-Remove-Item -Recurse -Force $tempDir
+Write-Host "  Copying public directory..." -ForegroundColor Gray
+scp -r public "${PI_USER}@${PI_HOST}:${APP_DIR}/"
 
 # Deploy and start with Docker
 Write-Host "🐳 Building and starting Docker container..." -ForegroundColor Yellow
 ssh "${PI_USER}@${PI_HOST}" @"
 cd $APP_DIR
 mkdir -p data
-docker-compose down 2>/dev/null || true
-docker-compose up -d --build
+docker compose down 2>/dev/null || true
+docker compose up -d --build
 echo ''
 echo '✅ Deployment complete!'
 echo ''
 echo '📊 Container status:'
-docker-compose ps
+docker compose ps
 echo ''
 echo '📝 Recent logs:'
-docker-compose logs --tail=20
+docker compose logs --tail=20
 "@
 
 Write-Host ""
@@ -84,7 +72,7 @@ Write-Host ""
 Write-Host "🌐 Access the app at: http://192.168.1.12:3001" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Useful commands:" -ForegroundColor Yellow
-Write-Host "  View logs:    ssh pi@192.168.1.12 'cd ~/treadmill-controller && docker-compose logs -f'"
-Write-Host "  Restart:      ssh pi@192.168.1.12 'cd ~/treadmill-controller && docker-compose restart'"
-Write-Host "  Stop:         ssh pi@192.168.1.12 'cd ~/treadmill-controller && docker-compose down'"
-Write-Host "  View status:  ssh pi@192.168.1.12 'cd ~/treadmill-controller && docker-compose ps'"
+Write-Host "  View logs:    ssh pi@192.168.1.12 'cd ~/treadmill-controller && docker compose logs -f'"
+Write-Host "  Restart:      ssh pi@192.168.1.12 'cd ~/treadmill-controller && docker compose restart'"
+Write-Host "  Stop:         ssh pi@192.168.1.12 'cd ~/treadmill-controller && docker compose down'"
+Write-Host "  View status:  ssh pi@192.168.1.12 'cd ~/treadmill-controller && docker compose ps'"
