@@ -30,9 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadOverallStats();
 
     // Check if Web Bluetooth is supported
-    if (!navigator.bluetooth) {
-        alert('Web Bluetooth er ikke støttet i denne nettleseren. Vennligst bruk Chrome, Edge eller Opera.');
-    }
+    checkBluetoothSupport();
 });
 
 function setupTabs() {
@@ -50,6 +48,41 @@ function setupTabs() {
             document.getElementById(tabName).classList.add('active');
         });
     });
+}
+
+function checkBluetoothSupport() {
+    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const isHTTPS = window.location.protocol === 'https:';
+
+    if (!navigator.bluetooth) {
+        const errorMsg = document.createElement('div');
+        errorMsg.style.cssText = 'background: #ef4444; color: white; padding: 16px; margin: 16px; border-radius: 8px; font-weight: bold;';
+
+        if (!isLocalhost && !isHTTPS) {
+            errorMsg.innerHTML = `
+                <h3 style="margin-top: 0;">⚠️ Web Bluetooth krever localhost eller HTTPS</h3>
+                <p>Du har åpnet appen via IP-adresse (${window.location.host}), som ikke støtter Web Bluetooth.</p>
+                <h4>Løsning:</h4>
+                <ol style="text-align: left; margin-bottom: 0;">
+                    <li>Kjør <code>setup-localhost-tunnel.ps1</code> på denne PCen</li>
+                    <li>Åpne <code>http://localhost:3001</code> i stedet</li>
+                </ol>
+                <p style="margin-bottom: 0;"><small>Se README.md for detaljer</small></p>
+            `;
+        } else {
+            errorMsg.innerHTML = `
+                <h3 style="margin-top: 0;">❌ Web Bluetooth ikke støttet</h3>
+                <p>Vennligst bruk Chrome, Edge, eller Opera på Windows/Mac/Linux/Android.</p>
+                <p style="margin-bottom: 0;"><small>Safari og iOS støtter ikke Web Bluetooth</small></p>
+            `;
+        }
+
+        document.querySelector('.container').insertBefore(errorMsg, document.querySelector('.container').firstChild);
+
+        // Disable bluetooth buttons
+        document.getElementById('connectBtn').disabled = true;
+        document.getElementById('scanAllBtn').disabled = true;
+    }
 }
 
 function setupEventListeners() {
