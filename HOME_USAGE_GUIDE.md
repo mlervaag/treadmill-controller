@@ -12,6 +12,27 @@ Du har nå et **perfekt oppsett** for hjemmebruk med multi-enhet støtte!
 
 ---
 
+## 🔒 Første gangs oppsett - HTTPS
+
+For at Web Bluetooth skal fungere må du aktivere HTTPS:
+
+```powershell
+.\enable-https.ps1
+```
+
+Dette gjøres **kun én gang**. Skriptet:
+- Genererer SSL-sertifikat på Raspberry Pi
+- Aktiverer HTTPS på serveren
+- Sertifikatet varer i 365 dager
+
+**Første gang du åpner appen:**
+1. Gå til `https://192.168.1.12:3001`
+2. Du får en sikkerhetsadvarsel (normalt for self-signed sertifikater)
+3. Klikk "Advanced" → "Continue to 192.168.1.12 (unsafe)"
+4. Du slipper å gjøre dette igjen!
+
+---
+
 ## 🚀 Daglig Bruk
 
 ### Start Server (før trening)
@@ -19,9 +40,11 @@ Du har nå et **perfekt oppsett** for hjemmebruk med multi-enhet støtte!
 .\start-server.ps1
 ```
 Serveren starter på ca 3 sekunder. Åpne deretter:
-- **Windows**: http://192.168.1.12:3001 i Chrome/Edge
-- **Mobil**: http://192.168.1.12:3001 i Chrome (Android)
-- **Tablet**: http://192.168.1.12:3001 i Chrome/Safari
+- **Windows**: https://192.168.1.12:3001 i Chrome/Edge
+- **Mobil**: https://192.168.1.12:3001 i Chrome (Android)
+- **Tablet**: https://192.168.1.12:3001 i Chrome/Safari
+
+**Første gang:** Godta sertifikatadvarsel ("Advanced" → "Continue")
 
 ### Stopp Server (etter trening)
 ```powershell
@@ -58,7 +81,7 @@ Serveren starter på ca 3 sekunder. Åpne deretter:
 # 1. Start server
 .\start-server.ps1
 
-# 2. Åpne http://192.168.1.12:3001 i browser
+# 2. Åpne https://192.168.1.12:3001 i browser
 # 3. Koble til tredemølle
 # 4. Tren!
 
@@ -171,7 +194,7 @@ Deretter:
 3. Navn: "Start Tredemølle Server"
 
 ### Legg til Favorites i Browser
-Lagre http://192.168.1.12:3001 som bookmark for rask tilgang
+Lagre https://192.168.1.12:3001 som bookmark for rask tilgang
 
 ### Sjekk Server Status
 ```powershell
@@ -209,7 +232,7 @@ Vurder **oppgradering** kun hvis:
 
 ### Daglig Bruk:
 1. `.\start-server.ps1`
-2. Tren på http://192.168.1.12:3001
+2. Tren på https://192.168.1.12:3001
 3. `.\stop-server.ps1`
 
 **Det er alt!** 🎉

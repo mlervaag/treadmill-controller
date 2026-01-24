@@ -69,7 +69,9 @@ docker compose logs --tail=20
 Write-Host ""
 Write-Host "🎉 Deployment finished!" -ForegroundColor Green
 Write-Host ""
-Write-Host "🌐 Access the app at: http://192.168.1.12:3001" -ForegroundColor Cyan
+Write-Host "🌐 Access the app at: https://192.168.1.12:3001" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "⚠️  If HTTPS is not working yet, run: .\enable-https.ps1" -ForegroundColor Yellow
 Write-Host ""
 Write-Host "Useful commands:" -ForegroundColor Yellow
 Write-Host "  View logs:    ssh pi@192.168.1.12 'cd ~/treadmill-controller && docker compose logs -f'"

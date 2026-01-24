@@ -1,6 +1,6 @@
 # 🔵 Web Bluetooth Oppsett
 
-## ⚠️ Viktig: Web Bluetooth krever localhost eller HTTPS
+## ⚠️ Viktig: Web Bluetooth krever HTTPS
 
 Web Bluetooth API (som brukes for å koble til tredemølle) fungerer **kun** med:
 - `https://` (HTTPS-tilkoblinger)
@@ -12,100 +12,83 @@ Den fungerer **IKKE** med:
 
 ---
 
-## ✅ Løsning: SSH Tunnel til localhost
+## ✅ Løsning: HTTPS med Self-Signed Certificate
 
-### Steg 1: Start SSH Tunnel
+### Steg 1: Aktiver HTTPS
 
 På din Windows PC, kjør:
 
 ```powershell
-.\setup-localhost-tunnel.ps1
+.\enable-https.ps1
 ```
 
 Dette skriptet:
-- Lager en SSH-tunnel fra `localhost:3001` til `192.168.1.12:3001`
-- Holder tunnelen åpen (la vinduet stå åpent)
-- Web Bluetooth vil nå fungere!
+- Lager et self-signed SSL-sertifikat på Raspberry Pi
+- Restarter serveren med HTTPS aktivert
+- Sertifikatet er gyldig for `192.168.1.12`, `127.0.0.1`, og `raspberrypi.local`
 
-### Steg 2: Åpne Appen via localhost
+### Steg 2: Åpne Appen via HTTPS
 
-I stedet for `http://192.168.1.12:3001`, åpne:
+Åpne i nettleseren:
 
 ```
-http://localhost:3001
+https://192.168.1.12:3001
 ```
 
-### Steg 3: Koble til Tredemølle
+### Steg 3: Godta Sertifikatadvarsel
 
-Nå vil "Koble til Tredemølle"-knappen fungere! 🎉
+Første gang du åpner appen vil du se en sikkerhetsadvarsel. Dette er normalt for self-signed sertifikater.
+
+**I Edge/Chrome:**
+1. Klikk "Advanced" eller "Avansert"
+2. Klikk "Continue to 192.168.1.12 (unsafe)" eller "Fortsett til 192.168.1.12 (usikkert)"
+3. Web Bluetooth vil nå fungere! 🎉
+
+**Hvorfor denne advarselen?**
+- Self-signed sertifikater er ikke signert av en trusted Certificate Authority (CA)
+- For lokal hjemmebruk er dette helt trygt
+- Alternativet ville vært å betale for et kommersielt sertifikat (unødvendig)
+
+### Steg 4: Koble til Tredemølle
+
+Nå vil "Koble til Tredemølle"-knappen fungere uten feil!
 
 ---
 
 ## 🔄 Daglig Bruk
 
-### Metode 1: Med SSH Tunnel (Anbefalt)
-
 ```powershell
-# Terminal 1: Start server på Pi
+# Start server på Pi
 .\start-server.ps1
 
-# Terminal 2: Start SSH tunnel
-.\setup-localhost-tunnel.ps1
+# Åpne i browser: https://192.168.1.12:3001
 
-# Åpne i browser: http://localhost:3001
+# Stopp server når ferdig (spar strøm)
+.\stop-server.ps1
 ```
-
-### Metode 2: Kombinert Script (Enklere)
-
-La meg lage et kombinert script for deg:
-
-```powershell
-# Kommer snart: .\start-with-tunnel.ps1
-```
-
----
-
-## 🌐 Alternativer (Mer Avansert)
-
-### Alternativ 1: HTTPS med Self-Signed Certificate
-
-**Fordeler:**
-- Kan bruke IP-adresse direkte
-- Fungerer fra andre enheter
-
-**Ulemper:**
-- Krever sertifikat-oppsett på Pi
-- Browser-advarsler om usikker tilkobling
-- Mer komplisert
-
-### Alternativ 2: mDNS med `.local` hostname
-
-Edge/Chrome støtter også `.local` domener:
-
-```
-http://raspberrypi.local:3001
-```
-
-Men dette fungerer **IKKE** med Web Bluetooth uten HTTPS.
 
 ---
 
 ## 🖥️ Andre Enheter
 
+### Windows PC
+✅ Full støtte med HTTPS
+```
+https://192.168.1.12:3001
+```
+
 ### Android Mobil/Tablet
-
-Android Chrome støtter Web Bluetooth også over HTTP via IP! 📱
-
-Du kan koble direkte til:
+✅ Full støtte med HTTPS
 ```
-http://192.168.1.12:3001
+https://192.168.1.12:3001
 ```
 
-**Ingen tunnel nødvendig!**
+**Bonus:** Android Chrome støtter også Web Bluetooth over HTTP via IP-adresser, så du kan bruke `http://192.168.1.12:3001` hvis du foretrekker det.
 
 ### iOS/iPad
-
 ❌ Fungerer ikke - iOS støtter ikke Web Bluetooth i det hele tatt.
+
+Du kan fortsatt se historikk og statistikk, men ikke koble til tredemøllen.
 
 ---
 
@@ -117,68 +100,58 @@ http://192.168.1.12:3001
 
 **Årsak:** Du bruker HTTP via IP-adresse
 
-**Løsning:** Bruk SSH tunnel og åpne `http://localhost:3001`
+**Løsning:**
+1. Kjør `.\enable-https.ps1` for å aktivere HTTPS
+2. Åpne `https://192.168.1.12:3001` (ikke `http://`)
+3. Godta sertifikatadvarselen
 
-### "Tunnel kobler fra"
+### "Server kjører fortsatt på HTTP"
+
+**Sjekk at sertifikatene eksisterer:**
+```powershell
+ssh pi@192.168.1.12 'ls -la ~/treadmill-controller/certs/'
+```
+
+Du skal se `server.key` og `server.crt`.
+
+**Sjekk server-logger:**
+```powershell
+ssh pi@192.168.1.12 'cd ~/treadmill-controller && docker compose logs'
+```
+
+Du skal se:
+```
+🔒 HTTPS enabled
+Server running on https://0.0.0.0:3001
+WebSocket server running on wss://0.0.0.0:3001
+```
+
+**Hvis ikke, restart serveren:**
+```powershell
+.\stop-server.ps1
+.\start-server.ps1
+```
+
+### "Sertifikatet er utløpt"
+
+Self-signed sertifikater er gyldige i 365 dager. For å fornye:
 
 ```powershell
-# Sjekk at Pi er tilgjengelig
-ping 192.168.1.12
+# Slett gamle sertifikater
+ssh pi@192.168.1.12 'rm ~/treadmill-controller/certs/server.*'
 
-# Sjekk SSH-tilgang
-ssh pi@192.168.1.12 'echo "OK"'
-
-# Start tunnel på nytt
-.\setup-localhost-tunnel.ps1
-```
-
-### "Port 3001 er allerede i bruk"
-
-```powershell
-# Windows: Finn og drep prosessen
-netstat -ano | findstr :3001
-taskkill /F /PID [PID]
-
-# Start tunnel på nytt
-.\setup-localhost-tunnel.ps1
-```
-
----
-
-## 💡 Anbefalt Setup for Hjemmebruk
-
-**For Windows PC (Bluetooth-enhet):**
-```powershell
-# Dag 1: Setup
-1. .\start-server.ps1           # Start server på Pi
-2. .\setup-localhost-tunnel.ps1  # Start tunnel (la stå åpent)
-3. Åpne http://localhost:3001
-
-# Dag 2+: Bruk
-- Tunnelen kjører fortsatt (hvis PC ikke restartet)
-- Bare åpne http://localhost:3001 og tren!
-
-# Når ferdig:
-- Ctrl+C i tunnel-vinduet
-- .\stop-server.ps1
-```
-
-**For Android Mobil/Tablet:**
-```
-1. Start server: .\start-server.ps1
-2. Åpne http://192.168.1.12:3001 direkte
-3. Koble til tredemølle
-4. Tren!
+# Generer nye
+.\enable-https.ps1
 ```
 
 ---
 
 ## 📝 Oppsummering
 
-| Enhet | URL | Bluetooth | Trenger Tunnel? |
-|-------|-----|-----------|-----------------|
-| **Windows PC** | `http://localhost:3001` | ✅ | ✅ Ja |
-| **Android** | `http://192.168.1.12:3001` | ✅ | ❌ Nei |
-| **iOS/iPad** | N/A | ❌ | N/A |
+| Enhet | URL | Bluetooth | Sertifikatadvarsel? |
+|-------|-----|-----------|---------------------|
+| **Windows PC** | `https://192.168.1.12:3001` | ✅ | Ja (kun første gang) |
+| **Android** | `https://192.168.1.12:3001` | ✅ | Ja (kun første gang) |
+| **iOS/iPad** | `https://192.168.1.12:3001` | ❌ | Ja (kun første gang) |
 
-**Huskeregel:** Windows = localhost med tunnel, Android = IP direkte! 🎯
+**Huskeregel:** HTTPS for alle enheter, godta sertifikat første gang! 🔒

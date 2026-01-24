@@ -8,7 +8,7 @@ $status = ssh pi@$PI_HOST 'docker ps --filter name=treadmill-controller --format
 
 if ($status -match "Up") {
     Write-Host "Server is already running!" -ForegroundColor Green
-    Write-Host "Access at: http://192.168.1.12:3001" -ForegroundColor Cyan
+    Write-Host "Access at: https://192.168.1.12:3001" -ForegroundColor Cyan
     exit 0
 }
 
@@ -24,7 +24,7 @@ $status = ssh pi@$PI_HOST 'docker ps --filter name=treadmill-controller --format
 if ($status) {
     Write-Host ""
     Write-Host "Server started successfully!" -ForegroundColor Green
-    Write-Host "Access at: http://192.168.1.12:3001" -ForegroundColor Cyan
+    Write-Host "Access at: https://192.168.1.12:3001" -ForegroundColor Cyan
     Write-Host ""
     Write-Host "Tip: Run stop-server.ps1 when done to save power" -ForegroundColor Gray
 } else {

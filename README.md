@@ -73,19 +73,56 @@ En moderne, fullstendig webapplikasjon for å kontrollere tredemøllen din via B
 
 ## 🚀 Installasjon
 
-### 1. Klon repositoryet
+### Oppsett på Raspberry Pi (Anbefalt for hjemmebruk)
+
+Dette oppsettet lar deg kjøre serveren på en Raspberry Pi, slik at du kan få tilgang fra flere enheter (PC, mobil, tablet) på hjemmenetverket ditt.
+
+#### Forutsetninger
+- Raspberry Pi med Docker installert
+- Windows PC med PowerShell (for deploy-skriptene)
+- SSH-tilgang til Raspberry Pi
+
+#### Installasjon
+1. **Klon repositoryet på din Windows PC**:
 ```bash
-git clone https://github.com/[ditt-brukernavn]/treadmill-controller.git
+git clone https://github.com/mlervaag/treadmill-controller.git
 cd treadmill-controller
 ```
 
-### 2. Installer avhengigheter
-```bash
-npm install
+2. **Deploy til Raspberry Pi**:
+```powershell
+.\deploy-to-pi.ps1
 ```
 
-### 3. Start serveren
+3. **Aktiver HTTPS** (nødvendig for Web Bluetooth):
+```powershell
+.\enable-https.ps1
+```
+
+4. **Åpne i nettleser**:
+- Gå til `https://192.168.1.12:3001` (erstatt med din Pi's IP-adresse)
+- Godta sikkerhetsadvarselen for self-signed sertifikat (klikk "Advanced" → "Continue")
+- Web Bluetooth vil nå fungere!
+
+#### Daglig bruk
+```powershell
+# Start server
+.\start-server.ps1
+
+# Stopp server (spar strøm)
+.\stop-server.ps1
+
+# Backup database
+.\backup-database.ps1
+```
+
+### Lokal installasjon (for utvikling)
+
 ```bash
+# Installer avhengigheter
+npm install
+
+# Start serveren
 npm start
 ```
 
@@ -94,16 +131,16 @@ Serveren kjører nå på **http://localhost:3001**
 ## 🎯 Bruk
 
 ### Første gang
-1. **Åpne appen**: Gå til `http://localhost:3001` i Chrome/Edge/Opera
-2. **Slå på tredemøllen**: Sørg for at Bluetooth er aktivert
-3. **Koble til**: Klikk "Koble til Tredemølle" og velg din tredemølle
-4. **Kjør!**: Du er klar til å trene!
+1. **Åpne appen**: Gå til `https://[PI-IP]:3001` i Chrome/Edge/Opera
+2. **Godta sertifikat**: Klikk "Advanced" → "Continue to [IP] (unsafe)" (kun første gang)
+3. **Slå på tredemøllen**: Sørg for at Bluetooth er aktivert
+4. **Koble til**: Klikk "Koble til Tredemølle" og velg din tredemølle
+5. **Kjør!**: Du er klar til å trene!
 
-### På mobil/tablet (Android)
-1. **Finn IP-adresse**: Kjør `ipconfig` (Windows) eller `ifconfig` (Mac/Linux) på PCen som kjører serveren
-2. **Åpne på mobil**: Gå til `http://[DIN-IP]:3001` i Chrome på Android
-3. **Koble til**: Android-enheten kobler til tredemøllen via Bluetooth
-4. **Treff!**: Fullt funksjonell mobil kontroll
+### Multi-enhet tilgang
+- **Windows PC**: `https://192.168.1.12:3001` - Full Bluetooth-kontroll
+- **Android mobil/tablet**: `https://192.168.1.12:3001` - Full Bluetooth-kontroll
+- **iOS/iPad**: `https://192.168.1.12:3001` - Kun visning (ingen Bluetooth-støtte)
 
 ### Visningsmoduser
 - **🎯 Fokus**: Store tall for hastighet og tid - perfekt under trening
@@ -146,17 +183,30 @@ Machine Status:       00002ada-0000-1000-8000-00805f9b34fb
 
 ```
 treadmill-controller/
-├── server.js              # Express server med WebSocket og API
-├── package.json           # npm konfigurasjon og dependencies
-├── treadmill.db          # SQLite database (opprettes automatisk)
-├── .gitignore            # Git ignore-fil
-├── LICENSE               # ISC lisens
-├── README.md             # Denne filen
+├── server.js                  # Express server med HTTPS, WebSocket og API
+├── package.json               # npm konfigurasjon og dependencies
+├── Dockerfile                 # Docker container build
+├── docker-compose.yml         # Docker Compose konfigurasjon
+├── .gitignore                 # Git ignore-fil
+├── LICENSE                    # ISC lisens
+├── README.md                  # Denne filen
+├── HOME_USAGE_GUIDE.md        # Guide for hjemmebruk
+├── deploy-to-pi.ps1           # Deploy til Raspberry Pi
+├── enable-https.ps1           # Aktiver HTTPS med SSL-sertifikat
+├── start-server.ps1           # Start server på Pi
+├── stop-server.ps1            # Stopp server på Pi
+├── backup-database.ps1        # Backup database fra Pi
+├── restore-database.ps1       # Gjenopprett database til Pi
+├── data/
+│   └── treadmill.db           # SQLite database (opprettes automatisk)
+├── certs/                     # SSL-sertifikater (git-ignored)
+│   ├── server.key             # Private key
+│   └── server.crt             # Self-signed certificate
 └── public/
-    ├── index.html        # Hovedside med full UI
-    ├── style.css         # Moderne, responsiv styling
-    ├── app.js            # Frontend logikk og UI-kontroll
-    └── ftms.js           # FTMS Bluetooth-implementasjon
+    ├── index.html             # Hovedside med full UI
+    ├── style.css              # Moderne, responsiv styling
+    ├── app.js                 # Frontend logikk og UI-kontroll
+    └── ftms.js                # FTMS Bluetooth-implementasjon
 ```
 
 ## 🗃️ Database Schema
@@ -235,7 +285,8 @@ distance_km, heart_rate
 - ❌ Safari støtter ikke Web Bluetooth (bruk Chrome/Edge/Opera)
 - ❌ Firefox støtter ikke Web Bluetooth
 - ❌ iOS støtter ikke Web Bluetooth (bruk Android eller desktop)
-- ✅ Sørg for at du bruker HTTPS eller localhost
+- ✅ Sørg for at du bruker HTTPS (kjør `.\enable-https.ps1` hvis ikke aktivert)
+- ✅ Godta self-signed sertifikat i nettleseren (klikk "Advanced" → "Continue")
 - ✅ Sjekk Bluetooth-tillatelser i nettleseren
 
 ### Port 3001 er opptatt
