@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#000000">
+    <title>Tredemølle Kontroller</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🏃 Tredemølle Kontroller</h1>
+            <div class="connection-status">
+                <button id="connectBtn" class="btn btn-primary">Koble til Tredemølle</button>
+                <button id="scanAllBtn" class="btn btn-secondary">Scan alle enheter</button>
+                <button id="discoverBtn" class="btn btn-secondary" disabled>Vis enhetsinformasjon</button>
+                <span id="connectionStatus" class="status-disconnected">Ikke tilkoblet</span>
+            </div>
+        </header>
+
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="control">Kontroll</button>
+            <button class="tab-btn" data-tab="workouts">Treningsøkter</button>
+            <button class="tab-btn" data-tab="history">Historikk</button>
+        </div>
+
+        <!-- Control Tab -->
+        <div id="control" class="tab-content active">
+            <div class="control-panel">
+                <!-- View Mode Selector -->
+                <div class="view-mode-selector">
+                    <button class="view-mode-btn active" data-mode="focus" onclick="setViewMode('focus')">
+                        <span>🎯</span> Fokus
+                    </button>
+                    <button class="view-mode-btn" data-mode="overview" onclick="setViewMode('overview')">
+                        <span>📊</span> Oversikt
+                    </button>
+                    <button class="view-mode-btn" data-mode="minimal" onclick="setViewMode('minimal')">
+                        <span>⚡</span> Minimal
+                    </button>
+                </div>
+
+                <!-- Focus Mode: Large primary stats -->
+                <div id="focusView" class="focus-view active-view">
+                    <div class="primary-stats">
+                        <div class="primary-stat">
+                            <div class="primary-stat-label">Hastighet</div>
+                            <div class="primary-stat-value" id="focusSpeed">0.0</div>
+                            <div class="primary-stat-unit">km/t</div>
+                        </div>
+                        <div class="primary-stat">
+                            <div class="primary-stat-label">Tid</div>
+                            <div class="primary-stat-value" id="focusTime">00:00</div>
+                            <div class="primary-stat-unit">minutter</div>
+                        </div>
+                    </div>
+                    <div class="secondary-stats-row">
+                        <div class="secondary-stat">
+                            <span class="secondary-stat-label">Distanse</span>
+                            <span class="secondary-stat-value" id="focusDistance">0.0 km</span>
+                        </div>
+                        <div class="secondary-stat">
+                            <span class="secondary-stat-label">Puls</span>
+                            <span class="secondary-stat-value" id="focusHR">-- bpm</span>
+                        </div>
+                        <div class="secondary-stat">
+                            <span class="secondary-stat-label">Stigning</span>
+                            <span class="secondary-stat-value" id="focusIncline">0%</span>
+                        </div>
+                        <div class="secondary-stat">
+                            <span class="secondary-stat-label">Kalorier</span>
+                            <span class="secondary-stat-value" id="focusCalories">0 kcal</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Overview Mode: All stats visible -->
+                <div id="overviewView" class="overview-view">
+                    <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-label">Hastighet</div>
+                        <div class="stat-value" id="currentSpeed">0.0</div>
+                        <div class="stat-unit">km/t</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Stigning</div>
+                        <div class="stat-value" id="currentIncline">0.0</div>
+                        <div class="stat-unit">%</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Distanse</div>
+                        <div class="stat-value" id="currentDistance">0.0</div>
+                        <div class="stat-unit">km</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Tid</div>
+                        <div class="stat-value" id="currentTime">00:00</div>
+                        <div class="stat-unit">min</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Puls</div>
+                        <div class="stat-value" id="currentHR">--</div>
+                        <div class="stat-unit">bpm</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Kalorier</div>
+                        <div class="stat-value" id="currentCalories">0</div>
+                        <div class="stat-unit">kcal</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Effekt</div>
+                        <div class="stat-value" id="currentPower">0</div>
+                        <div class="stat-unit">W</div>
+                    </div>
+                </div>
+                </div>
+
+                <!-- Minimal Mode: Just essentials -->
+                <div id="minimalView" class="minimal-view">
+                    <div class="minimal-stats">
+                        <div class="minimal-primary">
+                            <div class="minimal-stat-mega">
+                                <span id="minimalSpeed">0.0</span>
+                                <small>km/t</small>
+                            </div>
+                        </div>
+                        <div class="minimal-secondary">
+                            <div class="minimal-stat-small">
+                                <span class="label">Tid</span>
+                                <span class="value" id="minimalTime">00:00</span>
+                            </div>
+                            <div class="minimal-stat-small">
+                                <span class="label">Dist</span>
+                                <span class="value" id="minimalDistance">0.0</span>
+                            </div>
+                            <div class="minimal-stat-small">
+                                <span class="label">Puls</span>
+                                <span class="value" id="minimalHR">--</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="controls">
+                    <div class="control-group">
+                        <label>Hastighet (km/t) <small style="color: var(--text-secondary);">• 0.1-14.0 km/t</small></label>
+                        <div class="control-input">
+                            <button class="btn-small" onclick="adjustSpeed(-0.1)">-</button>
+                            <input type="number" id="speedInput" min="0.1" max="14.0" step="0.1" value="5.0">
+                            <button class="btn-small" onclick="adjustSpeed(0.1)">+</button>
+                            <button class="btn btn-secondary" onclick="setSpeed()">Sett</button>
+                        </div>
+                    </div>
+
+                    <div class="control-group">
+                        <label>Stigning (%) <small style="color: var(--text-secondary);">• 0-12%</small></label>
+                        <div class="control-input">
+                            <button class="btn-small" onclick="adjustIncline(-1)">-</button>
+                            <input type="number" id="inclineInput" min="0" max="12" step="1" value="0">
+                            <button class="btn-small" onclick="adjustIncline(1)">+</button>
+                            <button class="btn btn-secondary" onclick="setIncline()">Sett</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="action-buttons">
+                    <button id="startBtn" class="btn btn-success" onclick="startTreadmill()">Start</button>
+                    <button id="pauseBtn" class="btn btn-warning" onclick="pauseTreadmill()">Pause</button>
+                    <button id="stopBtn" class="btn btn-danger" onclick="stopTreadmill()">Stopp</button>
+                    <button id="resetBtn" class="btn btn-secondary" onclick="resetTreadmill()">Reset</button>
+                </div>
+
+                <div class="workout-selector">
+                    <label>Velg treningsøkt:</label>
+                    <select id="workoutSelect">
+                        <option value="">Manuell kontroll</option>
+                    </select>
+                    <button class="btn btn-primary" onclick="startWorkout()">Start Økt</button>
+                </div>
+
+                <div id="workoutProgress" class="workout-progress hidden">
+                    <div class="workout-progress-header">
+                        <h3>🏃 <span id="workoutName"></span></h3>
+                        <button class="btn-close-workout" onclick="stopWorkout()" title="Avslutt økt">×</button>
+                    </div>
+
+                    <!-- Overall Progress Bar -->
+                    <div class="overall-progress">
+                        <div class="progress-label">
+                            <span>Total fremgang</span>
+                            <span id="overallProgressPercent">0%</span>
+                        </div>
+                        <div class="progress-bar-container">
+                            <div id="overallProgressFill" class="progress-fill"></div>
+                        </div>
+                        <div class="progress-time">
+                            <span id="workoutElapsed">0:00</span>
+                            <span id="workoutRemaining">0:00 igjen</span>
+                        </div>
+                    </div>
+
+                    <!-- Current Segment Info -->
+                    <div class="current-segment-card">
+                        <div class="segment-header">
+                            <h4>Nåværende segment <span class="segment-counter"><span id="currentSegment">1</span>/<span id="totalSegments">1</span></span></h4>
+                        </div>
+                        <div class="segment-stats">
+                            <div class="segment-stat">
+                                <span class="segment-icon">🏃</span>
+                                <div class="segment-stat-content">
+                                    <span class="segment-stat-value" id="currentSegmentSpeed">5.0 km/t</span>
+                                    <span class="segment-stat-label">Hastighet</span>
+                                </div>
+                            </div>
+                            <div class="segment-stat">
+                                <span class="segment-icon">⛰️</span>
+                                <div class="segment-stat-content">
+                                    <span class="segment-stat-value" id="currentSegmentIncline">0%</span>
+                                    <span class="segment-stat-label">Stigning</span>
+                                </div>
+                            </div>
+                            <div class="segment-stat">
+                                <span class="segment-icon">⏱️</span>
+                                <div class="segment-stat-content">
+                                    <span class="segment-stat-value" id="segmentTimeLeft">5:00</span>
+                                    <span class="segment-stat-label">Tid igjen</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="segment-progress">
+                            <div class="segment-progress-bar">
+                                <div id="segmentProgressFill" class="segment-progress-fill"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Next Segment Preview -->
+                    <div id="nextSegmentCard" class="next-segment-card">
+                        <div class="next-segment-header">
+                            <h5>⏭️ Neste segment</h5>
+                        </div>
+                        <div class="next-segment-info">
+                            <span id="nextSegmentName">Oppvarming</span>
+                            <div class="next-segment-details">
+                                <span>🏃 <strong id="nextSegmentSpeed">6.0 km/t</strong></span>
+                                <span>⛰️ <strong id="nextSegmentIncline">2%</strong></span>
+                                <span>⏱️ <strong id="nextSegmentDuration">10 min</strong></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Workout Timeline -->
+                    <div class="workout-timeline">
+                        <h5>Tidslinje</h5>
+                        <div id="timelineSegments" class="timeline-segments">
+                            <!-- Segments will be dynamically added here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Workouts Tab -->
+        <div id="workouts" class="tab-content">
+            <div class="workouts-panel">
+                <div class="panel-header">
+                    <h2>Treningsøkter</h2>
+                    <button class="btn btn-primary" onclick="showCreateWorkout()">+ Ny Økt</button>
+                </div>
+
+                <!-- Workouts List -->
+                <div id="workoutsListView" class="workout-view active">
+                    <div id="workoutsList" class="workouts-list">
+                        <!-- Workouts will be loaded here -->
+                    </div>
+                </div>
+
+                <!-- Create Workout Form -->
+                <div id="createWorkoutForm" class="workout-form hidden">
+                    <div class="form-header">
+                        <h3>Lag ny treningsøkt</h3>
+                        <button class="btn-close" onclick="cancelCreateWorkout()">×</button>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Start fra mal (valgfritt):</label>
+                        <select id="templateSelect" onchange="loadTemplateData()">
+                            <option value="">-- Start fra scratch --</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Navn:</label>
+                        <input type="text" id="workoutName" placeholder="F.eks. Intervalltrening">
+                    </div>
+                    <div class="form-group">
+                        <label>Beskrivelse:</label>
+                        <textarea id="workoutDescription" placeholder="Beskrivelse av økten"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Vanskelighetsgrad:</label>
+                        <select id="workoutDifficulty">
+                            <option value="beginner">Nybegynner</option>
+                            <option value="intermediate">Middels</option>
+                            <option value="advanced">Avansert</option>
+                        </select>
+                    </div>
+
+                    <div class="segments-section">
+                        <h4>Segmenter</h4>
+                        <div id="segmentsList"></div>
+                        <button class="btn btn-secondary" onclick="addSegment()">+ Legg til segment</button>
+                    </div>
+
+                    <div class="workout-summary" id="workoutSummary" style="display: none;">
+                        <h4>📊 Oppsummering</h4>
+                        <div class="summary-stats">
+                            <div class="summary-stat">
+                                <span class="summary-label">Total varighet:</span>
+                                <span class="summary-value" id="summaryDuration">0 min</span>
+                            </div>
+                            <div class="summary-stat">
+                                <span class="summary-label">Estimert distanse:</span>
+                                <span class="summary-value" id="summaryDistance">0.0 km</span>
+                            </div>
+                            <div class="summary-stat">
+                                <span class="summary-label">Gj.snitt hastighet:</span>
+                                <span class="summary-value" id="summaryAvgSpeed">0.0 km/t</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button class="btn btn-primary" onclick="saveWorkout()">Lagre Økt</button>
+                        <button class="btn btn-secondary" onclick="cancelCreateWorkout()">Avbryt</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- History Tab -->
+        <div id="history" class="tab-content">
+            <div class="history-panel">
+                <div class="history-header">
+                    <h2>Treningshistorikk</h2>
+                    <div class="history-view-toggle">
+                        <button class="toggle-btn active" data-view="overview" onclick="switchHistoryView('overview')">📊 Oversikt</button>
+                        <button class="toggle-btn" data-view="sessions" onclick="switchHistoryView('sessions')">📋 Økter</button>
+                        <button class="toggle-btn" data-view="trends" onclick="switchHistoryView('trends')">📈 Trender</button>
+                    </div>
+                </div>
+
+                <!-- Overview View -->
+                <div id="overviewView" class="history-view active">
+                    <!-- Overall Statistics -->
+                    <div class="stats-section">
+                        <h3>Total Statistikk</h3>
+                        <div class="stats-grid-large">
+                            <div class="stat-card-large">
+                                <div class="stat-icon">🏃</div>
+                                <div class="stat-content">
+                                    <div class="stat-value" id="totalDistance">0.0</div>
+                                    <div class="stat-label">Total distanse (km)</div>
+                                </div>
+                            </div>
+                            <div class="stat-card-large">
+                                <div class="stat-icon">⏱️</div>
+                                <div class="stat-content">
+                                    <div class="stat-value" id="totalTime">0</div>
+                                    <div class="stat-label">Total tid (timer)</div>
+                                </div>
+                            </div>
+                            <div class="stat-card-large">
+                                <div class="stat-icon">🔥</div>
+                                <div class="stat-content">
+                                    <div class="stat-value" id="totalCalories">0</div>
+                                    <div class="stat-label">Total kalorier</div>
+                                </div>
+                            </div>
+                            <div class="stat-card-large">
+                                <div class="stat-icon">📅</div>
+                                <div class="stat-content">
+                                    <div class="stat-value" id="totalSessions">0</div>
+                                    <div class="stat-label">Antall økter</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Personal Records -->
+                    <div class="stats-section">
+                        <h3>🏆 Personlige Rekorder</h3>
+                        <div class="records-grid">
+                            <div class="record-card" id="fastestPaceCard">
+                                <div class="record-title">⚡ Beste Pace</div>
+                                <div class="record-value" id="fastestPace">-</div>
+                                <div class="record-date" id="fastestPaceDate">-</div>
+                            </div>
+                            <div class="record-card" id="longestDistanceCard">
+                                <div class="record-title">🎯 Lengste Distanse</div>
+                                <div class="record-value" id="longestDistance">-</div>
+                                <div class="record-date" id="longestDistanceDate">-</div>
+                            </div>
+                            <div class="record-card" id="longestTimeCard">
+                                <div class="record-title">⌛ Lengste Økt</div>
+                                <div class="record-value" id="longestTime">-</div>
+                                <div class="record-date" id="longestTimeDate">-</div>
+                            </div>
+                            <div class="record-card" id="mostCaloriesCard">
+                                <div class="record-title">🔥 Flest Kalorier</div>
+                                <div class="record-value" id="mostCalories">-</div>
+                                <div class="record-date" id="mostCaloriesDate">-</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Average Statistics -->
+                    <div class="stats-section">
+                        <h3>📊 Gjennomsnitt per Økt</h3>
+                        <div class="avg-stats-grid">
+                            <div class="avg-stat-card">
+                                <div class="avg-stat-label">Distanse</div>
+                                <div class="avg-stat-value" id="avgDistance">0.0 km</div>
+                            </div>
+                            <div class="avg-stat-card">
+                                <div class="avg-stat-label">Tid</div>
+                                <div class="avg-stat-value" id="avgTime">0 min</div>
+                            </div>
+                            <div class="avg-stat-card">
+                                <div class="avg-stat-label">Kalorier</div>
+                                <div class="avg-stat-value" id="avgCalories">0 kcal</div>
+                            </div>
+                            <div class="avg-stat-card">
+                                <div class="avg-stat-label">Puls</div>
+                                <div class="avg-stat-value" id="avgHeartRate">-- bpm</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Recent Activity -->
+                    <div class="stats-section">
+                        <h3>📅 Siste 7 Dager</h3>
+                        <div id="recentActivityList" class="recent-activity-list">
+                            <!-- Recent activity will be loaded here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sessions View -->
+                <div id="sessionsView" class="history-view">
+                    <div id="sessionsList" class="sessions-list">
+                        <!-- Sessions will be loaded here -->
+                    </div>
+                </div>
+
+                <!-- Trends View -->
+                <div id="trendsView" class="history-view">
+                    <div class="stats-section">
+                        <h3>📈 Ukentlig Utvikling</h3>
+                        <div id="weeklyTrends" class="trends-container">
+                            <!-- Weekly trends will be loaded here -->
+                        </div>
+                    </div>
+
+                    <div class="stats-section">
+                        <h3>📊 Månedlig Utvikling</h3>
+                        <div id="monthlyTrends" class="trends-container">
+                            <!-- Monthly trends will be loaded here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Access Modals -->
+    <div id="speedModal" class="quick-modal">
+        <div class="quick-modal-content">
+            <div class="quick-modal-header">
+                <h3>Velg Hastighet</h3>
+                <button class="quick-modal-close" onclick="closeQuickModal('speedModal')">&times;</button>
+            </div>
+            <div class="quick-modal-body">
+                <div class="quick-buttons-grid" id="speedButtons"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="inclineModal" class="quick-modal">
+        <div class="quick-modal-content">
+            <div class="quick-modal-header">
+                <h3>Velg Stigning</h3>
+                <button class="quick-modal-close" onclick="closeQuickModal('inclineModal')">&times;</button>
+            </div>
+            <div class="quick-modal-body">
+                <div class="quick-buttons-grid" id="inclineButtons"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="ftms.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

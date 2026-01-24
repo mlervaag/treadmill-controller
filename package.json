@@ -1,0 +1,42 @@
+{
+  "name": "treadmill-controller",
+  "version": "1.0.0",
+  "description": "A modern web application to control your treadmill via Bluetooth FTMS and track your workouts. Fully responsive for desktop, tablet, and mobile.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "treadmill",
+    "ftms",
+    "bluetooth",
+    "web-bluetooth",
+    "fitness",
+    "workout",
+    "running",
+    "exercise",
+    "health",
+    "tracker"
+  ],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/[your-username]/treadmill-controller.git"
+  },
+  "bugs": {
+    "url": "https://github.com/[your-username]/treadmill-controller/issues"
+  },
+  "homepage": "https://github.com/[your-username]/treadmill-controller#readme",
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.6.2",
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "ws": "^8.19.0"
+  }
+}
