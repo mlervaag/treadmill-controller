@@ -10,9 +10,20 @@ services:
     environment:
       - NODE_ENV=production
       - DATABASE_PATH=/app/data/treadmill.db
-    restart: unless-stopped
+    # Change to "no" if you want manual control (save power)
+    # Use "unless-stopped" for 24/7 operation
+    restart: "no"
     networks:
       - treadmill-network
+    # Resource limits for Raspberry Pi
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
 
 networks:
   treadmill-network:
