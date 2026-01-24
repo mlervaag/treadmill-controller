@@ -1,12 +1,30 @@
 const express = require('express');
 const http = require('http');
+const https = require('https');
+const fs = require('fs');
 const WebSocket = require('ws');
 const path = require('path');
 const cors = require('cors');
 const Database = require('better-sqlite3');
 
 const app = express();
-const server = http.createServer(app);
+
+// Check if SSL certificates exist
+const useHTTPS = fs.existsSync('./certs/server.key') && fs.existsSync('./certs/server.crt');
+
+let server;
+if (useHTTPS) {
+    const httpsOptions = {
+        key: fs.readFileSync('./certs/server.key'),
+        cert: fs.readFileSync('./certs/server.crt')
+    };
+    server = https.createServer(httpsOptions, app);
+    console.log('🔒 HTTPS enabled');
+} else {
+    server = http.createServer(app);
+    console.log('⚠️  HTTP mode (HTTPS certificates not found)');
+}
+
 const wss = new WebSocket.Server({ server });
 
 // Middleware
@@ -592,6 +610,8 @@ const PORT = process.env.PORT || 3001;
 const HOST = process.env.HOST || '0.0.0.0';
 
 server.listen(PORT, HOST, () => {
-  console.log(`Server running on http://${HOST}:${PORT}`);
-  console.log(`WebSocket server running on ws://${HOST}:${PORT}`);
+  const protocol = useHTTPS ? 'https' : 'http';
+  const wsProtocol = useHTTPS ? 'wss' : 'ws';
+  console.log(`Server running on ${protocol}://${HOST}:${PORT}`);
+  console.log(`WebSocket server running on ${wsProtocol}://${HOST}:${PORT}`);
 });

@@ -9,6 +9,9 @@ node_modules/
 # Backups (contains personal workout data)
 backups/
 
+# SSL certificates
+certs/
+
 # Environment variables
 .env
 .env.local

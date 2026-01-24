@@ -7,6 +7,8 @@ services:
     volumes:
       # Persist database outside container
       - ./data:/app/data
+      # SSL certificates for HTTPS (optional)
+      - ./certs:/app/certs:ro
     environment:
       - NODE_ENV=production
       - DATABASE_PATH=/app/data/treadmill.db
