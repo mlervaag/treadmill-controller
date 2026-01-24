@@ -73,9 +73,39 @@ En moderne, fullstendig webapplikasjon for å kontrollere tredemøllen din via B
 
 ## 🚀 Installasjon
 
-### Oppsett på Raspberry Pi (Anbefalt for hjemmebruk)
+### Enkel installasjon (Anbefalt for de fleste)
 
-Dette oppsettet lar deg kjøre serveren på en Raspberry Pi, slik at du kan få tilgang fra flere enheter (PC, mobil, tablet) på hjemmenetverket ditt.
+Den raskeste måten å komme i gang:
+
+1. **Klon repositoryet**:
+```bash
+git clone https://github.com/mlervaag/treadmill-controller.git
+cd treadmill-controller
+```
+
+2. **Installer avhengigheter**:
+```bash
+npm install
+```
+
+3. **Start serveren**:
+```bash
+npm start
+```
+
+4. **Åpne i nettleser**:
+- Gå til `http://localhost:3001` i Chrome/Edge/Opera
+- Koble til tredemøllen via Bluetooth
+- Begynn å trene!
+
+**Det er alt!** Serveren kjører på din PC, og Web Bluetooth fungerer via localhost.
+
+### Avansert: Raspberry Pi deployment (Multi-enhet tilgang)
+
+Hvis du vil kjøre serveren på en Raspberry Pi og få tilgang fra flere enheter (PC, mobil, tablet) på hjemmenetverket:
+
+<details>
+<summary><strong>Vis Raspberry Pi installasjon</strong></summary>
 
 #### Forutsetninger
 - Raspberry Pi med Docker installert
@@ -116,31 +146,34 @@ cd treadmill-controller
 .\backup-database.ps1
 ```
 
-### Lokal installasjon (for utvikling)
+#### Fordeler med Raspberry Pi-oppsett
+- ✅ Multi-enhet tilgang (PC, mobil, tablet)
+- ✅ Sentralisert data - alle enheter ser samme historikk
+- ✅ Kan slå av/på serveren for å spare strøm
+- ✅ Automatisk backup-løsning
 
-```bash
-# Installer avhengigheter
-npm install
-
-# Start serveren
-npm start
-```
-
-Serveren kjører nå på **http://localhost:3001**
+</details>
 
 ## 🎯 Bruk
 
-### Første gang
-1. **Åpne appen**: Gå til `https://[PI-IP]:3001` i Chrome/Edge/Opera
-2. **Godta sertifikat**: Klikk "Advanced" → "Continue to [IP] (unsafe)" (kun første gang)
+### Lokal bruk (enklest)
+1. **Start serveren**: Kjør `npm start` i terminalen
+2. **Åpne appen**: Gå til `http://localhost:3001` i Chrome/Edge/Opera
 3. **Slå på tredemøllen**: Sørg for at Bluetooth er aktivert
 4. **Koble til**: Klikk "Koble til Tredemølle" og velg din tredemølle
-5. **Kjør!**: Du er klar til å trene!
+5. **Tren!**: Du er klar til å kjøre!
 
-### Multi-enhet tilgang
-- **Windows PC**: `https://192.168.1.12:3001` - Full Bluetooth-kontroll
-- **Android mobil/tablet**: `https://192.168.1.12:3001` - Full Bluetooth-kontroll
-- **iOS/iPad**: `https://192.168.1.12:3001` - Kun visning (ingen Bluetooth-støtte)
+### Raspberry Pi bruk (multi-enhet)
+Hvis du har satt opp Raspberry Pi-deployment:
+
+1. **Første gang**:
+   - Åpne `https://[PI-IP]:3001` i Chrome/Edge/Opera
+   - Godta sertifikatadvarsel (klikk "Advanced" → "Continue")
+
+2. **Multi-enhet tilgang**:
+   - **Windows PC**: `https://192.168.1.12:3001` - Full Bluetooth-kontroll
+   - **Android mobil/tablet**: `https://192.168.1.12:3001` - Full Bluetooth-kontroll
+   - **iOS/iPad**: `https://192.168.1.12:3001` - Kun visning (ingen Bluetooth-støtte)
 
 ### Visningsmoduser
 - **🎯 Fokus**: Store tall for hastighet og tid - perfekt under trening
@@ -285,8 +318,8 @@ distance_km, heart_rate
 - ❌ Safari støtter ikke Web Bluetooth (bruk Chrome/Edge/Opera)
 - ❌ Firefox støtter ikke Web Bluetooth
 - ❌ iOS støtter ikke Web Bluetooth (bruk Android eller desktop)
-- ✅ Sørg for at du bruker HTTPS (kjør `.\enable-https.ps1` hvis ikke aktivert)
-- ✅ Godta self-signed sertifikat i nettleseren (klikk "Advanced" → "Continue")
+- ✅ **Lokal bruk**: Bruk `http://localhost:3001` (ikke IP-adresse)
+- ✅ **Raspberry Pi**: Bruk HTTPS (`.\enable-https.ps1` hvis ikke aktivert) og godta sertifikatadvarsel
 - ✅ Sjekk Bluetooth-tillatelser i nettleseren
 
 ### Port 3001 er opptatt
