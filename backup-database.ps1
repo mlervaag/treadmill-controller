@@ -4,7 +4,7 @@ $BACKUP_DIR = ".\backups"
 $TIMESTAMP = Get-Date -Format "yyyy-MM-dd_HHmm"
 $BACKUP_FILE = "$BACKUP_DIR\treadmill-backup-$TIMESTAMP.db"
 
-Write-Host "💾 Backing up Treadmill Database..." -ForegroundColor Cyan
+Write-Host "Backing up Treadmill Database..." -ForegroundColor Cyan
 
 # Create backup directory if it doesn't exist
 if (-not (Test-Path $BACKUP_DIR)) {
@@ -18,11 +18,11 @@ scp pi@${PI_HOST}:/home/pi/treadmill-controller/data/treadmill.db $BACKUP_FILE
 if ($LASTEXITCODE -eq 0) {
     $fileSize = (Get-Item $BACKUP_FILE).Length / 1KB
     Write-Host ""
-    Write-Host "✅ Backup completed successfully!" -ForegroundColor Green
-    Write-Host "📁 Saved to: $BACKUP_FILE" -ForegroundColor Cyan
-    Write-Host "📊 Size: $([math]::Round($fileSize, 2)) KB" -ForegroundColor Gray
+    Write-Host "Backup completed successfully!" -ForegroundColor Green
+    Write-Host "Saved to: $BACKUP_FILE" -ForegroundColor Cyan
+    Write-Host "Size: $([math]::Round($fileSize, 2)) KB" -ForegroundColor Gray
     Write-Host ""
-    Write-Host "💡 Tip: Keep backups before major updates or monthly" -ForegroundColor Gray
+    Write-Host "Tip: Keep backups before major updates or monthly" -ForegroundColor Gray
 
     # List recent backups
     Write-Host ""
@@ -35,6 +35,6 @@ if ($LASTEXITCODE -eq 0) {
             Write-Host "  $($_.Name) - $size KB - $($_.LastWriteTime)" -ForegroundColor Gray
         }
 } else {
-    Write-Host "❌ Backup failed!" -ForegroundColor Red
+    Write-Host "Backup failed!" -ForegroundColor Red
     Write-Host "Check that the Raspberry Pi is accessible" -ForegroundColor Red
 }
