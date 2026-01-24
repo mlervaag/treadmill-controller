@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  treadmill-controller:
+    build: .
+    container_name: treadmill-controller
+    ports:
+      - "3001:3001"
+    volumes:
+      # Persist database outside container
+      - ./data:/app/data
+    environment:
+      - NODE_ENV=production
+      - DATABASE_PATH=/app/data/treadmill.db
+    restart: unless-stopped
+    networks:
+      - treadmill-network
+
+networks:
+  treadmill-network:
+    driver: bridge
