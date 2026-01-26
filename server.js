@@ -314,6 +314,35 @@ app.post('/api/sessions/:id/data', (req, res) => {
 });
 
 // Get detailed session data
+// Get session stats calculated from data points
+app.get('/api/sessions/:id/stats', (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id) || id <= 0) {
+      return res.status(400).json({ error: 'Ugyldig ID' });
+    }
+
+    // Calculate stats from actual data points
+    const stats = db.prepare(`
+      SELECT
+        MAX(distance_km) as max_distance,
+        COUNT(*) as total_seconds,
+        AVG(CASE WHEN heart_rate > 0 AND heart_rate < 255 THEN heart_rate ELSE NULL END) as avg_heart_rate
+      FROM session_data
+      WHERE session_id = ?
+    `).get(id);
+
+    res.json({
+      max_distance: stats.max_distance || 0,
+      total_seconds: stats.total_seconds || 0,
+      avg_heart_rate: stats.avg_heart_rate ? Math.round(stats.avg_heart_rate) : null
+    });
+  } catch (error) {
+    console.error('Error calculating session stats:', error);
+    res.status(500).json({ error: 'Kunne ikke beregne øktstatistikk' });
+  }
+});
+
 app.get('/api/sessions/:id/details', (req, res) => {
   try {
     const id = parseInt(req.params.id);

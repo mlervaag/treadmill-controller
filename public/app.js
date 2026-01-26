@@ -1094,16 +1094,21 @@ async function endSession() {
     if (!currentSession) return;
 
     try {
-        const avgHR = sessionData.heartRates.length > 0
+        // Get actual data from server (calculated from all datapunkter)
+        const statsResponse = await fetch(`/api/sessions/${currentSession}/stats`);
+        const stats = await statsResponse.json();
+
+        // Use server-calculated avg HR if available, otherwise use client-side calculation
+        const avgHR = stats.avg_heart_rate || (sessionData.heartRates.length > 0
             ? Math.round(sessionData.heartRates.reduce((a, b) => a + b, 0) / sessionData.heartRates.length)
-            : null;
+            : null);
 
         await fetch(`/api/sessions/${currentSession}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                total_distance_km: sessionData.distance,
-                total_time_seconds: sessionData.time,
+                total_distance_km: stats.max_distance || sessionData.distance,
+                total_time_seconds: stats.total_seconds || sessionData.time,
                 avg_heart_rate: avgHR,
                 calories_burned: sessionData.calories
             })
