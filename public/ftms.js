@@ -178,8 +178,10 @@ class TreadmillController {
     }
 
     // Total Energy (if present in extended flags)
+    // FTMS spec: Energy is in calories, not kilocalories
     if ((flags & 0x100) && offset < value.byteLength) {
-      data.total_energy_kcal = value.getUint16(offset, true);
+      const energyCalories = value.getUint16(offset, true);
+      data.total_energy_kcal = energyCalories / 1000; // Convert cal to kcal
       offset += 2;
       // Energy per hour
       if (offset < value.byteLength) {

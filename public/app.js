@@ -212,9 +212,10 @@ function updateStats(data) {
         }
     }
     if (data.total_energy_kcal !== undefined) {
-        document.getElementById('currentCalories').textContent = data.total_energy_kcal;
-        document.getElementById('focusCalories').textContent = data.total_energy_kcal + ' kcal';
-        sessionData.calories = data.total_energy_kcal;
+        const kcal = Math.round(data.total_energy_kcal);
+        document.getElementById('currentCalories').textContent = kcal + ' kcal';
+        document.getElementById('focusCalories').textContent = kcal + ' kcal';
+        sessionData.calories = Math.round(data.total_energy_kcal);
     }
     if (data.power_watts !== undefined) {
         document.getElementById('currentPower').textContent = data.power_watts;
