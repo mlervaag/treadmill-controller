@@ -79,6 +79,7 @@ db.exec(`
     incline_percent REAL,
     distance_km REAL,
     heart_rate INTEGER,
+    calories INTEGER,
     FOREIGN KEY (session_id) REFERENCES workout_sessions(id) ON DELETE CASCADE
   );
 `);
@@ -293,18 +294,19 @@ app.post('/api/sessions/:id/data', (req, res) => {
       return res.status(400).json({ error: 'Ugyldig ID' });
     }
 
-    const { speed_kmh, incline_percent, distance_km, heart_rate } = req.body;
+    const { speed_kmh, incline_percent, distance_km, heart_rate, calories } = req.body;
 
     // Validate and sanitize
     const speed = parseFloat(speed_kmh) || 0;
     const incline = parseFloat(incline_percent) || 0;
     const distance = parseFloat(distance_km) || 0;
     const hr = heart_rate && !isNaN(parseInt(heart_rate)) ? parseInt(heart_rate) : null;
+    const cal = calories && !isNaN(parseInt(calories)) ? parseInt(calories) : null;
 
     db.prepare(`
-      INSERT INTO session_data (session_id, speed_kmh, incline_percent, distance_km, heart_rate)
-      VALUES (?, ?, ?, ?, ?)
-    `).run(id, Math.max(0, speed), Math.max(0, incline), Math.max(0, distance), hr);
+      INSERT INTO session_data (session_id, speed_kmh, incline_percent, distance_km, heart_rate, calories)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(id, Math.max(0, speed), Math.max(0, incline), Math.max(0, distance), hr, cal);
 
     res.json({ success: true });
   } catch (error) {
@@ -327,7 +329,8 @@ app.get('/api/sessions/:id/stats', (req, res) => {
       SELECT
         MAX(distance_km) as max_distance,
         COUNT(*) as total_seconds,
-        AVG(CASE WHEN heart_rate > 0 AND heart_rate < 255 THEN heart_rate ELSE NULL END) as avg_heart_rate
+        AVG(CASE WHEN heart_rate > 0 AND heart_rate < 255 THEN heart_rate ELSE NULL END) as avg_heart_rate,
+        MAX(calories) as max_calories
       FROM session_data
       WHERE session_id = ?
     `).get(id);
@@ -335,7 +338,8 @@ app.get('/api/sessions/:id/stats', (req, res) => {
     res.json({
       max_distance: stats.max_distance || 0,
       total_seconds: stats.total_seconds || 0,
-      avg_heart_rate: stats.avg_heart_rate ? Math.round(stats.avg_heart_rate) : null
+      avg_heart_rate: stats.avg_heart_rate ? Math.round(stats.avg_heart_rate) : null,
+      max_calories: stats.max_calories || 0
     });
   } catch (error) {
     console.error('Error calculating session stats:', error);

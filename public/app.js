@@ -293,6 +293,9 @@ function recordSessionData(data) {
     // Only record valid heart rate (not 0 or 255)
     const validHR = (data.heart_rate && data.heart_rate > 0 && data.heart_rate < 255) ? data.heart_rate : null;
 
+    // Only record calories if present and valid
+    const validCalories = (data.total_energy_kcal && data.total_energy_kcal > 0) ? Math.round(data.total_energy_kcal) : null;
+
     fetch(`/api/sessions/${currentSession}/data`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -300,7 +303,8 @@ function recordSessionData(data) {
             speed_kmh: data.speed_kmh,
             incline_percent: data.incline_percent,
             distance_km: data.total_distance_m ? data.total_distance_m / 1000 : null,
-            heart_rate: validHR
+            heart_rate: validHR,
+            calories: validCalories
         })
     }).catch(err => console.error('Failed to record session data:', err));
 }
@@ -1111,7 +1115,7 @@ async function endSession() {
                 total_distance_km: stats.max_distance || sessionData.distance,
                 total_time_seconds: stats.total_seconds || sessionData.time,
                 avg_heart_rate: avgHR,
-                calories_burned: sessionData.calories
+                calories_burned: stats.max_calories || sessionData.calories
             })
         });
 

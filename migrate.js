@@ -33,6 +33,16 @@ try {
     console.log('✓ Added segment_name column');
   }
 
+  // Check session_data table
+  const sessionDataInfo = db.prepare("PRAGMA table_info(session_data)").all();
+  const hasCalories = sessionDataInfo.some(col => col.name === 'calories');
+
+  if (!hasCalories) {
+    console.log('Adding calories column to session_data table...');
+    db.exec(`ALTER TABLE session_data ADD COLUMN calories INTEGER`);
+    console.log('✓ Added calories column');
+  }
+
   console.log('\n✅ Database migration completed successfully!');
   console.log('You can now restart the server.');
 
