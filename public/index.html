@@ -181,7 +181,20 @@
                     <select id="workoutSelect">
                         <option value="">Manuell kontroll</option>
                     </select>
-                    <button class="btn btn-primary" onclick="startWorkout()">Start Økt</button>
+                    <button class="btn btn-primary" onclick="startWorkout()">Last Økt til Kontroll</button>
+                </div>
+
+                <!-- Loaded Workout Card -->
+                <div id="loadedWorkoutCard" class="loaded-workout-card hidden">
+                    <div class="loaded-workout-header">
+                        <h3>📋 Lastet Økt</h3>
+                    </div>
+                    <div class="loaded-workout-info">
+                        <strong id="loadedWorkoutName"></strong>
+                        <p id="loadedWorkoutInfo"></p>
+                    </div>
+                    <button id="startLoadedWorkoutBtn" class="btn btn-success" onclick="startLoadedWorkout()">▶ Start Lastet Økt</button>
+                    <p class="loaded-workout-tip">💡 Eller trykk Start på tredemøllen</p>
                 </div>
 
                 <div id="workoutProgress" class="workout-progress hidden">
@@ -275,23 +288,18 @@
                     <button class="btn btn-primary" onclick="showCreateWorkout()">+ Ny Økt</button>
                 </div>
 
-                <!-- Filter Section -->
+                <!-- Filter Section (Always Visible) -->
                 <div class="filter-section">
-                    <button class="btn-toggle-filter" onclick="toggleFilter()">
-                        <span class="icon">🔍</span> Filtrer treningsøkter
-                        <span class="filter-indicator hidden" id="filterIndicator">(Aktiv)</span>
-                    </button>
-
-                    <div id="filterMenu" class="filter-menu hidden">
+                    <div id="filterMenu" class="filter-menu">
                         <div class="filter-group">
                             <h4>Nivå</h4>
                             <div class="filter-tags">
                                 <label><input type="checkbox" class="filter-difficulty" value="beginner"
-                                        onchange="applyFilters()"> Nybegynner</label>
+                                        onchange="applyFilters()"> <span>Nybegynner</span></label>
                                 <label><input type="checkbox" class="filter-difficulty" value="intermediate"
-                                        onchange="applyFilters()"> Middels</label>
+                                        onchange="applyFilters()"> <span>Middels</span></label>
                                 <label><input type="checkbox" class="filter-difficulty" value="advanced"
-                                        onchange="applyFilters()"> Avansert</label>
+                                        onchange="applyFilters()"> <span>Avansert</span></label>
                             </div>
                         </div>
 
@@ -303,7 +311,7 @@
                         </div>
 
                         <div class="filter-group">
-                            <h4>Maks Varighet: <span id="durationValue">Altf</span> min</h4>
+                            <h4>Maks Varighet: <span id="durationValue">Alt</span> min</h4>
                             <input type="range" id="filterDuration" min="10" max="120" step="5" value="120"
                                 oninput="updateDurationLabel(); applyFilters()">
                         </div>

@@ -2,6 +2,7 @@
 let treadmill = null;
 let currentSession = null;
 let currentWorkout = null;
+let loadedWorkout = null; // Workout loaded but not started
 let workoutTimer = null;
 let currentSegmentIndex = 0;
 let segmentTimeRemaining = 0;
@@ -28,6 +29,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadWorkouts();
     loadSessions();
     loadOverallStats();
+    updateLoadedWorkoutUI(); // Initialize loaded workout UI
 
     // Check if Web Bluetooth is supported
     checkBluetoothSupport();
@@ -750,7 +752,7 @@ function createWorkoutCard(workout, isTemplate) {
             <div class="workout-segments-preview" id="segmentsPreview${workout.id}"></div>
         </div>
         <div class="workout-actions">
-            <button class="btn btn-primary" onclick="selectWorkout(${workout.id})">Start</button>
+            <button class="btn btn-primary" onclick="loadWorkoutFromCard(${workout.id})">Last økt</button>
             ${!isTemplate ? `<button class="btn btn-danger" onclick="deleteWorkout(${workout.id})">Slett</button>` : ''}
         </div>
     `;
@@ -1067,10 +1069,49 @@ async function selectWorkout(id) {
     document.getElementById('workoutSelect').value = id;
 }
 
+async function loadWorkoutFromCard(id) {
+    try {
+        const response = await fetch(`/api/workouts/${id}`);
+        loadedWorkout = await response.json();
+
+        // Switch to control tab
+        document.querySelector('.tab-btn[data-tab="control"]').click();
+
+        // Update loaded workout UI
+        updateLoadedWorkoutUI();
+
+        alert(`✅ "${loadedWorkout.name}" er lastet og klar!\n\nTrykk "Start Lastet Økt" i portalen, eller trykk Start på tredemøllen.`);
+    } catch (error) {
+        alert('Kunne ikke laste økt: ' + error.message);
+    }
+}
+
 async function startWorkout() {
     const workoutId = document.getElementById('workoutSelect').value;
     if (!workoutId) {
         alert('Velg en treningsøkt først');
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/workouts/${workoutId}`);
+        loadedWorkout = await response.json();
+
+        // Switch to control tab
+        document.querySelector('.tab-btn[data-tab="control"]').click();
+
+        // Update loaded workout UI
+        updateLoadedWorkoutUI();
+
+        alert(`✅ "${loadedWorkout.name}" er klar!\n\nTrykk "Start Lastet Økt" i portalen, eller trykk Start på tredemøllen.`);
+    } catch (error) {
+        alert('Kunne ikke laste økt: ' + error.message);
+    }
+}
+
+async function startLoadedWorkout() {
+    if (!loadedWorkout) {
+        alert('Ingen økt er lastet. Gå til Treningsøkter og velg en økt først.');
         return;
     }
 
@@ -1080,9 +1121,7 @@ async function startWorkout() {
     }
 
     try {
-        const response = await fetch(`/api/workouts/${workoutId}`);
-        currentWorkout = await response.json();
-
+        currentWorkout = loadedWorkout;
         currentSegmentIndex = 0;
 
         // Show workout progress panel
@@ -1093,10 +1132,35 @@ async function startWorkout() {
         // Build timeline
         buildWorkoutTimeline();
 
-        await startSession(workoutId);
+        await startSession(loadedWorkout.id);
         await executeSegment(0);
+
+        // Clear loaded workout UI
+        loadedWorkout = null;
+        updateLoadedWorkoutUI();
     } catch (error) {
         alert('Kunne ikke starte økt: ' + error.message);
+    }
+}
+
+function updateLoadedWorkoutUI() {
+    const loadedWorkoutCard = document.getElementById('loadedWorkoutCard');
+    const startLoadedBtn = document.getElementById('startLoadedWorkoutBtn');
+    const loadedWorkoutName = document.getElementById('loadedWorkoutName');
+    const loadedWorkoutInfo = document.getElementById('loadedWorkoutInfo');
+
+    if (loadedWorkout) {
+        loadedWorkoutCard.classList.remove('hidden');
+        loadedWorkoutName.textContent = loadedWorkout.name;
+
+        const totalDuration = loadedWorkout.segments.reduce((sum, seg) => sum + seg.duration_seconds, 0);
+        const minutes = Math.floor(totalDuration / 60);
+        loadedWorkoutInfo.textContent = `${loadedWorkout.segments.length} segmenter • ${minutes} min`;
+
+        startLoadedBtn.disabled = false;
+    } else {
+        loadedWorkoutCard.classList.add('hidden');
+        startLoadedBtn.disabled = true;
     }
 }
 
@@ -1272,8 +1336,13 @@ async function endSession() {
 function handleTreadmillStatus(status, code) {
     // 0x04 = Started - treadmill has started running
     if (code === 0x04) {
-        // Auto-start a manual session if no session is active
-        if (!currentSession) {
+        // Priority 1: If a workout is loaded but not started, start it
+        if (loadedWorkout && !currentSession) {
+            console.log('Treadmill started - auto-starting loaded workout');
+            startLoadedWorkout();
+        }
+        // Priority 2: If no workout is loaded, start a manual session
+        else if (!currentSession) {
             console.log('Treadmill started - auto-starting manual session');
             startSession(); // No workoutId = manual session
         }

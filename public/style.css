@@ -629,6 +629,54 @@ h1 {
     border-color: var(--primary-color);
 }
 
+.loaded-workout-card {
+    margin-top: 24px;
+    padding: 20px;
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, rgba(16, 185, 129, 0.05) 100%);
+    border-radius: 16px;
+    border: 2px solid rgba(34, 197, 94, 0.3);
+    animation: slideDown 0.3s ease;
+}
+
+.loaded-workout-header h3 {
+    margin: 0 0 12px 0;
+    font-size: 16px;
+    color: var(--text-primary);
+}
+
+.loaded-workout-info {
+    margin-bottom: 16px;
+}
+
+.loaded-workout-info strong {
+    display: block;
+    font-size: 18px;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+
+.loaded-workout-info p {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+
+.loaded-workout-card .btn-success {
+    width: 100%;
+    padding: 14px;
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+.loaded-workout-tip {
+    text-align: center;
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin: 0;
+    font-style: italic;
+}
+
 .workout-progress {
     margin-top: 24px;
     padding: 24px;
@@ -2714,4 +2762,174 @@ html {
     .session-card {
         break-inside: avoid;
     }
+}
+
+/* Modern Filter Section */
+.filter-section {
+    background: var(--card-bg);
+    border-bottom: 1px solid var(--border-color);
+    padding: 20px 0;
+    margin-bottom: 24px;
+}
+
+.filter-menu {
+    display: flex !important; /* Force visible */
+    flex-wrap: wrap;
+    gap: 24px;
+    align-items: start;
+}
+
+.filter-group {
+    flex: 1;
+    min-width: 200px;
+}
+
+.filter-group h4 {
+    font-size: 13px;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+/* Chip Checkboxes (Level & Tags) */
+.filter-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.filter-tags label {
+    cursor: pointer;
+    user-select: none;
+    margin: 0; 
+}
+
+/* Hide actual checkbox */
+.filter-tags input[type="checkbox"] {
+    display: none;
+}
+
+/* The visual chip */
+.filter-tags span, 
+.filter-tags input[type="checkbox"] + span { /* Fallback selector if span is sibling */
+    display: inline-block;
+    padding: 8px 16px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-color);
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.filter-tags input[type="checkbox"]:checked + span {
+    background: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+    box-shadow: 0 4px 12px rgba(0, 122, 255, 0.3);
+    transform: translateY(-1px);
+}
+
+.filter-tags input[type="checkbox"]:hover + span {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: var(--text-secondary);
+}
+
+.filter-tags input[type="checkbox"]:checked:hover + span {
+    background: var(--primary-hover);
+    border-color: var(--primary-hover);
+}
+
+/* Range Slider Styling */
+input[type=range] {
+    -webkit-appearance: none;
+    width: 100%;
+    background: transparent;
+    padding: 8px 0;
+}
+
+input[type=range]:focus {
+    outline: none;
+}
+
+/* Track */
+input[type=range]::-webkit-slider-runnable-track {
+    width: 100%;
+    height: 6px;
+    cursor: pointer;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+}
+
+input[type=range]::-moz-range-track {
+    width: 100%;
+    height: 6px;
+    cursor: pointer;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+}
+
+/* Thumb */
+input[type=range]::-webkit-slider-thumb {
+    height: 20px;
+    width: 20px;
+    border-radius: 50%;
+    background: var(--primary-color);
+    cursor: pointer;
+    -webkit-appearance: none;
+    margin-top: -7px; /* center on track */
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    transition: transform 0.1s;
+}
+
+input[type=range]::-moz-range-thumb {
+    height: 20px;
+    width: 20px;
+    border: none;
+    border-radius: 50%;
+    background: var(--primary-color);
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    transition: transform 0.1s;
+}
+
+input[type=range]::-webkit-slider-thumb:hover {
+    transform: scale(1.1);
+}
+
+input[type=range]::-moz-range-thumb:hover {
+    transform: scale(1.1);
+}
+
+/* Tag Badges in Cards */
+.workout-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+
+.tag-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    background: rgba(255, 255, 255, 0.05); /* Subtle dark bg */
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    text-transform: capitalize;
+}
+
+/* Filter Actions */
+.filter-actions {
+    display: flex;
+    justify-content: flex-end;
+    width: 100%;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border-color);
 }
