@@ -16,6 +16,7 @@ RUN npm ci --only=production
 # Copy application files
 COPY server.js .
 COPY migrate.js .
+COPY templates.json .
 COPY public ./public
 
 # Create directory for database with proper permissions

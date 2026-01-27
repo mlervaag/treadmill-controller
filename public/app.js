@@ -64,8 +64,8 @@ function checkBluetoothSupport() {
                 <p>Du har åpnet appen via IP-adresse (${window.location.host}), som ikke støtter Web Bluetooth.</p>
                 <h4>Løsning:</h4>
                 <ol style="text-align: left; margin-bottom: 0;">
-                    <li>Kjør <code>setup-localhost-tunnel.ps1</code> på denne PCen</li>
-                    <li>Åpne <code>http://localhost:3001</code> i stedet</li>
+                    <li>Sørg for at du bruker <strong>HTTPS</strong> hvis du ikke er på localhost.</li>
+                    <li>Sjekk dokumentasjonen for hvordan aktivere HTTPS (sertifikater).</li>
                 </ol>
                 <p style="margin-bottom: 0;"><small>Se README.md for detaljer</small></p>
             `;

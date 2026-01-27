@@ -24,6 +24,7 @@ En moderne, fullstendig webapplikasjon for å kontrollere tredemøllen din via B
 - **Egendefinerte økter**: Lag dine egne treningsøkter med flere segmenter
 - **Automatisk kjøring**: Start forhåndsdefinerte økter som kjører automatisk
 - **Segment-støtte**: Hvert segment med egen varighet, hastighet og stigning
+- **Filtrering & Tags**: Finn økter raskt basert på type (intervall, langkjøring), varighet og vanskelighetsgrad
 
 ### 📊 Historikk & Statistikk
 - **Tre visninger**: Oversikt, Økter, og Trender
@@ -224,6 +225,7 @@ Machine Status:       00002ada-0000-1000-8000-00805f9b34fb
 treadmill-controller/
 ├── server.js                  # Express server med HTTPS, WebSocket og API
 ├── package.json               # npm konfigurasjon og dependencies
+├── templates.json             # Definisjon av standard treningsøkter og tags
 ├── Dockerfile                 # Docker container build
 ├── docker-compose.yml         # Docker Compose konfigurasjon
 ├── .gitignore                 # Git ignore-fil
@@ -256,7 +258,7 @@ treadmill-controller/
 ### `workouts`
 Lagrer treningsøkter (både maler og egendefinerte)
 ```sql
-id, name, description, difficulty, is_template, created_at
+id, name, description, difficulty, is_template, tags, created_at
 ```
 
 ### `workout_segments`
