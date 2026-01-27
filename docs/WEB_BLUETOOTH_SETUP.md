@@ -7,7 +7,7 @@ Web Bluetooth API (som brukes for å koble til tredemølle) fungerer **kun** med
 - `http://localhost` eller `http://127.0.0.1`
 
 Den fungerer **IKKE** med:
-- ❌ `http://192.168.1.12:3001` (IP-adresse over HTTP)
+- ❌ `http://[YOUR_PI_IP]:3001` (IP-adresse over HTTP)
 - ❌ `http://raspberrypi.local:3001` (hostname over HTTP)
 
 ---
@@ -25,14 +25,14 @@ På din Windows PC, kjør:
 Dette skriptet:
 - Lager et self-signed SSL-sertifikat på Raspberry Pi
 - Restarter serveren med HTTPS aktivert
-- Sertifikatet er gyldig for `192.168.1.12`, `127.0.0.1`, og `raspberrypi.local`
+- Sertifikatet er gyldig for `[YOUR_PI_IP]`, `127.0.0.1`, og `raspberrypi.local`
 
 ### Steg 2: Åpne Appen via HTTPS
 
 Åpne i nettleseren:
 
 ```
-https://192.168.1.12:3001
+https://[YOUR_PI_IP]:3001
 ```
 
 ### Steg 3: Godta Sertifikatadvarsel
@@ -41,7 +41,7 @@ Første gang du åpner appen vil du se en sikkerhetsadvarsel. Dette er normalt f
 
 **I Edge/Chrome:**
 1. Klikk "Advanced" eller "Avansert"
-2. Klikk "Continue to 192.168.1.12 (unsafe)" eller "Fortsett til 192.168.1.12 (usikkert)"
+2. Klikk "Continue to [YOUR_PI_IP] (unsafe)" eller "Fortsett til [YOUR_PI_IP] (usikkert)"
 3. Web Bluetooth vil nå fungere! 🎉
 
 **Hvorfor denne advarselen?**
@@ -61,7 +61,7 @@ Nå vil "Koble til Tredemølle"-knappen fungere uten feil!
 # Start server på Pi
 .\scripts\start-server.ps1
 
-# Åpne i browser: https://192.168.1.12:3001
+# Åpne i browser: https://[YOUR_PI_IP]:3001
 
 # Stopp server når ferdig (spar strøm)
 .\scripts\stop-server.ps1
@@ -74,16 +74,16 @@ Nå vil "Koble til Tredemølle"-knappen fungere uten feil!
 ### Windows PC
 ✅ Full støtte med HTTPS
 ```
-https://192.168.1.12:3001
+https://[YOUR_PI_IP]:3001
 ```
 
 ### Android Mobil/Tablet
 ✅ Full støtte med HTTPS
 ```
-https://192.168.1.12:3001
+https://[YOUR_PI_IP]:3001
 ```
 
-**Bonus:** Android Chrome støtter også Web Bluetooth over HTTP via IP-adresser, så du kan bruke `http://192.168.1.12:3001` hvis du foretrekker det.
+**Bonus:** Android Chrome støtter også Web Bluetooth over HTTP via IP-adresser, så du kan bruke `http://[YOUR_PI_IP]:3001` hvis du foretrekker det.
 
 ### iOS/iPad
 ❌ Fungerer ikke - iOS støtter ikke Web Bluetooth i det hele tatt.
@@ -102,21 +102,21 @@ Du kan fortsatt se historikk og statistikk, men ikke koble til tredemøllen.
 
 **Løsning:**
 1. Kjør `.\scripts\enable-https.ps1` for å aktivere HTTPS
-2. Åpne `https://192.168.1.12:3001` (ikke `http://`)
+2. Åpne `https://[YOUR_PI_IP]:3001` (ikke `http://`)
 3. Godta sertifikatadvarselen
 
 ### "Server kjører fortsatt på HTTP"
 
 **Sjekk at sertifikatene eksisterer:**
 ```powershell
-ssh pi@192.168.1.12 'ls -la ~/treadmill-controller/certs/'
+ssh pi@[YOUR_PI_IP] 'ls -la ~/treadmill-controller/certs/'
 ```
 
 Du skal se `server.key` og `server.crt`.
 
 **Sjekk server-logger:**
 ```powershell
-ssh pi@192.168.1.12 'cd ~/treadmill-controller && docker compose logs'
+ssh pi@[YOUR_PI_IP] 'cd ~/treadmill-controller && docker compose logs'
 ```
 
 Du skal se:
@@ -138,7 +138,7 @@ Self-signed sertifikater er gyldige i 365 dager. For å fornye:
 
 ```powershell
 # Slett gamle sertifikater
-ssh pi@192.168.1.12 'rm ~/treadmill-controller/certs/server.*'
+ssh pi@[YOUR_PI_IP] 'rm ~/treadmill-controller/certs/server.*'
 
 # Generer nye
 .\scripts\enable-https.ps1
@@ -150,8 +150,8 @@ ssh pi@192.168.1.12 'rm ~/treadmill-controller/certs/server.*'
 
 | Enhet | URL | Bluetooth | Sertifikatadvarsel? |
 |-------|-----|-----------|---------------------|
-| **Windows PC** | `https://192.168.1.12:3001` | ✅ | Ja (kun første gang) |
-| **Android** | `https://192.168.1.12:3001` | ✅ | Ja (kun første gang) |
-| **iOS/iPad** | `https://192.168.1.12:3001` | ❌ | Ja (kun første gang) |
+| **Windows PC** | `https://[YOUR_PI_IP]:3001` | ✅ | Ja (kun første gang) |
+| **Android** | `https://[YOUR_PI_IP]:3001` | ✅ | Ja (kun første gang) |
+| **iOS/iPad** | `https://[YOUR_PI_IP]:3001` | ❌ | Ja (kun første gang) |
 
 **Huskeregel:** HTTPS for alle enheter, godta sertifikat første gang! 🔒

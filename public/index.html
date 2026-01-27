@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="no">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
@@ -9,6 +10,7 @@
     <title>Tredemølle Kontroller</title>
     <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
     <div class="container">
         <header>
@@ -80,42 +82,42 @@
                 <!-- Overview Mode: All stats visible -->
                 <div id="overviewView" class="overview-view">
                     <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-label">Hastighet</div>
-                        <div class="stat-value" id="currentSpeed">0.0</div>
-                        <div class="stat-unit">km/t</div>
+                        <div class="stat-card">
+                            <div class="stat-label">Hastighet</div>
+                            <div class="stat-value" id="currentSpeed">0.0</div>
+                            <div class="stat-unit">km/t</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Stigning</div>
+                            <div class="stat-value" id="currentIncline">0.0</div>
+                            <div class="stat-unit">%</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Distanse</div>
+                            <div class="stat-value" id="currentDistance">0.0</div>
+                            <div class="stat-unit">km</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Tid</div>
+                            <div class="stat-value" id="currentTime">00:00</div>
+                            <div class="stat-unit">min</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Puls</div>
+                            <div class="stat-value" id="currentHR">--</div>
+                            <div class="stat-unit">bpm</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Kalorier</div>
+                            <div class="stat-value" id="currentCalories">0</div>
+                            <div class="stat-unit">kcal</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Effekt</div>
+                            <div class="stat-value" id="currentPower">0</div>
+                            <div class="stat-unit">W</div>
+                        </div>
                     </div>
-                    <div class="stat-card">
-                        <div class="stat-label">Stigning</div>
-                        <div class="stat-value" id="currentIncline">0.0</div>
-                        <div class="stat-unit">%</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-label">Distanse</div>
-                        <div class="stat-value" id="currentDistance">0.0</div>
-                        <div class="stat-unit">km</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-label">Tid</div>
-                        <div class="stat-value" id="currentTime">00:00</div>
-                        <div class="stat-unit">min</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-label">Puls</div>
-                        <div class="stat-value" id="currentHR">--</div>
-                        <div class="stat-unit">bpm</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-label">Kalorier</div>
-                        <div class="stat-value" id="currentCalories">0</div>
-                        <div class="stat-unit">kcal</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-label">Effekt</div>
-                        <div class="stat-value" id="currentPower">0</div>
-                        <div class="stat-unit">W</div>
-                    </div>
-                </div>
                 </div>
 
                 <!-- Minimal Mode: Just essentials -->
@@ -146,7 +148,8 @@
 
                 <div class="controls">
                     <div class="control-group">
-                        <label>Hastighet (km/t) <small style="color: var(--text-secondary);">• 0.1-14.0 km/t</small></label>
+                        <label>Hastighet (km/t) <small style="color: var(--text-secondary);">• 0.1-14.0
+                                km/t</small></label>
                         <div class="control-input">
                             <button class="btn-small" onclick="adjustSpeed(-0.1)">-</button>
                             <input type="number" id="speedInput" min="0.1" max="14.0" step="0.1" value="5.0">
@@ -205,7 +208,8 @@
                     <!-- Current Segment Info -->
                     <div class="current-segment-card">
                         <div class="segment-header">
-                            <h4>Nåværende segment <span class="segment-counter"><span id="currentSegment">1</span>/<span id="totalSegments">1</span></span></h4>
+                            <h4>Nåværende segment <span class="segment-counter"><span id="currentSegment">1</span>/<span
+                                        id="totalSegments">1</span></span></h4>
                         </div>
                         <div class="segment-stats">
                             <div class="segment-stat">
@@ -269,6 +273,45 @@
                 <div class="panel-header">
                     <h2>Treningsøkter</h2>
                     <button class="btn btn-primary" onclick="showCreateWorkout()">+ Ny Økt</button>
+                </div>
+
+                <!-- Filter Section -->
+                <div class="filter-section">
+                    <button class="btn-toggle-filter" onclick="toggleFilter()">
+                        <span class="icon">🔍</span> Filtrer treningsøkter
+                        <span class="filter-indicator hidden" id="filterIndicator">(Aktiv)</span>
+                    </button>
+
+                    <div id="filterMenu" class="filter-menu hidden">
+                        <div class="filter-group">
+                            <h4>Nivå</h4>
+                            <div class="filter-tags">
+                                <label><input type="checkbox" class="filter-difficulty" value="beginner"
+                                        onchange="applyFilters()"> Nybegynner</label>
+                                <label><input type="checkbox" class="filter-difficulty" value="intermediate"
+                                        onchange="applyFilters()"> Middels</label>
+                                <label><input type="checkbox" class="filter-difficulty" value="advanced"
+                                        onchange="applyFilters()"> Avansert</label>
+                            </div>
+                        </div>
+
+                        <div class="filter-group">
+                            <h4>Kategori</h4>
+                            <div class="filter-tags" id="tagFilters">
+                                <!-- Will be populated by JS -->
+                            </div>
+                        </div>
+
+                        <div class="filter-group">
+                            <h4>Maks Varighet: <span id="durationValue">Altf</span> min</h4>
+                            <input type="range" id="filterDuration" min="10" max="120" step="5" value="120"
+                                oninput="updateDurationLabel(); applyFilters()">
+                        </div>
+
+                        <div class="filter-actions">
+                            <button class="btn-small btn-secondary" onclick="resetFilters()">Nullstill</button>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Workouts List -->
@@ -347,9 +390,12 @@
                 <div class="history-header">
                     <h2>Treningshistorikk</h2>
                     <div class="history-view-toggle">
-                        <button class="toggle-btn active" data-view="overview" onclick="switchHistoryView('overview')">📊 Oversikt</button>
-                        <button class="toggle-btn" data-view="sessions" onclick="switchHistoryView('sessions')">📋 Økter</button>
-                        <button class="toggle-btn" data-view="trends" onclick="switchHistoryView('trends')">📈 Trender</button>
+                        <button class="toggle-btn active" data-view="overview"
+                            onclick="switchHistoryView('overview')">📊 Oversikt</button>
+                        <button class="toggle-btn" data-view="sessions" onclick="switchHistoryView('sessions')">📋
+                            Økter</button>
+                        <button class="toggle-btn" data-view="trends" onclick="switchHistoryView('trends')">📈
+                            Trender</button>
                     </div>
                 </div>
 
@@ -504,4 +550,5 @@
     <script src="ftms.js"></script>
     <script src="app.js"></script>
 </body>
+
 </html>

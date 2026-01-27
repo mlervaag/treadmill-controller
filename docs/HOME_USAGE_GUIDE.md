@@ -5,7 +5,7 @@
 Du har nå et **perfekt oppsett** for hjemmebruk med multi-enhet støtte!
 
 ### ✨ Ditt Oppsett
-- **Server**: Raspberry Pi (192.168.1.12) - alltid tilgjengelig på nettverket
+- **Server**: Raspberry Pi ([YOUR_PI_IP]) - alltid tilgjengelig på nettverket
 - **Frontend**: Windows PC, mobil, tablet - alle kan koble til samtidig
 - **Bluetooth**: Hver enhet kobler til tredemølle via sin egen Bluetooth
 - **Data**: Sentralisert på Pi - alle enheter ser samme data
@@ -26,9 +26,9 @@ Dette gjøres **kun én gang**. Skriptet:
 - Sertifikatet varer i 365 dager
 
 **Første gang du åpner appen:**
-1. Gå til `https://192.168.1.12:3001`
+1. Gå til `https://[YOUR_PI_IP]:3001`
 2. Du får en sikkerhetsadvarsel (normalt for self-signed sertifikater)
-3. Klikk "Advanced" → "Continue to 192.168.1.12 (unsafe)"
+3. Klikk "Advanced" → "Continue to [YOUR_PI_IP] (unsafe)"
 4. Du slipper å gjøre dette igjen!
 
 ---
@@ -40,9 +40,9 @@ Dette gjøres **kun én gang**. Skriptet:
 .\scripts\start-server.ps1
 ```
 Serveren starter på ca 3 sekunder. Åpne deretter:
-- **Windows**: https://192.168.1.12:3001 i Chrome/Edge
-- **Mobil**: https://192.168.1.12:3001 i Chrome (Android)
-- **Tablet**: https://192.168.1.12:3001 i Chrome/Safari
+- **Windows**: https://[YOUR_PI_IP]:3001 i Chrome/Edge
+- **Mobil**: https://[YOUR_PI_IP]:3001 i Chrome (Android)
+- **Tablet**: https://[YOUR_PI_IP]:3001 i Chrome/Safari
 
 **Første gang:** Godta sertifikatadvarsel ("Advanced" → "Continue")
 
@@ -81,7 +81,7 @@ Serveren starter på ca 3 sekunder. Åpne deretter:
 # 1. Start server
 .\scripts\start-server.ps1
 
-# 2. Åpne https://192.168.1.12:3001 i browser
+# 2. Åpne https://[YOUR_PI_IP]:3001 i browser
 # 3. Koble til tredemølle
 # 4. Tren!
 
@@ -118,7 +118,7 @@ Deretter:
 1. **Ta backup**: `.\scripts\backup-database.ps1`
 2. **Sjekk diskplass** på Pi:
    ```powershell
-   ssh pi@192.168.1.12 'df -h'
+   ssh [YOUR_USER]@[YOUR_PI_IP] 'df -h'
    ```
 
 ### Ved Oppdateringer
@@ -194,11 +194,11 @@ Deretter:
 3. Navn: "Start Tredemølle Server"
 
 ### Legg til Favorites i Browser
-Lagre https://192.168.1.12:3001 som bookmark for rask tilgang
+Lagre https://[YOUR_PI_IP]:3001 som bookmark for rask tilgang
 
 ### Sjekk Server Status
 ```powershell
-ssh pi@192.168.1.12 'docker ps'
+ssh [YOUR_USER]@[YOUR_PI_IP] 'docker ps'
 ```
 
 ---
@@ -232,7 +232,7 @@ Vurder **oppgradering** kun hvis:
 
 ### Daglig Bruk:
 1. `.\scripts\start-server.ps1`
-2. Tren på https://192.168.1.12:3001
+2. Tren på https://[YOUR_PI_IP]:3001
 3. `.\scripts\stop-server.ps1`
 
 **Det er alt!** 🎉

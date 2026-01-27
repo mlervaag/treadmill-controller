@@ -1,7 +1,23 @@
 # Configuration
-$PI_USER = "pi"
-$PI_HOST = "192.168.1.12"
-$APP_DIR = "/home/pi/treadmill-controller"
+$EnvPath = Join-Path $PSScriptRoot "..\.env.local"
+if (Test-Path $EnvPath) {
+    Get-Content $EnvPath | ForEach-Object {
+        if ($_ -match '^\s*([^#=]+)\s*=\s*(.*)$') {
+            Set-Variable -Name $matches[1] -Value $matches[2] -Scope Script
+        }
+    }
+}
+
+if (-not $PI_HOST) {
+    $PI_HOST = Read-Host "Enter Raspberry Pi IP address/Hostname (e.g. 192.168.1.12)"
+}
+if (-not $PI_USER) {
+    $PI_USER = Read-Host "Enter Raspberry Pi Username (default: pi)"
+    if (-not $PI_USER) { $PI_USER = "pi" }
+}
+if (-not $APP_DIR) {
+    $APP_DIR = "/home/$PI_USER/treadmill-controller"
+}
 
 Write-Host "🚀 Deploying Treadmill Controller to Raspberry Pi..." -ForegroundColor Cyan
 
@@ -11,7 +27,8 @@ try {
     ssh -o ConnectTimeout=5 "${PI_USER}@${PI_HOST}" "echo 'SSH connection successful!'"
     if ($LASTEXITCODE -ne 0) { throw "SSH failed" }
     Write-Host "✅ SSH connection successful!" -ForegroundColor Green
-} catch {
+}
+catch {
     Write-Host "❌ Cannot connect to Raspberry Pi. Please check:" -ForegroundColor Red
     Write-Host "  - IP address is correct ($PI_HOST)" -ForegroundColor Red
     Write-Host "  - SSH is enabled on Pi" -ForegroundColor Red
@@ -35,7 +52,8 @@ $filesToCopy = @(
     "migrate.js",
     "Dockerfile",
     "docker-compose.yml",
-    ".dockerignore"
+    ".dockerignore",
+    "templates.json"
 )
 
 foreach ($file in $filesToCopy) {

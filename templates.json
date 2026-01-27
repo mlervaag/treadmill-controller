@@ -1,0 +1,2940 @@
+[
+    {
+        "name": "Couch to 5K - Uke 1",
+        "description": "Trygg start for absolutte nybegynnere. Veksler mellom gange og lett jogg med god margin.",
+        "difficulty": "beginner",
+        "tags": [
+            "interval",
+            "walk-run",
+            "endurance",
+            "medium"
+        ],
+        "segments": [
+            {
+                "name": "Oppvarming",
+                "duration": 300,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Jogg 1",
+                "duration": 60,
+                "speed": 9.0,
+                "incline": 0
+            },
+            {
+                "name": "Gange 1",
+                "duration": 90,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Jogg 2",
+                "duration": 60,
+                "speed": 9.0,
+                "incline": 0
+            },
+            {
+                "name": "Gange 2",
+                "duration": 90,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Jogg 3",
+                "duration": 60,
+                "speed": 9.0,
+                "incline": 0
+            },
+            {
+                "name": "Gange 3",
+                "duration": 90,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Jogg 4",
+                "duration": 60,
+                "speed": 9.0,
+                "incline": 0
+            },
+            {
+                "name": "Gange 4",
+                "duration": 90,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Jogg 5",
+                "duration": 60,
+                "speed": 9.0,
+                "incline": 0
+            },
+            {
+                "name": "Nedkjøling",
+                "duration": 300,
+                "speed": 5.0,
+                "incline": 0
+            }
+        ]
+    },
+    {
+        "name": "Steady State - Rolig Langkjøring 25",
+        "description": "Sammenhengende rolig jogg i pratetempo. Bygger base og gir høy kvalitet uten å bli tung.",
+        "difficulty": "beginner",
+        "tags": [
+            "long",
+            "run-only",
+            "endurance",
+            "medium"
+        ],
+        "segments": [
+            {
+                "name": "Oppvarming",
+                "duration": 300,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Rolig jogg",
+                "duration": 1200,
+                "speed": 9.5,
+                "incline": 0
+            },
+            {
+                "name": "Nedkjøling",
+                "duration": 300,
+                "speed": 5.0,
+                "incline": 0
+            }
+        ]
+    },
+    {
+        "name": "Steady State - Rolig Langkjøring 40",
+        "description": "Forlengelse av baseøkt for mer utholdenhet. Hold samme lette pust hele veien.",
+        "difficulty": "beginner",
+        "tags": [
+            "long",
+            "run-only",
+            "endurance"
+        ],
+        "segments": [
+            {
+                "name": "Oppvarming",
+                "duration": 300,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Rolig jogg",
+                "duration": 2100,
+                "speed": 9.5,
+                "incline": 0
+            },
+            {
+                "name": "Nedkjøling",
+                "duration": 300,
+                "speed": 5.0,
+                "incline": 0
+            }
+        ]
+    },
+    {
+        "name": "Restitusjon - Gange med Lett Stigning",
+        "description": "Aktiv restitusjon. Skånsom for ledd, men gir puls og arbeid i legg og sete.",
+        "difficulty": "beginner",
+        "tags": [
+            "recovery",
+            "incline",
+            "fatburn",
+            "walk-run",
+            "medium"
+        ],
+        "segments": [
+            {
+                "name": "Rolig gange",
+                "duration": 1800,
+                "speed": 5.9,
+                "incline": 3
+            }
+        ]
+    },
+    {
+        "name": "Hill Intro - Motbakke for Nybegynner",
+        "description": "Første motbakkeøkt. Kontroller tempo og hold korte steg.",
+        "difficulty": "beginner",
+        "tags": [
+            "hill",
+            "incline",
+            "strength",
+            "interval",
+            "medium"
+        ],
+        "segments": [
+            {
+                "name": "Oppvarming",
+                "duration": 300,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Motbakke 1",
+                "duration": 180,
+                "speed": 6.0,
+                "incline": 4
+            },
+            {
+                "name": "Flat rolig",
+                "duration": 120,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Motbakke 2",
+                "duration": 180,
+                "speed": 6.0,
+                "incline": 6
+            },
+            {
+                "name": "Flat rolig",
+                "duration": 120,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Motbakke 3",
+                "duration": 180,
+                "speed": 6.0,
+                "incline": 8
+            },
+            {
+                "name": "Nedkjøling",
+                "duration": 300,
+                "speed": 5.0,
+                "incline": 0
+            }
+        ]
+    },
+    {
+        "name": "Motbakke Stige 3-6-9-12",
+        "description": "Stigning øker trinnvis. Gå i motbakke, jogg flatt i pausene om ønskelig.",
+        "difficulty": "beginner",
+        "tags": [
+            "hill",
+            "incline",
+            "strength",
+            "progressive",
+            "medium"
+        ],
+        "segments": [
+            {
+                "name": "Oppvarming",
+                "duration": 300,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "3 %",
+                "duration": 180,
+                "speed": 6.0,
+                "incline": 3
+            },
+            {
+                "name": "Flat hvile",
+                "duration": 120,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "6 %",
+                "duration": 180,
+                "speed": 6.0,
+                "incline": 6
+            },
+            {
+                "name": "Flat hvile",
+                "duration": 120,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "9 %",
+                "duration": 180,
+                "speed": 5.8,
+                "incline": 9
+            },
+            {
+                "name": "Flat hvile",
+                "duration": 120,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "12 %",
+                "duration": 120,
+                "speed": 5.6,
+                "incline": 12
+            },
+            {
+                "name": "Nedkjøling",
+                "duration": 300,
+                "speed": 5.0,
+                "incline": 0
+            }
+        ]
+    },
+    {
+        "name": "Bygger 8x1 min",
+        "description": "8 drag med 1 min lett jogg og 1 min gange. Enkelt å gjennomføre og lett å skalere.",
+        "difficulty": "beginner",
+        "tags": [
+            "interval",
+            "walk-run",
+            "endurance",
+            "medium"
+        ],
+        "segments": [
+            {
+                "name": "Oppvarming",
+                "duration": 300,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Jogg 1",
+                "duration": 60,
+                "speed": 9.5,
+                "incline": 0
+            },
+            {
+                "name": "Gange 1",
+                "duration": 60,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Jogg 2",
+                "duration": 60,
+                "speed": 9.5,
+                "incline": 0
+            },
+            {
+                "name": "Gange 2",
+                "duration": 60,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Jogg 3",
+                "duration": 60,
+                "speed": 9.5,
+                "incline": 0
+            },
+            {
+                "name": "Gange 3",
+                "duration": 60,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Jogg 4",
+                "duration": 60,
+                "speed": 9.5,
+                "incline": 0
+            },
+            {
+                "name": "Gange 4",
+                "duration": 60,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Jogg 5",
+                "duration": 60,
+                "speed": 9.5,
+                "incline": 0
+            },
+            {
+                "name": "Gange 5",
+                "duration": 60,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Jogg 6",
+                "duration": 60,
+                "speed": 9.5,
+                "incline": 0
+            },
+            {
+                "name": "Gange 6",
+                "duration": 60,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Jogg 7",
+                "duration": 60,
+                "speed": 9.5,
+                "incline": 0
+            },
+            {
+                "name": "Gange 7",
+                "duration": 60,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Jogg 8",
+                "duration": 60,
+                "speed": 9.5,
+                "incline": 0
+            },
+            {
+                "name": "Gange 8",
+                "duration": 60,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Nedkjøling",
+                "duration": 300,
+                "speed": 5.0,
+                "incline": 0
+            }
+        ]
+    },
+    {
+        "name": "Korte Intervaller 10x1 min",
+        "description": "10 drag på 1 min med korte pauser. Fokus på jevn flyt, ikke maks.",
+        "difficulty": "beginner",
+        "tags": [
+            "interval",
+            "walk-run",
+            "speed",
+            "medium"
+        ],
+        "segments": [
+            {
+                "name": "Oppvarming",
+                "duration": 300,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 1",
+                "duration": 60,
+                "speed": 10.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause 1",
+                "duration": 30,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 2",
+                "duration": 60,
+                "speed": 10.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause 2",
+                "duration": 30,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 3",
+                "duration": 60,
+                "speed": 10.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause 3",
+                "duration": 30,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 4",
+                "duration": 60,
+                "speed": 10.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause 4",
+                "duration": 30,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 5",
+                "duration": 60,
+                "speed": 10.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause 5",
+                "duration": 30,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 6",
+                "duration": 60,
+                "speed": 10.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause 6",
+                "duration": 30,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 7",
+                "duration": 60,
+                "speed": 10.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause 7",
+                "duration": 30,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 8",
+                "duration": 60,
+                "speed": 10.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause 8",
+                "duration": 30,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 9",
+                "duration": 60,
+                "speed": 10.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause 9",
+                "duration": 30,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 10",
+                "duration": 60,
+                "speed": 10.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause 10",
+                "duration": 30,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Nedkjøling",
+                "duration": 300,
+                "speed": 5.0,
+                "incline": 0
+            }
+        ]
+    },
+    {
+        "name": "Standard Intervall 6x2",
+        "description": "Klassiske 2 minutters drag. God balanse mellom kvalitet og kontroll.",
+        "difficulty": "beginner",
+        "tags": [
+            "interval",
+            "walk-run",
+            "endurance",
+            "medium"
+        ],
+        "segments": [
+            {
+                "name": "Oppvarming",
+                "duration": 300,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 1",
+                "duration": 120,
+                "speed": 10.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause 1",
+                "duration": 60,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 2",
+                "duration": 120,
+                "speed": 10.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause 2",
+                "duration": 60,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 3",
+                "duration": 120,
+                "speed": 10.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause 3",
+                "duration": 60,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 4",
+                "duration": 120,
+                "speed": 10.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause 4",
+                "duration": 60,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 5",
+                "duration": 120,
+                "speed": 10.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause 5",
+                "duration": 60,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 6",
+                "duration": 120,
+                "speed": 10.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause 6",
+                "duration": 60,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Nedkjøling",
+                "duration": 300,
+                "speed": 5.0,
+                "incline": 0
+            }
+        ]
+    },
+    {
+        "name": "Standard Intervall 10x2",
+        "description": "10 drag på 2 min med 1 min pause. Klassisk, effektiv og lett å måle progresjon på.",
+        "difficulty": "beginner",
+        "tags": [
+            "interval",
+            "walk-run",
+            "endurance",
+            "medium"
+        ],
+        "segments": [
+            {
+                "name": "Oppvarming",
+                "duration": 300,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 1",
+                "duration": 120,
+                "speed": 10.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause 1",
+                "duration": 60,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 2",
+                "duration": 120,
+                "speed": 10.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause 2",
+                "duration": 60,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 3",
+                "duration": 120,
+                "speed": 10.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause 3",
+                "duration": 60,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 4",
+                "duration": 120,
+                "speed": 10.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause 4",
+                "duration": 60,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 5",
+                "duration": 120,
+                "speed": 10.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause 5",
+                "duration": 60,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 6",
+                "duration": 120,
+                "speed": 10.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause 6",
+                "duration": 60,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 7",
+                "duration": 120,
+                "speed": 10.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause 7",
+                "duration": 60,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 8",
+                "duration": 120,
+                "speed": 10.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause 8",
+                "duration": 60,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 9",
+                "duration": 120,
+                "speed": 10.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause 9",
+                "duration": 60,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 10",
+                "duration": 120,
+                "speed": 10.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause 10",
+                "duration": 60,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Nedjogg",
+                "duration": 300,
+                "speed": 5.2,
+                "incline": 0
+            }
+        ]
+    },
+    {
+        "name": "Standard Intervall 4x4",
+        "description": "4 drag på 4 min. Hold jevn, kontrollert fart som du kunne holdt litt lenger.",
+        "difficulty": "beginner",
+        "tags": [
+            "interval",
+            "walk-run",
+            "endurance",
+            "medium"
+        ],
+        "segments": [
+            {
+                "name": "Oppvarming",
+                "duration": 300,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 1",
+                "duration": 240,
+                "speed": 9.5,
+                "incline": 0
+            },
+            {
+                "name": "Pause 1",
+                "duration": 120,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 2",
+                "duration": 240,
+                "speed": 9.5,
+                "incline": 0
+            },
+            {
+                "name": "Pause 2",
+                "duration": 120,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 3",
+                "duration": 240,
+                "speed": 9.5,
+                "incline": 0
+            },
+            {
+                "name": "Pause 3",
+                "duration": 120,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 4",
+                "duration": 240,
+                "speed": 9.5,
+                "incline": 0
+            },
+            {
+                "name": "Nedjogg",
+                "duration": 300,
+                "speed": 5.2,
+                "incline": 0
+            }
+        ]
+    },
+    {
+        "name": "Standard Intervall 45/15 x20",
+        "description": "20 korte drag. Etter 10 drag tar du 2 min aktiv hvile for å holde kvaliteten.",
+        "difficulty": "beginner",
+        "tags": [
+            "interval",
+            "walk-run",
+            "speed",
+            "medium"
+        ],
+        "segments": [
+            {
+                "name": "Oppvarming",
+                "duration": 300,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 1",
+                "duration": 45,
+                "speed": 10.5,
+                "incline": 0
+            },
+            {
+                "name": "Pause 1",
+                "duration": 15,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 2",
+                "duration": 45,
+                "speed": 10.5,
+                "incline": 0
+            },
+            {
+                "name": "Pause 2",
+                "duration": 15,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 3",
+                "duration": 45,
+                "speed": 10.5,
+                "incline": 0
+            },
+            {
+                "name": "Pause 3",
+                "duration": 15,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 4",
+                "duration": 45,
+                "speed": 10.5,
+                "incline": 0
+            },
+            {
+                "name": "Pause 4",
+                "duration": 15,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 5",
+                "duration": 45,
+                "speed": 10.5,
+                "incline": 0
+            },
+            {
+                "name": "Pause 5",
+                "duration": 15,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 6",
+                "duration": 45,
+                "speed": 10.5,
+                "incline": 0
+            },
+            {
+                "name": "Pause 6",
+                "duration": 15,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 7",
+                "duration": 45,
+                "speed": 10.5,
+                "incline": 0
+            },
+            {
+                "name": "Pause 7",
+                "duration": 15,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 8",
+                "duration": 45,
+                "speed": 10.5,
+                "incline": 0
+            },
+            {
+                "name": "Pause 8",
+                "duration": 15,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 9",
+                "duration": 45,
+                "speed": 10.5,
+                "incline": 0
+            },
+            {
+                "name": "Pause 9",
+                "duration": 15,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 10",
+                "duration": 45,
+                "speed": 10.5,
+                "incline": 0
+            },
+            {
+                "name": "Pause 10",
+                "duration": 15,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Aktiv hvile halvveis",
+                "duration": 120,
+                "speed": 5.9,
+                "incline": 1
+            },
+            {
+                "name": "Løp 11",
+                "duration": 45,
+                "speed": 10.5,
+                "incline": 0
+            },
+            {
+                "name": "Pause 11",
+                "duration": 15,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 12",
+                "duration": 45,
+                "speed": 10.5,
+                "incline": 0
+            },
+            {
+                "name": "Pause 12",
+                "duration": 15,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 13",
+                "duration": 45,
+                "speed": 10.5,
+                "incline": 0
+            },
+            {
+                "name": "Pause 13",
+                "duration": 15,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 14",
+                "duration": 45,
+                "speed": 10.5,
+                "incline": 0
+            },
+            {
+                "name": "Pause 14",
+                "duration": 15,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 15",
+                "duration": 45,
+                "speed": 10.5,
+                "incline": 0
+            },
+            {
+                "name": "Pause 15",
+                "duration": 15,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 16",
+                "duration": 45,
+                "speed": 10.5,
+                "incline": 0
+            },
+            {
+                "name": "Pause 16",
+                "duration": 15,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 17",
+                "duration": 45,
+                "speed": 10.5,
+                "incline": 0
+            },
+            {
+                "name": "Pause 17",
+                "duration": 15,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 18",
+                "duration": 45,
+                "speed": 10.5,
+                "incline": 0
+            },
+            {
+                "name": "Pause 18",
+                "duration": 15,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 19",
+                "duration": 45,
+                "speed": 10.5,
+                "incline": 0
+            },
+            {
+                "name": "Pause 19",
+                "duration": 15,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 20",
+                "duration": 45,
+                "speed": 10.5,
+                "incline": 0
+            },
+            {
+                "name": "Pause 20",
+                "duration": 15,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Nedjogg",
+                "duration": 300,
+                "speed": 5.2,
+                "incline": 0
+            }
+        ]
+    },
+    {
+        "name": "Pyramide 1-2-3-4-4-3-2-1",
+        "description": "Klassisk pyramide med stigende og fallende drag. Stabil fart, presise pauser.",
+        "difficulty": "beginner",
+        "tags": [
+            "pyramid",
+            "interval",
+            "walk-run",
+            "endurance",
+            "medium"
+        ],
+        "segments": [
+            {
+                "name": "Oppvarming",
+                "duration": 300,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 1 min",
+                "duration": 60,
+                "speed": 10.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause",
+                "duration": 30,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 2 min",
+                "duration": 120,
+                "speed": 10.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause",
+                "duration": 60,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 3 min",
+                "duration": 180,
+                "speed": 10.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause",
+                "duration": 90,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 4 min",
+                "duration": 240,
+                "speed": 10.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause",
+                "duration": 120,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 4 min",
+                "duration": 240,
+                "speed": 10.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause",
+                "duration": 120,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 3 min",
+                "duration": 180,
+                "speed": 10.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause",
+                "duration": 90,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 2 min",
+                "duration": 120,
+                "speed": 10.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause",
+                "duration": 60,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 1 min",
+                "duration": 60,
+                "speed": 10.0,
+                "incline": 0
+            },
+            {
+                "name": "Nedjogg",
+                "duration": 300,
+                "speed": 5.2,
+                "incline": 0
+            }
+        ]
+    },
+    {
+        "name": "Pyramide Rask 30-45-60",
+        "description": "Raskere pyramide med mange korte drag. God når du vil ha fart, men kort total varighet.",
+        "difficulty": "beginner",
+        "tags": [
+            "pyramid",
+            "interval",
+            "walk-run",
+            "speed",
+            "medium"
+        ],
+        "segments": [
+            {
+                "name": "Oppvarming",
+                "duration": 300,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "30 sek løp 1",
+                "duration": 30,
+                "speed": 11.0,
+                "incline": 0
+            },
+            {
+                "name": "15 sek pause 1",
+                "duration": 15,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "30 sek løp 2",
+                "duration": 30,
+                "speed": 11.0,
+                "incline": 0
+            },
+            {
+                "name": "15 sek pause 2",
+                "duration": 15,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "30 sek løp 3",
+                "duration": 30,
+                "speed": 11.0,
+                "incline": 0
+            },
+            {
+                "name": "15 sek pause 3",
+                "duration": 15,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "45 sek løp 1",
+                "duration": 45,
+                "speed": 11.0,
+                "incline": 0
+            },
+            {
+                "name": "15 sek pause 45 1",
+                "duration": 15,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "45 sek løp 2",
+                "duration": 45,
+                "speed": 11.0,
+                "incline": 0
+            },
+            {
+                "name": "15 sek pause 45 2",
+                "duration": 15,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "45 sek løp 3",
+                "duration": 45,
+                "speed": 11.0,
+                "incline": 0
+            },
+            {
+                "name": "15 sek pause 45 3",
+                "duration": 15,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "45 sek løp 4",
+                "duration": 45,
+                "speed": 11.0,
+                "incline": 0
+            },
+            {
+                "name": "15 sek pause 45 4",
+                "duration": 15,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "60 sek løp 1",
+                "duration": 60,
+                "speed": 11.0,
+                "incline": 0
+            },
+            {
+                "name": "30 sek pause 60 1",
+                "duration": 30,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "60 sek løp 2",
+                "duration": 60,
+                "speed": 11.0,
+                "incline": 0
+            },
+            {
+                "name": "30 sek pause 60 2",
+                "duration": 30,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "60 sek løp 3",
+                "duration": 60,
+                "speed": 11.0,
+                "incline": 0
+            },
+            {
+                "name": "30 sek pause 60 3",
+                "duration": 30,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "60 sek løp 4",
+                "duration": 60,
+                "speed": 11.0,
+                "incline": 0
+            },
+            {
+                "name": "30 sek pause 60 4",
+                "duration": 30,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "60 sek løp 5",
+                "duration": 60,
+                "speed": 11.0,
+                "incline": 0
+            },
+            {
+                "name": "30 sek pause 60 5",
+                "duration": 30,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "45 sek løp ned 1",
+                "duration": 45,
+                "speed": 11.0,
+                "incline": 0
+            },
+            {
+                "name": "15 sek pause ned 45 1",
+                "duration": 15,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "45 sek løp ned 2",
+                "duration": 45,
+                "speed": 11.0,
+                "incline": 0
+            },
+            {
+                "name": "15 sek pause ned 45 2",
+                "duration": 15,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "45 sek løp ned 3",
+                "duration": 45,
+                "speed": 11.0,
+                "incline": 0
+            },
+            {
+                "name": "15 sek pause ned 45 3",
+                "duration": 15,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "45 sek løp ned 4",
+                "duration": 45,
+                "speed": 11.0,
+                "incline": 0
+            },
+            {
+                "name": "15 sek pause ned 45 4",
+                "duration": 15,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "30 sek løp ned 1",
+                "duration": 30,
+                "speed": 11.0,
+                "incline": 0
+            },
+            {
+                "name": "15 sek pause ned 1",
+                "duration": 15,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "30 sek løp ned 2",
+                "duration": 30,
+                "speed": 11.0,
+                "incline": 0
+            },
+            {
+                "name": "15 sek pause ned 2",
+                "duration": 15,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "30 sek løp ned 3",
+                "duration": 30,
+                "speed": 11.0,
+                "incline": 0
+            },
+            {
+                "name": "15 sek pause ned 3",
+                "duration": 15,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "15 sek løp 1",
+                "duration": 15,
+                "speed": 11.0,
+                "incline": 0
+            },
+            {
+                "name": "15 sek pause 15 1",
+                "duration": 15,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "15 sek løp 2",
+                "duration": 15,
+                "speed": 11.0,
+                "incline": 0
+            },
+            {
+                "name": "15 sek pause 15 2",
+                "duration": 15,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Nedjogg",
+                "duration": 300,
+                "speed": 5.2,
+                "incline": 0
+            }
+        ]
+    },
+    {
+        "name": "Progressive Intervaller Blokker",
+        "description": "Først lengre drag, deretter kortere. Farten kan økes svakt når dragene blir kortere.",
+        "difficulty": "beginner",
+        "tags": [
+            "progressive",
+            "interval",
+            "walk-run",
+            "speed",
+            "medium"
+        ],
+        "segments": [
+            {
+                "name": "Oppvarming",
+                "duration": 300,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "2 min løp 1",
+                "duration": 120,
+                "speed": 10.0,
+                "incline": 0
+            },
+            {
+                "name": "1 min pause 1",
+                "duration": 60,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "2 min løp 2",
+                "duration": 120,
+                "speed": 10.0,
+                "incline": 0
+            },
+            {
+                "name": "1 min pause 2",
+                "duration": 60,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "2 min løp 3",
+                "duration": 120,
+                "speed": 10.0,
+                "incline": 0
+            },
+            {
+                "name": "1 min pause 3",
+                "duration": 60,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "1 min løp 1",
+                "duration": 60,
+                "speed": 10.5,
+                "incline": 0
+            },
+            {
+                "name": "30 sek pause 1",
+                "duration": 30,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "1 min løp 2",
+                "duration": 60,
+                "speed": 10.5,
+                "incline": 0
+            },
+            {
+                "name": "30 sek pause 2",
+                "duration": 30,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "1 min løp 3",
+                "duration": 60,
+                "speed": 10.5,
+                "incline": 0
+            },
+            {
+                "name": "30 sek pause 3",
+                "duration": 30,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "1 min løp 4",
+                "duration": 60,
+                "speed": 10.5,
+                "incline": 0
+            },
+            {
+                "name": "30 sek pause 4",
+                "duration": 30,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "45 sek løp 1",
+                "duration": 45,
+                "speed": 10.5,
+                "incline": 0
+            },
+            {
+                "name": "30 sek pause 45 1",
+                "duration": 30,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "45 sek løp 2",
+                "duration": 45,
+                "speed": 10.5,
+                "incline": 0
+            },
+            {
+                "name": "30 sek pause 45 2",
+                "duration": 30,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "45 sek løp 3",
+                "duration": 45,
+                "speed": 10.5,
+                "incline": 0
+            },
+            {
+                "name": "30 sek pause 45 3",
+                "duration": 30,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "45 sek løp 4",
+                "duration": 45,
+                "speed": 10.5,
+                "incline": 0
+            },
+            {
+                "name": "30 sek pause 45 4",
+                "duration": 30,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "45 sek løp 5",
+                "duration": 45,
+                "speed": 10.5,
+                "incline": 0
+            },
+            {
+                "name": "30 sek pause 45 5",
+                "duration": 30,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "30 sek løp 1",
+                "duration": 30,
+                "speed": 11.0,
+                "incline": 0
+            },
+            {
+                "name": "15 sek pause 30 1",
+                "duration": 15,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "30 sek løp 2",
+                "duration": 30,
+                "speed": 11.0,
+                "incline": 0
+            },
+            {
+                "name": "15 sek pause 30 2",
+                "duration": 15,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "30 sek løp 3",
+                "duration": 30,
+                "speed": 11.0,
+                "incline": 0
+            },
+            {
+                "name": "15 sek pause 30 3",
+                "duration": 15,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "30 sek løp 4",
+                "duration": 30,
+                "speed": 11.0,
+                "incline": 0
+            },
+            {
+                "name": "15 sek pause 30 4",
+                "duration": 15,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "30 sek løp 5",
+                "duration": 30,
+                "speed": 11.0,
+                "incline": 0
+            },
+            {
+                "name": "15 sek pause 30 5",
+                "duration": 15,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "30 sek løp 6",
+                "duration": 30,
+                "speed": 11.0,
+                "incline": 0
+            },
+            {
+                "name": "15 sek pause 30 6",
+                "duration": 15,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Nedjogg",
+                "duration": 300,
+                "speed": 5.2,
+                "incline": 0
+            }
+        ]
+    },
+    {
+        "name": "Progressive Sett 3+2+1 x3",
+        "description": "Tre sett med 3-2-1 min. Øk startfart litt per sett. Aktiv hvile mellom settene.",
+        "difficulty": "beginner",
+        "tags": [
+            "progressive",
+            "interval",
+            "walk-run",
+            "speed",
+            "long"
+        ],
+        "segments": [
+            {
+                "name": "Oppvarming",
+                "duration": 300,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "3 min løp sett 1",
+                "duration": 180,
+                "speed": 9.5,
+                "incline": 0
+            },
+            {
+                "name": "Pause",
+                "duration": 60,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "2 min løp sett 1",
+                "duration": 120,
+                "speed": 9.5,
+                "incline": 0
+            },
+            {
+                "name": "Pause",
+                "duration": 60,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "1 min løp sett 1",
+                "duration": 60,
+                "speed": 9.5,
+                "incline": 0
+            },
+            {
+                "name": "Aktiv hvile",
+                "duration": 120,
+                "speed": 5.9,
+                "incline": 1
+            },
+            {
+                "name": "3 min løp sett 2",
+                "duration": 180,
+                "speed": 10.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause",
+                "duration": 60,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "2 min løp sett 2",
+                "duration": 120,
+                "speed": 10.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause",
+                "duration": 60,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "1 min løp sett 2",
+                "duration": 60,
+                "speed": 10.0,
+                "incline": 0
+            },
+            {
+                "name": "Aktiv hvile",
+                "duration": 120,
+                "speed": 5.9,
+                "incline": 1
+            },
+            {
+                "name": "3 min løp sett 3",
+                "duration": 180,
+                "speed": 10.5,
+                "incline": 0
+            },
+            {
+                "name": "Pause",
+                "duration": 60,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "2 min løp sett 3",
+                "duration": 120,
+                "speed": 10.5,
+                "incline": 0
+            },
+            {
+                "name": "Pause",
+                "duration": 60,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "1 min løp sett 3",
+                "duration": 60,
+                "speed": 10.5,
+                "incline": 0
+            },
+            {
+                "name": "30 sek avslutning 1",
+                "duration": 30,
+                "speed": 11.0,
+                "incline": 0
+            },
+            {
+                "name": "15 sek pause 1",
+                "duration": 15,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "30 sek avslutning 2",
+                "duration": 30,
+                "speed": 11.0,
+                "incline": 0
+            },
+            {
+                "name": "15 sek pause 2",
+                "duration": 15,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "30 sek avslutning 3",
+                "duration": 30,
+                "speed": 11.0,
+                "incline": 0
+            },
+            {
+                "name": "15 sek pause 3",
+                "duration": 15,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "30 sek avslutning 4",
+                "duration": 30,
+                "speed": 11.0,
+                "incline": 0
+            },
+            {
+                "name": "Nedjogg",
+                "duration": 300,
+                "speed": 5.2,
+                "incline": 0
+            }
+        ]
+    },
+    {
+        "name": "Tempo Intro 3x5",
+        "description": "Tre drag på 5 min i kontrollert, litt høyere fart. Målet er jevnhet, ikke maksfart.",
+        "difficulty": "beginner",
+        "tags": [
+            "interval",
+            "run-only",
+            "endurance",
+            "speed",
+            "medium"
+        ],
+        "segments": [
+            {
+                "name": "Oppvarming",
+                "duration": 300,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Tempo 1",
+                "duration": 300,
+                "speed": 10.0,
+                "incline": 0
+            },
+            {
+                "name": "Rolig jogg",
+                "duration": 120,
+                "speed": 9.0,
+                "incline": 0
+            },
+            {
+                "name": "Tempo 2",
+                "duration": 300,
+                "speed": 10.0,
+                "incline": 0
+            },
+            {
+                "name": "Rolig jogg",
+                "duration": 120,
+                "speed": 9.0,
+                "incline": 0
+            },
+            {
+                "name": "Tempo 3",
+                "duration": 300,
+                "speed": 10.0,
+                "incline": 0
+            },
+            {
+                "name": "Nedkjøling",
+                "duration": 300,
+                "speed": 5.0,
+                "incline": 0
+            }
+        ]
+    },
+    {
+        "name": "Fartlek Lett 20",
+        "description": "Lek med fart. Kortere og lengre drag uten strenge pauser. Fin når du vil ha variasjon.",
+        "difficulty": "beginner",
+        "tags": [
+            "interval",
+            "run-only",
+            "speed",
+            "medium"
+        ],
+        "segments": [
+            {
+                "name": "Oppvarming",
+                "duration": 300,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Rolig jogg",
+                "duration": 240,
+                "speed": 9.0,
+                "incline": 0
+            },
+            {
+                "name": "Fartlek 1",
+                "duration": 60,
+                "speed": 10.5,
+                "incline": 0
+            },
+            {
+                "name": "Rolig",
+                "duration": 120,
+                "speed": 9.0,
+                "incline": 0
+            },
+            {
+                "name": "Fartlek 2",
+                "duration": 90,
+                "speed": 10.5,
+                "incline": 0
+            },
+            {
+                "name": "Rolig",
+                "duration": 150,
+                "speed": 9.0,
+                "incline": 0
+            },
+            {
+                "name": "Fartlek 3",
+                "duration": 60,
+                "speed": 11.0,
+                "incline": 0
+            },
+            {
+                "name": "Rolig",
+                "duration": 180,
+                "speed": 9.0,
+                "incline": 0
+            },
+            {
+                "name": "Nedkjøling",
+                "duration": 300,
+                "speed": 5.0,
+                "incline": 0
+            }
+        ]
+    },
+    {
+        "name": "Teknikk Økt - Lett Kadens",
+        "description": "Fokus på korte steg og stabil rytme. Lav intensitet, høy kvalitet i bevegelsen.",
+        "difficulty": "beginner",
+        "tags": [
+            "technique",
+            "run-only",
+            "mental",
+            "endurance",
+            "medium"
+        ],
+        "segments": [
+            {
+                "name": "Oppvarming",
+                "duration": 300,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Jogg kontrollert",
+                "duration": 900,
+                "speed": 9.0,
+                "incline": 0
+            },
+            {
+                "name": "Strides 6x20 sek",
+                "duration": 120,
+                "speed": 10.5,
+                "incline": 0
+            },
+            {
+                "name": "Nedkjøling",
+                "duration": 300,
+                "speed": 5.0,
+                "incline": 0
+            }
+        ]
+    },
+    {
+        "name": "Måløkt - Sammenhengende 30",
+        "description": "Målrettet økt for å bli komfortabel med sammenhengende jogging i 30 minutter.",
+        "difficulty": "beginner",
+        "tags": [
+            "long",
+            "run-only",
+            "endurance",
+            "mental",
+            "medium"
+        ],
+        "segments": [
+            {
+                "name": "Oppvarming",
+                "duration": 300,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Sammenhengende jogg",
+                "duration": 1800,
+                "speed": 9.5,
+                "incline": 0
+            },
+            {
+                "name": "Nedkjøling",
+                "duration": 300,
+                "speed": 5.0,
+                "incline": 0
+            }
+        ]
+    },
+    {
+        "name": "Fettforbrenning - Gange 45 med Stigning",
+        "description": "Lang og lav intensitet. Jevn gange i stigning for høy totalbelastning uten hard løping.",
+        "difficulty": "beginner",
+        "tags": [
+            "long",
+            "fatburn",
+            "incline",
+            "recovery"
+        ],
+        "segments": [
+            {
+                "name": "Gange",
+                "duration": 2700,
+                "speed": 5.9,
+                "incline": 4
+            }
+        ]
+    },
+    {
+        "name": "Ukeprogram 1-4 Økt A Base",
+        "description": "Fast økt A. Rolig sammenhengende jogg for base.",
+        "difficulty": "beginner",
+        "tags": [
+            "plan",
+            "long",
+            "run-only",
+            "endurance",
+            "medium"
+        ],
+        "segments": [
+            {
+                "name": "Oppvarming",
+                "duration": 300,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Rolig jogg",
+                "duration": 900,
+                "speed": 9.5,
+                "incline": 0
+            },
+            {
+                "name": "Nedkjøling",
+                "duration": 300,
+                "speed": 5.0,
+                "incline": 0
+            }
+        ]
+    },
+    {
+        "name": "Ukeprogram 1-4 Økt B Intervall",
+        "description": "Fast økt B. Korte intervaller som bygger fart på en trygg måte.",
+        "difficulty": "beginner",
+        "tags": [
+            "plan",
+            "interval",
+            "walk-run",
+            "speed",
+            "short"
+        ],
+        "segments": [
+            {
+                "name": "Oppvarming",
+                "duration": 300,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 1",
+                "duration": 90,
+                "speed": 10.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause 1",
+                "duration": 90,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 2",
+                "duration": 90,
+                "speed": 10.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause 2",
+                "duration": 90,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 3",
+                "duration": 90,
+                "speed": 10.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause 3",
+                "duration": 90,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Nedkjøling",
+                "duration": 300,
+                "speed": 5.0,
+                "incline": 0
+            }
+        ]
+    },
+    {
+        "name": "Ukeprogram 1-4 Økt C Motbakke",
+        "description": "Fast økt C. Motbakke med gåpause som bygger styrke.",
+        "difficulty": "beginner",
+        "tags": [
+            "plan",
+            "hill",
+            "incline",
+            "strength",
+            "medium"
+        ],
+        "segments": [
+            {
+                "name": "Oppvarming",
+                "duration": 300,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Motbakke",
+                "duration": 240,
+                "speed": 6.0,
+                "incline": 5
+            },
+            {
+                "name": "Flat hvile",
+                "duration": 180,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Motbakke",
+                "duration": 240,
+                "speed": 6.0,
+                "incline": 7
+            },
+            {
+                "name": "Nedkjøling",
+                "duration": 300,
+                "speed": 5.0,
+                "incline": 0
+            }
+        ]
+    },
+    {
+        "name": "Ukeprogram 1-4 Økt D Variasjon",
+        "description": "Fast økt D. Variert med lett stigning og rolig jogg.",
+        "difficulty": "beginner",
+        "tags": [
+            "plan",
+            "progressive",
+            "incline",
+            "endurance",
+            "medium"
+        ],
+        "segments": [
+            {
+                "name": "Oppvarming",
+                "duration": 300,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Jogg lett",
+                "duration": 300,
+                "speed": 9.0,
+                "incline": 1
+            },
+            {
+                "name": "Gange",
+                "duration": 180,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Jogg lett",
+                "duration": 300,
+                "speed": 9.0,
+                "incline": 2
+            },
+            {
+                "name": "Nedkjøling",
+                "duration": 300,
+                "speed": 5.0,
+                "incline": 0
+            }
+        ]
+    },
+    {
+        "name": "Intervall 60/60 x10",
+        "description": "10 drag på 60 sek med 60 sek pause. Stabil rytme og enkel å følge.",
+        "difficulty": "beginner",
+        "tags": [
+            "interval",
+            "walk-run",
+            "endurance",
+            "medium"
+        ],
+        "segments": [
+            {
+                "name": "Oppvarming",
+                "duration": 300,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 1",
+                "duration": 60,
+                "speed": 10.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause 1",
+                "duration": 60,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 2",
+                "duration": 60,
+                "speed": 10.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause 2",
+                "duration": 60,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 3",
+                "duration": 60,
+                "speed": 10.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause 3",
+                "duration": 60,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 4",
+                "duration": 60,
+                "speed": 10.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause 4",
+                "duration": 60,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 5",
+                "duration": 60,
+                "speed": 10.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause 5",
+                "duration": 60,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 6",
+                "duration": 60,
+                "speed": 10.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause 6",
+                "duration": 60,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 7",
+                "duration": 60,
+                "speed": 10.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause 7",
+                "duration": 60,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 8",
+                "duration": 60,
+                "speed": 10.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause 8",
+                "duration": 60,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 9",
+                "duration": 60,
+                "speed": 10.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause 9",
+                "duration": 60,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 10",
+                "duration": 60,
+                "speed": 10.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause 10",
+                "duration": 60,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Nedkjøling",
+                "duration": 300,
+                "speed": 5.0,
+                "incline": 0
+            }
+        ]
+    },
+    {
+        "name": "Intervall 30/30 x20",
+        "description": "20 drag på 30 sek med 30 sek pause. God for å trene på jevn innsats.",
+        "difficulty": "beginner",
+        "tags": [
+            "interval",
+            "walk-run",
+            "speed",
+            "medium"
+        ],
+        "segments": [
+            {
+                "name": "Oppvarming",
+                "duration": 300,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 1",
+                "duration": 30,
+                "speed": 11.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause 1",
+                "duration": 30,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 2",
+                "duration": 30,
+                "speed": 11.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause 2",
+                "duration": 30,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 3",
+                "duration": 30,
+                "speed": 11.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause 3",
+                "duration": 30,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 4",
+                "duration": 30,
+                "speed": 11.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause 4",
+                "duration": 30,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 5",
+                "duration": 30,
+                "speed": 11.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause 5",
+                "duration": 30,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 6",
+                "duration": 30,
+                "speed": 11.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause 6",
+                "duration": 30,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 7",
+                "duration": 30,
+                "speed": 11.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause 7",
+                "duration": 30,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 8",
+                "duration": 30,
+                "speed": 11.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause 8",
+                "duration": 30,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 9",
+                "duration": 30,
+                "speed": 11.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause 9",
+                "duration": 30,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 10",
+                "duration": 30,
+                "speed": 11.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause 10",
+                "duration": 30,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 11",
+                "duration": 30,
+                "speed": 11.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause 11",
+                "duration": 30,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 12",
+                "duration": 30,
+                "speed": 11.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause 12",
+                "duration": 30,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 13",
+                "duration": 30,
+                "speed": 11.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause 13",
+                "duration": 30,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 14",
+                "duration": 30,
+                "speed": 11.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause 14",
+                "duration": 30,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 15",
+                "duration": 30,
+                "speed": 11.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause 15",
+                "duration": 30,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 16",
+                "duration": 30,
+                "speed": 11.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause 16",
+                "duration": 30,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 17",
+                "duration": 30,
+                "speed": 11.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause 17",
+                "duration": 30,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 18",
+                "duration": 30,
+                "speed": 11.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause 18",
+                "duration": 30,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 19",
+                "duration": 30,
+                "speed": 11.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause 19",
+                "duration": 30,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Løp 20",
+                "duration": 30,
+                "speed": 11.0,
+                "incline": 0
+            },
+            {
+                "name": "Pause 20",
+                "duration": 30,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Nedkjøling",
+                "duration": 300,
+                "speed": 5.0,
+                "incline": 0
+            }
+        ]
+    },
+    {
+        "name": "Motbakke Intervall 6x2",
+        "description": "2 minutters drag i stigning. Skånsomt for fart, tøft for bein.",
+        "difficulty": "beginner",
+        "tags": [
+            "hill",
+            "interval",
+            "incline",
+            "strength",
+            "medium"
+        ],
+        "segments": [
+            {
+                "name": "Oppvarming",
+                "duration": 300,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Motbakke løp 1",
+                "duration": 120,
+                "speed": 9.0,
+                "incline": 4
+            },
+            {
+                "name": "Flat pause 1",
+                "duration": 90,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Motbakke løp 2",
+                "duration": 120,
+                "speed": 9.0,
+                "incline": 4
+            },
+            {
+                "name": "Flat pause 2",
+                "duration": 90,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Motbakke løp 3",
+                "duration": 120,
+                "speed": 9.0,
+                "incline": 4
+            },
+            {
+                "name": "Flat pause 3",
+                "duration": 90,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Motbakke løp 4",
+                "duration": 120,
+                "speed": 9.0,
+                "incline": 4
+            },
+            {
+                "name": "Flat pause 4",
+                "duration": 90,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Motbakke løp 5",
+                "duration": 120,
+                "speed": 9.0,
+                "incline": 4
+            },
+            {
+                "name": "Flat pause 5",
+                "duration": 90,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Motbakke løp 6",
+                "duration": 120,
+                "speed": 9.0,
+                "incline": 4
+            },
+            {
+                "name": "Flat pause 6",
+                "duration": 90,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Nedkjøling",
+                "duration": 300,
+                "speed": 5.0,
+                "incline": 0
+            }
+        ]
+    },
+    {
+        "name": "Progressiv Langøkt 3 steg",
+        "description": "Langøkt som blir litt raskere i tre steg. Fin for å lære pacing.",
+        "difficulty": "beginner",
+        "tags": [
+            "progressive",
+            "long",
+            "run-only",
+            "endurance",
+            "medium"
+        ],
+        "segments": [
+            {
+                "name": "Oppvarming",
+                "duration": 300,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "Steg 1",
+                "duration": 600,
+                "speed": 9.0,
+                "incline": 0
+            },
+            {
+                "name": "Steg 2",
+                "duration": 600,
+                "speed": 9.5,
+                "incline": 0
+            },
+            {
+                "name": "Steg 3",
+                "duration": 600,
+                "speed": 10.0,
+                "incline": 0
+            },
+            {
+                "name": "Nedkjøling",
+                "duration": 300,
+                "speed": 5.0,
+                "incline": 0
+            }
+        ]
+    },
+    {
+        "name": "Bakke Pyramide 3-6-9-6-3",
+        "description": "Pyramide i stigning. Du går i bratteste partier og holder kontroll.",
+        "difficulty": "beginner",
+        "tags": [
+            "pyramid",
+            "hill",
+            "incline",
+            "strength",
+            "medium"
+        ],
+        "segments": [
+            {
+                "name": "Oppvarming",
+                "duration": 300,
+                "speed": 5.5,
+                "incline": 0
+            },
+            {
+                "name": "3 %",
+                "duration": 180,
+                "speed": 6.0,
+                "incline": 3
+            },
+            {
+                "name": "6 %",
+                "duration": 180,
+                "speed": 6.0,
+                "incline": 6
+            },
+            {
+                "name": "9 %",
+                "duration": 180,
+                "speed": 5.8,
+                "incline": 9
+            },
+            {
+                "name": "6 %",
+                "duration": 180,
+                "speed": 6.0,
+                "incline": 6
+            },
+            {
+                "name": "3 %",
+                "duration": 180,
+                "speed": 6.0,
+                "incline": 3
+            },
+            {
+                "name": "Nedkjøling",
+                "duration": 300,
+                "speed": 5.0,
+                "incline": 0
+            }
+        ]
+    }
+]

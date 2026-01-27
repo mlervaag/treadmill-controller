@@ -4,14 +4,14 @@
 
 Your Treadmill Controller is now running on your Raspberry Pi!
 
-**Access URL**: http://192.168.1.12:3001
+**Access URL**: http://[YOUR_PI_IP]:3001
 
 ---
 
 ## 📋 Quick Reference
 
 ### System Info
-- **Pi IP**: 192.168.1.12
+- **Pi IP**: [YOUR_PI_IP]
 - **User**: pi
 - **App Directory**: /home/pi/treadmill-controller
 - **Container Name**: treadmill-controller
@@ -21,25 +21,25 @@ Your Treadmill Controller is now running on your Raspberry Pi!
 
 ```bash
 # View logs (real-time)
-ssh pi@192.168.1.12 'cd ~/treadmill-controller && docker compose logs -f'
+ssh [YOUR_USER]@[YOUR_PI_IP] 'cd ~/treadmill-controller && docker compose logs -f'
 
 # View last 50 log lines
-ssh pi@192.168.1.12 'cd ~/treadmill-controller && docker compose logs --tail=50'
+ssh [YOUR_USER]@[YOUR_PI_IP] 'cd ~/treadmill-controller && docker compose logs --tail=50'
 
 # Restart container
-ssh pi@192.168.1.12 'cd ~/treadmill-controller && docker compose restart'
+ssh [YOUR_USER]@[YOUR_PI_IP] 'cd ~/treadmill-controller && docker compose restart'
 
 # Stop container
-ssh pi@192.168.1.12 'cd ~/treadmill-controller && docker compose down'
+ssh [YOUR_USER]@[YOUR_PI_IP] 'cd ~/treadmill-controller && docker compose down'
 
 # Start container
-ssh pi@192.168.1.12 'cd ~/treadmill-controller && docker compose up -d'
+ssh [YOUR_USER]@[YOUR_PI_IP] 'cd ~/treadmill-controller && docker compose up -d'
 
 # Check container status
-ssh pi@192.168.1.12 'cd ~/treadmill-controller && docker compose ps'
+ssh [YOUR_USER]@[YOUR_PI_IP] 'cd ~/treadmill-controller && docker compose ps'
 
 # View container resource usage
-ssh pi@192.168.1.12 'docker stats treadmill-controller --no-stream'
+ssh [YOUR_USER]@[YOUR_PI_IP] 'docker stats treadmill-controller --no-stream'
 ```
 
 ---
@@ -65,7 +65,7 @@ bash deploy-to-pi.sh
 ### 1. Access the App
 Open your browser (Chrome, Edge, or Opera) and go to:
 ```
-http://192.168.1.12:3001
+http://[YOUR_PI_IP]:3001
 ```
 
 ### 2. Connect to Treadmill
@@ -84,7 +84,7 @@ http://192.168.1.12:3001
 │                 │                     └──────────────────┘
 └────────┬────────┘
          │ HTTP/WebSocket
-         │ (192.168.1.12:3001)
+         │ ([YOUR_PI_IP]:3001)
          ▼
 ┌─────────────────┐
 │  Raspberry Pi   │
@@ -107,11 +107,11 @@ This is persisted outside the Docker container, so your data survives container 
 ### Backup Database
 ```bash
 # Backup to your Windows machine
-scp pi@192.168.1.12:/home/pi/treadmill-controller/data/treadmill.db ./backup-treadmill.db
+scp [YOUR_USER]@[YOUR_PI_IP]:/home/pi/treadmill-controller/data/treadmill.db ./backup-treadmill.db
 
 # Restore database
-scp ./backup-treadmill.db pi@192.168.1.12:/home/pi/treadmill-controller/data/treadmill.db
-ssh pi@192.168.1.12 'cd ~/treadmill-controller && docker compose restart'
+scp ./backup-treadmill.db [YOUR_USER]@[YOUR_PI_IP]:/home/pi/treadmill-controller/data/treadmill.db
+ssh [YOUR_USER]@[YOUR_PI_IP] 'cd ~/treadmill-controller && docker compose restart'
 ```
 
 ---
@@ -121,24 +121,24 @@ ssh pi@192.168.1.12 'cd ~/treadmill-controller && docker compose restart'
 ### Container won't start
 ```bash
 # Check logs
-ssh pi@192.168.1.12 'cd ~/treadmill-controller && docker compose logs'
+ssh [YOUR_USER]@[YOUR_PI_IP] 'cd ~/treadmill-controller && docker compose logs'
 
 # Rebuild and restart
-ssh pi@192.168.1.12 'cd ~/treadmill-controller && docker compose up -d --build'
+ssh [YOUR_USER]@[YOUR_PI_IP] 'cd ~/treadmill-controller && docker compose up -d --build'
 ```
 
 ### Can't access from Windows
-1. Check Pi is on same network: `ping 192.168.1.12`
-2. Check container is running: `ssh pi@192.168.1.12 'docker ps'`
-3. Check port is open: `ssh pi@192.168.1.12 'netstat -tuln | grep 3001'`
+1. Check Pi is on same network: `ping [YOUR_PI_IP]`
+2. Check container is running: `ssh [YOUR_USER]@[YOUR_PI_IP] 'docker ps'`
+3. Check port is open: `ssh [YOUR_USER]@[YOUR_PI_IP] 'netstat -tuln | grep 3001'`
 
 ### Database issues
 ```bash
 # Check database file exists
-ssh pi@192.168.1.12 'ls -lh ~/treadmill-controller/data/'
+ssh [YOUR_USER]@[YOUR_PI_IP] 'ls -lh ~/treadmill-controller/data/'
 
 # Check file permissions
-ssh pi@192.168.1.12 'chmod 666 ~/treadmill-controller/data/treadmill.db'
+ssh [YOUR_USER]@[YOUR_PI_IP] 'chmod 666 ~/treadmill-controller/data/treadmill.db'
 ```
 
 ---
@@ -156,12 +156,12 @@ The container is configured with `restart: unless-stopped`, so it will:
 
 ### Check if healthy
 ```bash
-ssh pi@192.168.1.12 'docker inspect treadmill-controller | grep -A 5 Health'
+ssh [YOUR_USER]@[YOUR_PI_IP] 'docker inspect treadmill-controller | grep -A 5 Health'
 ```
 
 ### View resource usage
 ```bash
-ssh pi@192.168.1.12 'docker stats treadmill-controller'
+ssh [YOUR_USER]@[YOUR_PI_IP] 'docker stats treadmill-controller'
 ```
 
 ---
@@ -188,7 +188,7 @@ environment:
 
 After editing, redeploy:
 ```bash
-ssh pi@192.168.1.12 'cd ~/treadmill-controller && docker compose up -d'
+ssh pi@[YOUR_PI_IP] 'cd ~/treadmill-controller && docker compose up -d'
 ```
 
 ---
@@ -197,4 +197,4 @@ ssh pi@192.168.1.12 'cd ~/treadmill-controller && docker compose up -d'
 
 Your treadmill controller is now running 24/7 on your Raspberry Pi!
 
-Just open **http://192.168.1.12:3001** in Chrome/Edge on any device on your network and start training! 🏃‍♂️
+Just open **http://[YOUR_PI_IP]:3001** in Chrome/Edge on any device on your network and start training! 🏃‍♂️

@@ -1,9 +1,15 @@
 #!/bin/bash
 
 # Configuration
-PI_USER="pi"
-PI_HOST="192.168.1.12"
-APP_DIR="/home/pi/treadmill-controller"
+if [ -f .env.local ]; then
+    source .env.local
+fi
+
+PI_USER=${PI_USER:-"pi"}
+if [ -z "$PI_HOST" ]; then
+    read -p "Enter Raspberry Pi IP address: " PI_HOST
+fi
+APP_DIR=${APP_DIR:-"/home/$PI_USER/treadmill-controller"}
 
 echo "🚀 Deploying Treadmill Controller to Raspberry Pi..."
 
@@ -58,14 +64,14 @@ echo "📝 Recent logs:"
 docker-compose logs --tail=20
 
 echo ""
-echo "🌐 Access the app at: http://192.168.1.12:3001"
+echo "🌐 Access the app at: http://$PI_HOST:3001"
 echo ""
 echo "Useful commands:"
-echo "  View logs:    ssh pi@192.168.1.12 'cd ~/treadmill-controller && docker-compose logs -f'"
-echo "  Restart:      ssh pi@192.168.1.12 'cd ~/treadmill-controller && docker-compose restart'"
-echo "  Stop:         ssh pi@192.168.1.12 'cd ~/treadmill-controller && docker-compose down'"
-echo "  View status:  ssh pi@192.168.1.12 'cd ~/treadmill-controller && docker-compose ps'"
+echo "  View logs:    ssh $PI_USER@$PI_HOST 'cd ~/treadmill-controller && docker-compose logs -f'"
+echo "  Restart:      ssh $PI_USER@$PI_HOST 'cd ~/treadmill-controller && docker-compose restart'"
+echo "  Stop:         ssh $PI_USER@$PI_HOST 'cd ~/treadmill-controller && docker-compose down'"
+echo "  View status:  ssh $PI_USER@$PI_HOST 'cd ~/treadmill-controller && docker-compose ps'"
 ENDSSH
 
 echo ""
-echo "🎉 Deployment finished! App should be running at http://192.168.1.12:3001"
+echo "🎉 Deployment finished! App should be running at http://$PI_HOST:3001"

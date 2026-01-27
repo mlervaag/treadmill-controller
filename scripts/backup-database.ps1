@@ -1,5 +1,19 @@
 # Backup Treadmill Database from Raspberry Pi
-$PI_HOST = "192.168.1.12"
+$EnvPath = Join-Path $PSScriptRoot "..\.env.local"
+if (Test-Path $EnvPath) {
+    Get-Content $EnvPath | ForEach-Object {
+        if ($_ -match '^\s*([^#=]+)\s*=\s*(.*)$') {
+            Set-Variable -Name $matches[1] -Value $matches[2] -Scope Script
+        }
+    }
+}
+
+if (-not $PI_HOST) {
+    $PI_HOST = Read-Host "Enter Raspberry Pi IP address/Hostname (e.g. 192.168.1.12)"
+}
+if (-not $PI_USER) {
+    $PI_USER = "pi"
+}
 $BACKUP_DIR = ".\backups"
 $TIMESTAMP = Get-Date -Format "yyyy-MM-dd_HHmm"
 $BACKUP_FILE = "$BACKUP_DIR\treadmill-backup-$TIMESTAMP.db"
@@ -13,7 +27,7 @@ if (-not (Test-Path $BACKUP_DIR)) {
 
 # Download database
 Write-Host "Downloading from Raspberry Pi..." -ForegroundColor Yellow
-scp pi@${PI_HOST}:/home/pi/treadmill-controller/data/treadmill.db $BACKUP_FILE
+scp $PI_USER@${PI_HOST}:/home/$PI_USER/treadmill-controller/data/treadmill.db $BACKUP_FILE
 
 if ($LASTEXITCODE -eq 0) {
     $fileSize = (Get-Item $BACKUP_FILE).Length / 1KB

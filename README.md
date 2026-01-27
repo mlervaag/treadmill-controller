@@ -79,7 +79,7 @@ Den raskeste måten å komme i gang:
 
 1. **Klon repositoryet**:
 ```bash
-git clone https://github.com/mlervaag/treadmill-controller.git
+git clone https://github.com/yourusername/treadmill-controller.git
 cd treadmill-controller
 ```
 
@@ -117,7 +117,7 @@ Hvis du vil kjøre serveren på en Raspberry Pi og få tilgang fra flere enheter
 #### Installasjon
 1. **Klon repositoryet på din Windows PC**:
 ```bash
-git clone https://github.com/mlervaag/treadmill-controller.git
+git clone https://github.com/yourusername/treadmill-controller.git
 cd treadmill-controller
 ```
 
@@ -132,7 +132,7 @@ cd treadmill-controller
 ```
 
 4. **Åpne i nettleser**:
-- Gå til `https://192.168.1.12:3001` (erstatt med din Pi's IP-adresse)
+- Gå til `https://[YOUR_PI_IP]:3001` (erstatt med din Pi's IP-adresse)
 - Godta sikkerhetsadvarselen for self-signed sertifikat (klikk "Advanced" → "Continue")
 - Web Bluetooth vil nå fungere!
 
@@ -175,9 +175,9 @@ Hvis du har satt opp Raspberry Pi-deployment:
    - Godta sertifikatadvarsel (klikk "Advanced" → "Continue")
 
 2. **Multi-enhet tilgang**:
-   - **Windows PC**: `https://192.168.1.12:3001` - Full Bluetooth-kontroll
-   - **Android mobil/tablet**: `https://192.168.1.12:3001` - Full Bluetooth-kontroll
-   - **iOS/iPad**: `https://192.168.1.12:3001` - Kun visning (ingen Bluetooth-støtte)
+   - **Windows PC**: `https://[YOUR_PI_IP]:3001` - Full Bluetooth-kontroll
+   - **Android mobil/tablet**: `https://[YOUR_PI_IP]:3001` - Full Bluetooth-kontroll
+   - **iOS/iPad**: `https://[YOUR_PI_IP]:3001` - Kun visning (ingen Bluetooth-støtte)
 
 ### Visningsmoduser
 - **🎯 Fokus**: Store tall for hastighet og tid - perfekt under trening

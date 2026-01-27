@@ -122,6 +122,7 @@ async function connectToTreadmill(acceptAllDevices = false) {
         // Set up status callback
         treadmill.onStatus((status, code) => {
             console.log('Treadmill status:', status);
+            handleTreadmillStatus(status, code);
         });
 
         await treadmill.connect(acceptAllDevices);
@@ -382,7 +383,7 @@ async function discoverDeviceInfo() {
 
         // Show in alert (limited, but works)
         alert('Enhetsinformasjon er logget i konsollen! Trykk F12 for å se detaljene.\n\n' +
-              info.substring(0, 500) + (info.length > 500 ? '...\n\n(Se konsoll for fullstendig info)' : ''));
+            info.substring(0, 500) + (info.length > 500 ? '...\n\n(Se konsoll for fullstendig info)' : ''));
 
         btn.textContent = 'Vis enhetsinformasjon';
         btn.disabled = false;
@@ -553,22 +554,144 @@ async function loadWorkouts() {
             });
         }
 
-        displayWorkouts();
+        populateFilterTags();
+        applyFilters(); // This calls displayWorkouts()
     } catch (error) {
         console.error('Failed to load workouts:', error);
     }
 }
 
-function displayWorkouts() {
+// Filtering Logic
+let activeFilters = {
+    difficulty: [],
+    tags: [],
+    maxDuration: 120
+};
+
+function toggleFilter() {
+    const menu = document.getElementById('filterMenu');
+    menu.classList.toggle('hidden');
+    // Save state if needed, but simple toggle is fine
+}
+
+function updateDurationLabel() {
+    const val = document.getElementById('filterDuration').value;
+    document.getElementById('durationValue').textContent = val >= 120 ? 'Alt' : val;
+}
+
+function populateFilterTags() {
+    const tagContainer = document.getElementById('tagFilters');
+    tagContainer.innerHTML = '';
+
+    // Extract all unique tags
+    const allTags = new Set();
+    allWorkouts.forEach(w => {
+        if (w.tags && Array.isArray(w.tags)) {
+            w.tags.forEach(t => allTags.add(t));
+        }
+    });
+
+    const sortedTags = Array.from(allTags).sort();
+
+    // Define categories for consistent ordering/grouping if desired, 
+    // or just list them all. For now, simple list.
+    sortedTags.forEach(tag => {
+        const label = document.createElement('label');
+        label.className = 'tag-checkbox';
+        label.innerHTML = `
+            <input type="checkbox" value="${tag}" onchange="applyFilters()">
+            <span>${tag}</span>
+        `;
+        tagContainer.appendChild(label);
+    });
+}
+
+function applyFilters() {
+    // 1. Get selected difficulties
+    const diffCheckboxes = document.querySelectorAll('.filter-difficulty:checked');
+    const selectedDifficulties = Array.from(diffCheckboxes).map(cb => cb.value);
+
+    // 2. Get selected tags
+    const tagCheckboxes = document.querySelectorAll('#tagFilters input:checked');
+    const selectedTags = Array.from(tagCheckboxes).map(cb => cb.value);
+
+    // 3. Get max duration
+    const durationInput = document.getElementById('filterDuration');
+    const maxDuration = parseInt(durationInput.value);
+
+    // Update UI state
+    const indicator = document.getElementById('filterIndicator');
+    const hasActiveFilters = selectedDifficulties.length > 0 || selectedTags.length > 0 || maxDuration < 120;
+
+    if (indicator) {
+        if (hasActiveFilters) {
+            indicator.classList.remove('hidden');
+            indicator.textContent = `(${selectedDifficulties.length + selectedTags.length + (maxDuration < 120 ? 1 : 0)})`;
+        } else {
+            indicator.classList.add('hidden');
+        }
+    }
+
+    // Filter Logic
+    const filteredWorkouts = allWorkouts.filter(workout => {
+        // Difficulty Match (OR logic)
+        if (selectedDifficulties.length > 0 && !selectedDifficulties.includes(workout.difficulty)) {
+            return false;
+        }
+
+        // Duration Match (Les than or equal)
+        // Backend returns total_duration_seconds. If missing, estimate from segment_count
+        let durationMinutes = 0;
+        if (workout.total_duration_seconds) {
+            durationMinutes = workout.total_duration_seconds / 60;
+        } else {
+            // Fallback estimate: 3 mins per segment if data missing
+            durationMinutes = workout.segment_count * 3;
+        }
+
+        // If maxDuration is < 120, we filter. If 120, we show all (120+)
+        if (maxDuration < 120 && durationMinutes > maxDuration) {
+            return false;
+        }
+
+        // Tag Match (AND logic - must contain ALL selected tags? OR logic - must contain ANY?
+        // Usually Attribute filtering is AND across categories, OR within category.
+        // Since we have a flat tag list for now, let's go with OR logic for simplicity (matches ANY selected tag).
+        // If the user wants specific "Interval" AND "Hills", they might expect AND. 
+        // Let's stick to: If tags selected, workout must have AT LEAST ONE of them.
+        if (selectedTags.length > 0) {
+            if (!workout.tags || !workout.tags.some(tag => selectedTags.includes(tag))) {
+                return false;
+            }
+        }
+
+        return true;
+    });
+
+    displayWorkouts(filteredWorkouts);
+}
+
+function resetFilters() {
+    // Uncheck all boxes
+    document.querySelectorAll('.filter-difficulty, #tagFilters input').forEach(cb => cb.checked = false);
+
+    // Reset slider
+    document.getElementById('filterDuration').value = 120;
+    document.getElementById('durationValue').textContent = 'Alt';
+
+    applyFilters();
+}
+
+function displayWorkouts(workoutsToDisplay = allWorkouts) {
     const list = document.getElementById('workoutsList');
     list.innerHTML = '';
 
-    if (allWorkouts.length === 0) {
-        list.innerHTML = '<p style="text-align: center; color: var(--text-secondary);">Ingen treningsøkter ennå. Lag din første økt!</p>';
+    if (workoutsToDisplay.length === 0) {
+        list.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">Ingen økter matcher filteret.</p>';
         return;
     }
 
-    allWorkouts.forEach(workout => {
+    workoutsToDisplay.forEach(workout => {
         const card = createWorkoutCard(workout, workout.is_template);
         list.appendChild(card);
     });
@@ -582,7 +705,18 @@ function createWorkoutCard(workout, isTemplate) {
     }
 
     // Calculate total duration
-    const totalMinutes = workout.segment_count > 0 ? '~' + Math.round(workout.segment_count * 3) + ' min' : 'Ukjent';
+    let totalMinutes = 'Ukjent';
+    let totalDistanceStr = '';
+
+    if (workout.total_duration_seconds) {
+        totalMinutes = Math.round(workout.total_duration_seconds / 60) + ' min';
+    } else if (workout.segment_count > 0) {
+        totalMinutes = '~' + Math.round(workout.segment_count * 3) + ' min';
+    }
+
+    if (workout.total_distance_km) {
+        totalDistanceStr = ` • ${workout.total_distance_km.toFixed(1)} km`;
+    }
 
     // Difficulty badge
     const difficultyMap = {
@@ -592,15 +726,24 @@ function createWorkoutCard(workout, isTemplate) {
     };
     const difficultyText = difficultyMap[workout.difficulty] || 'Nybegynner';
 
+    // Tags
+    let tagsHtml = '';
+    if (workout.tags && Array.isArray(workout.tags) && workout.tags.length > 0) {
+        tagsHtml = `<div class="workout-tags">
+            ${workout.tags.map(tag => `<span class="tag-badge">${tag}</span>`).join('')}
+        </div>`;
+    }
+
     card.innerHTML = `
         <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
             <h3>${workout.name}</h3>
             <span class="difficulty-badge ${workout.difficulty || 'beginner'}">${difficultyText}</span>
         </div>
         <p>${workout.description || 'Ingen beskrivelse'}</p>
+        ${tagsHtml}
         <div class="workout-meta">
             <span>📋 ${workout.segment_count} segmenter</span>
-            <span>⏱️ ${totalMinutes}</span>
+            <span>⏱️ ${totalMinutes}${totalDistanceStr}</span>
         </div>
         <div class="workout-details" id="workoutDetails${workout.id}">
             <button class="btn-details" onclick="toggleWorkoutDetails(${workout.id})">Vis detaljer</button>
@@ -1055,7 +1198,7 @@ async function executeSegment(index) {
         // Calculate overall progress
         const totalDuration = currentWorkout.segments.reduce((sum, s) => sum + s.duration_seconds, 0);
         const elapsed = currentWorkout.segments.slice(0, index).reduce((sum, s) => sum + s.duration_seconds, 0) +
-                       (segment.duration_seconds - segmentTimeRemaining);
+            (segment.duration_seconds - segmentTimeRemaining);
         const overallProgress = (elapsed / totalDuration) * 100;
 
         // Update overall progress bar and percentage
@@ -1123,6 +1266,32 @@ async function endSession() {
         loadSessions();
     } catch (error) {
         console.error('Failed to end session:', error);
+    }
+}
+
+function handleTreadmillStatus(status, code) {
+    // 0x04 = Started - treadmill has started running
+    if (code === 0x04) {
+        // Auto-start a manual session if no session is active
+        if (!currentSession) {
+            console.log('Treadmill started - auto-starting manual session');
+            startSession(); // No workoutId = manual session
+        }
+    }
+
+    // 0x02 = Stopped - treadmill has stopped
+    // 0x01 = Reset - treadmill was reset
+    if (code === 0x02 || code === 0x01) {
+        // Auto-end the current session if one is active
+        if (currentSession) {
+            console.log('Treadmill stopped - auto-ending session');
+            endSession();
+
+            // If this was a structured workout, also stop it
+            if (currentWorkout) {
+                stopWorkout();
+            }
+        }
     }
 }
 

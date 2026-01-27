@@ -4,7 +4,21 @@ param(
     [string]$BackupFile
 )
 
-$PI_HOST = "192.168.1.12"
+$EnvPath = Join-Path $PSScriptRoot "..\.env.local"
+if (Test-Path $EnvPath) {
+    Get-Content $EnvPath | ForEach-Object {
+        if ($_ -match '^\s*([^#=]+)\s*=\s*(.*)$') {
+            Set-Variable -Name $matches[1] -Value $matches[2] -Scope Script
+        }
+    }
+}
+
+if (-not $PI_HOST) {
+    $PI_HOST = Read-Host "Enter Raspberry Pi IP address/Hostname (e.g. 192.168.1.12)"
+}
+if (-not $PI_USER) {
+    $PI_USER = "pi"
+}
 $BACKUP_DIR = ".\backups"
 
 Write-Host "🔄 Restore Treadmill Database" -ForegroundColor Cyan
@@ -57,24 +71,24 @@ if ($confirm -ne 'YES') {
 # Stop container first
 Write-Host ""
 Write-Host "Stopping container..." -ForegroundColor Yellow
-ssh pi@$PI_HOST 'cd ~/treadmill-controller && docker compose stop'
+ssh $PI_USER@$PI_HOST 'cd ~/treadmill-controller && docker compose stop'
 
 # Upload database
 Write-Host "Uploading backup to Raspberry Pi..." -ForegroundColor Yellow
-scp $BackupFile pi@${PI_HOST}:/home/pi/treadmill-controller/data/treadmill.db
+scp $BackupFile $PI_USER@${PI_HOST}:/home/$PI_USER/treadmill-controller/data/treadmill.db
 
 if ($LASTEXITCODE -eq 0) {
     # Restart container
     Write-Host "Restarting container..." -ForegroundColor Yellow
-    ssh pi@$PI_HOST 'cd ~/treadmill-controller && docker compose start'
+    ssh $PI_USER@$PI_HOST 'cd ~/treadmill-controller && docker compose start'
 
     Start-Sleep -Seconds 2
 
     Write-Host ""
     Write-Host "✅ Database restored successfully!" -ForegroundColor Green
-    Write-Host "🌐 App is available at: http://192.168.1.12:3001" -ForegroundColor Cyan
+    Write-Host "🌐 App is available at: http://$PI_HOST:3001" -ForegroundColor Cyan
 } else {
     Write-Host "❌ Restore failed!" -ForegroundColor Red
     Write-Host "Starting container anyway..." -ForegroundColor Yellow
-    ssh pi@$PI_HOST 'cd ~/treadmill-controller && docker compose start'
+    ssh $PI_USER@$PI_HOST 'cd ~/treadmill-controller && docker compose start'
 }

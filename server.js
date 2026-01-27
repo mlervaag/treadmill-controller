@@ -14,15 +14,15 @@ const useHTTPS = fs.existsSync('./certs/server.key') && fs.existsSync('./certs/s
 
 let server;
 if (useHTTPS) {
-    const httpsOptions = {
-        key: fs.readFileSync('./certs/server.key'),
-        cert: fs.readFileSync('./certs/server.crt')
-    };
-    server = https.createServer(httpsOptions, app);
-    console.log('🔒 HTTPS enabled');
+  const httpsOptions = {
+    key: fs.readFileSync('./certs/server.key'),
+    cert: fs.readFileSync('./certs/server.crt')
+  };
+  server = https.createServer(httpsOptions, app);
+  console.log('🔒 HTTPS enabled');
 } else {
-    server = http.createServer(app);
-    console.log('⚠️  HTTP mode (HTTPS certificates not found)');
+  server = http.createServer(app);
+  console.log('⚠️  HTTP mode (HTTPS certificates not found)');
 }
 
 const wss = new WebSocket.Server({ server });
@@ -45,6 +45,7 @@ db.exec(`
     description TEXT,
     difficulty TEXT DEFAULT 'beginner',
     is_template INTEGER DEFAULT 0,
+    tags TEXT DEFAULT '[]',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
@@ -87,26 +88,48 @@ db.exec(`
 // API Routes
 app.get('/api/workouts', (req, res) => {
   const workouts = db.prepare(`
-    SELECT w.*, COUNT(ws.id) as segment_count
+    SELECT 
+      w.*, 
+      COUNT(ws.id) as segment_count,
+      COALESCE(SUM(ws.duration_seconds), 0) as total_duration_seconds,
+      COALESCE(SUM(ws.duration_seconds * ws.speed_kmh / 3600.0), 0) as total_distance_km
     FROM workouts w
     LEFT JOIN workout_segments ws ON w.id = ws.workout_id
     GROUP BY w.id
     ORDER BY w.created_at DESC
   `).all();
-  res.json(workouts);
+
+  // Parse tags from JSON string
+  const workoutsWithTags = workouts.map(w => ({
+    ...w,
+    tags: w.tags ? JSON.parse(w.tags) : []
+  }));
+
+  res.json(workoutsWithTags);
 });
 
 // Get template workouts - MUST come before /api/workouts/:id
+// Get template workouts - MUST come before /api/workouts/:id
 app.get('/api/workouts/templates', (req, res) => {
   const templates = db.prepare(`
-    SELECT w.*, COUNT(ws.id) as segment_count
+    SELECT 
+      w.*, 
+      COUNT(ws.id) as segment_count,
+      COALESCE(SUM(ws.duration_seconds), 0) as total_duration_seconds,
+      COALESCE(SUM(ws.duration_seconds * ws.speed_kmh / 3600.0), 0) as total_distance_km
     FROM workouts w
     LEFT JOIN workout_segments ws ON w.id = ws.workout_id
     WHERE w.is_template = 1
     GROUP BY w.id
     ORDER BY w.id ASC
   `).all();
-  res.json(templates);
+
+  const templatesWithTags = templates.map(t => ({
+    ...t,
+    tags: t.tags ? JSON.parse(t.tags) : []
+  }));
+
+  res.json(templatesWithTags);
 });
 
 app.get('/api/workouts/:id', (req, res) => {
@@ -119,6 +142,15 @@ app.get('/api/workouts/:id', (req, res) => {
     const workout = db.prepare('SELECT * FROM workouts WHERE id = ?').get(id);
     if (!workout) {
       return res.status(404).json({ error: 'Treningsøkt ikke funnet' });
+    }
+
+    // Parse tags if present
+    if (workout.tags) {
+      try {
+        workout.tags = JSON.parse(workout.tags);
+      } catch (e) {
+        workout.tags = [];
+      }
     }
 
     const segments = db.prepare('SELECT * FROM workout_segments WHERE workout_id = ? ORDER BY segment_order').all(id);
@@ -497,119 +529,121 @@ app.get('/api/stats/monthly', (req, res) => {
   res.json(monthlyData);
 });
 
-// Initialize template workouts if not exists
+// Initialize template workouts from JSON file
 function initializeTemplates() {
-  const templateCount = db.prepare('SELECT COUNT(*) as count FROM workouts WHERE is_template = 1').get();
+  try {
+    const templatesPath = path.join(__dirname, 'templates.json');
 
-  if (templateCount.count === 0) {
-    console.log('Initializing template workouts...');
+    if (!fs.existsSync(templatesPath)) {
+      console.log('⚠️  templates.json not found, skipping template initialization.');
+      return;
+    }
 
-    const templates = [
-      {
-        name: 'Couch to 5K - Uke 1',
-        description: 'Den klassiske Couch to 5K programmet. Perfekt for absolutte nybegynnere. Veksler mellom gange og jogging for å bygge utholdenhet.',
-        difficulty: 'beginner',
-        segments: [
-          { name: 'Oppvarming', duration: 300, speed: 5.0, incline: 0 },
-          { name: 'Jogg 1', duration: 60, speed: 7.0, incline: 0 },
-          { name: 'Gange 1', duration: 90, speed: 5.0, incline: 0 },
-          { name: 'Jogg 2', duration: 60, speed: 7.0, incline: 0 },
-          { name: 'Gange 2', duration: 90, speed: 5.0, incline: 0 },
-          { name: 'Jogg 3', duration: 60, speed: 7.0, incline: 0 },
-          { name: 'Gange 3', duration: 90, speed: 5.0, incline: 0 },
-          { name: 'Jogg 4', duration: 60, speed: 7.0, incline: 0 },
-          { name: 'Gange 4', duration: 90, speed: 5.0, incline: 0 },
-          { name: 'Jogg 5', duration: 60, speed: 7.0, incline: 0 },
-          { name: 'Nedkjøling', duration: 300, speed: 4.0, incline: 0 }
-        ]
-      },
-      {
-        name: 'HIIT - High Intensity Interval Training',
-        description: 'Inspirert av Tabata-metoden. Korte, intense intervaller etterfulgt av aktiv hvile. Effektiv for fettforbrenning og kondisjonsforbedring på kort tid.',
-        difficulty: 'intermediate',
-        segments: [
-          { name: 'Oppvarming', duration: 300, speed: 6.0, incline: 0 },
-          { name: 'Sprint 1', duration: 30, speed: 12.0, incline: 0 },
-          { name: 'Hvile 1', duration: 60, speed: 5.0, incline: 0 },
-          { name: 'Sprint 2', duration: 30, speed: 12.0, incline: 0 },
-          { name: 'Hvile 2', duration: 60, speed: 5.0, incline: 0 },
-          { name: 'Sprint 3', duration: 30, speed: 12.0, incline: 0 },
-          { name: 'Hvile 3', duration: 60, speed: 5.0, incline: 0 },
-          { name: 'Sprint 4', duration: 30, speed: 12.0, incline: 0 },
-          { name: 'Hvile 4', duration: 60, speed: 5.0, incline: 0 },
-          { name: 'Sprint 5', duration: 30, speed: 12.0, incline: 0 },
-          { name: 'Hvile 5', duration: 60, speed: 5.0, incline: 0 },
-          { name: 'Sprint 6', duration: 30, speed: 12.0, incline: 0 },
-          { name: 'Nedkjøling', duration: 300, speed: 4.5, incline: 0 }
-        ]
-      },
-      {
-        name: 'Hill Climbing - Fjelltrening',
-        description: 'Klassisk stigningstrening inspirert av fjellløpere. Bygger styrke i beina og forbedrer anaerob kapasitet. Økende vanskelighetsgrad.',
-        difficulty: 'intermediate',
-        segments: [
-          { name: 'Oppvarming flat', duration: 300, speed: 6.0, incline: 0 },
-          { name: 'Lett stigning', duration: 180, speed: 7.0, incline: 3 },
-          { name: 'Flat hvile', duration: 120, speed: 5.5, incline: 0 },
-          { name: 'Middels stigning', duration: 180, speed: 6.5, incline: 6 },
-          { name: 'Flat hvile', duration: 120, speed: 5.5, incline: 0 },
-          { name: 'Bratt stigning', duration: 180, speed: 6.0, incline: 9 },
-          { name: 'Flat hvile', duration: 120, speed: 5.5, incline: 0 },
-          { name: 'Maksimal stigning', duration: 120, speed: 5.5, incline: 12 },
-          { name: 'Nedkjøling', duration: 360, speed: 4.5, incline: 0 }
-        ]
-      },
-      {
-        name: 'Steady State - Langkjøring',
-        description: 'Basert på Maffetone-metoden. Moderat intensitet over lengre tid for å bygge aerob kapasitet. Perfekt for å øke utholdenhet.',
-        difficulty: 'beginner',
-        segments: [
-          { name: 'Oppvarming', duration: 300, speed: 5.5, incline: 0 },
-          { name: 'Steady pace', duration: 1200, speed: 8.0, incline: 0 },
-          { name: 'Nedkjøling', duration: 300, speed: 5.0, incline: 0 }
-        ]
-      },
-      {
-        name: 'Pyramid Intervals - Pyramidetrening',
-        description: 'Progressiv intervalltrening inspirert av Jack Daniels Running Formula. Økende og deretter minkende intensitet - bygger både fart og utholdenhet.',
-        difficulty: 'intermediate',
-        segments: [
-          { name: 'Oppvarming', duration: 300, speed: 6.0, incline: 0 },
-          { name: 'Intervall 1 min', duration: 60, speed: 10.0, incline: 0 },
-          { name: 'Hvile', duration: 60, speed: 5.5, incline: 0 },
-          { name: 'Intervall 2 min', duration: 120, speed: 9.5, incline: 0 },
-          { name: 'Hvile', duration: 90, speed: 5.5, incline: 0 },
-          { name: 'Intervall 3 min', duration: 180, speed: 9.0, incline: 0 },
-          { name: 'Hvile', duration: 120, speed: 5.5, incline: 0 },
-          { name: 'Intervall 4 min', duration: 240, speed: 8.5, incline: 0 },
-          { name: 'Hvile', duration: 120, speed: 5.5, incline: 0 },
-          { name: 'Intervall 3 min', duration: 180, speed: 9.0, incline: 0 },
-          { name: 'Hvile', duration: 90, speed: 5.5, incline: 0 },
-          { name: 'Intervall 2 min', duration: 120, speed: 9.5, incline: 0 },
-          { name: 'Hvile', duration: 60, speed: 5.5, incline: 0 },
-          { name: 'Intervall 1 min', duration: 60, speed: 10.0, incline: 0 },
-          { name: 'Nedkjøling', duration: 300, speed: 4.5, incline: 0 }
-        ]
-      }
-    ];
+    const templatesData = fs.readFileSync(templatesPath, 'utf8');
+    const templates = JSON.parse(templatesData);
 
-    templates.forEach(template => {
-      const workoutResult = db.prepare(`
-        INSERT INTO workouts (name, description, difficulty, is_template)
-        VALUES (?, ?, ?, 1)
-      `).run(template.name, template.description, template.difficulty);
+    if (!Array.isArray(templates)) {
+      console.error('❌ templates.json must contain an array of template objects.');
+      return;
+    }
 
-      const workoutId = workoutResult.lastInsertRowid;
+    // Ensure tags column exists (simple migration)
+    try {
+      db.prepare("SELECT tags FROM workouts LIMIT 1").get();
+    } catch (err) {
+      console.log('🔄 Adding tags column to workouts table...');
+      db.exec("ALTER TABLE workouts ADD COLUMN tags TEXT DEFAULT '[]'");
+    }
 
-      template.segments.forEach((segment, index) => {
-        db.prepare(`
-          INSERT INTO workout_segments (workout_id, segment_order, duration_seconds, speed_kmh, incline_percent, segment_name)
-          VALUES (?, ?, ?, ?, ?, ?)
-        `).run(workoutId, index, segment.duration, segment.speed, segment.incline, segment.name);
+    console.log(`📂 Found ${templates.length} templates in templates.json. Syncing...`);
+
+    let addedCount = 0;
+    let updatedCount = 0;
+
+    const insertWorkout = db.prepare(`
+      INSERT INTO workouts (name, description, difficulty, is_template, tags)
+      VALUES (?, ?, ?, 1, ?)
+    `);
+
+    const updateWorkout = db.prepare(`
+        UPDATE workouts 
+        SET description = ?, difficulty = ?, tags = ?
+        WHERE id = ?
+    `);
+
+    const deleteSegments = db.prepare('DELETE FROM workout_segments WHERE workout_id = ?');
+
+    const insertSegment = db.prepare(`
+      INSERT INTO workout_segments (workout_id, segment_order, duration_seconds, speed_kmh, incline_percent, segment_name)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `);
+
+    db.transaction(() => {
+      templates.forEach(template => {
+        const existing = db.prepare('SELECT id FROM workouts WHERE name = ? AND is_template = 1').get(template.name);
+        const tagsJson = JSON.stringify(template.tags || []);
+
+        if (!existing) {
+          console.log(`   ➕ Adding new template: ${template.name}`);
+
+          const result = insertWorkout.run(
+            template.name,
+            template.description || '',
+            template.difficulty || 'beginner',
+            tagsJson
+          );
+          const workoutId = result.lastInsertRowid;
+
+          if (template.segments && Array.isArray(template.segments)) {
+            template.segments.forEach((segment, index) => {
+              insertSegment.run(
+                workoutId,
+                index,
+                segment.duration || 60,
+                segment.speed || 0,
+                segment.incline || 0,
+                segment.name || null
+              );
+            });
+          }
+          addedCount++;
+        } else {
+          // Update existing template to ensure tags and description are fresh
+          // console.log(`   ↻ Updating existing template: ${template.name}`);
+          updateWorkout.run(
+            template.description || '',
+            template.difficulty || 'beginner',
+            tagsJson,
+            existing.id
+          );
+
+          // Re-insert segments to ensure they match JSON
+          deleteSegments.run(existing.id);
+          if (template.segments && Array.isArray(template.segments)) {
+            template.segments.forEach((segment, index) => {
+              insertSegment.run(
+                existing.id,
+                index,
+                segment.duration || 60,
+                segment.speed || 0,
+                segment.incline || 0,
+                segment.name || null
+              );
+            });
+          }
+          updatedCount++;
+        }
       });
-    });
+    })();
 
-    console.log('Template workouts initialized successfully!');
+    if (addedCount > 0 || updatedCount > 0) {
+      console.log(`✅ Synced templates: ${addedCount} added, ${updatedCount} updated.`);
+    } else {
+      console.log('✅ All templates are up to date.');
+    }
+
+  } catch (error) {
+    console.error('❌ Error initializing templates:', error);
   }
 }
 
