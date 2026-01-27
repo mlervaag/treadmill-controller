@@ -87,12 +87,12 @@ docker compose logs --tail=20
 Write-Host ""
 Write-Host "🎉 Deployment finished!" -ForegroundColor Green
 Write-Host ""
-Write-Host "🌐 Access the app at: https://192.168.1.12:3001" -ForegroundColor Cyan
+Write-Host "🌐 Access the app at: https://${PI_HOST}:3001" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "⚠️  If HTTPS is not working yet, run: .\enable-https.ps1" -ForegroundColor Yellow
+Write-Host "⚠️  If HTTPS is not working yet, run: .\scripts\enable-https.ps1" -ForegroundColor Yellow
 Write-Host ""
 Write-Host "Useful commands:" -ForegroundColor Yellow
-Write-Host "  View logs:    ssh pi@192.168.1.12 'cd ~/treadmill-controller && docker compose logs -f'"
-Write-Host "  Restart:      ssh pi@192.168.1.12 'cd ~/treadmill-controller && docker compose restart'"
-Write-Host "  Stop:         ssh pi@192.168.1.12 'cd ~/treadmill-controller && docker compose down'"
-Write-Host "  View status:  ssh pi@192.168.1.12 'cd ~/treadmill-controller && docker compose ps'"
+Write-Host "  View logs:    ssh ${PI_USER}@${PI_HOST} 'cd ${APP_DIR} && docker compose logs -f'"
+Write-Host "  Restart:      ssh ${PI_USER}@${PI_HOST} 'cd ${APP_DIR} && docker compose restart'"
+Write-Host "  Stop:         ssh ${PI_USER}@${PI_HOST} 'cd ${APP_DIR} && docker compose down'"
+Write-Host "  View status:  ssh ${PI_USER}@${PI_HOST} 'cd ${APP_DIR} && docker compose ps'"

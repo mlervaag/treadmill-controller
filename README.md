@@ -15,16 +15,16 @@ En moderne, fullstendig webapplikasjon for å kontrollere tredemøllen din via B
 - **Live statistikk**: Se hastighet, distanse, tid, puls, kalorier og effekt
 
 ### 💪 Treningsøkter
-- **Forhåndsdefinerte maler**: 5 profesjonelle treningsøkter inkludert:
-  - Couch to 5K (nybegynner)
-  - HIIT - High Intensity Interval Training
-  - Hill Climbing - Fjelltrening
-  - Steady State - Langkjøring
-  - Pyramid Intervals - Pyramidetrening
+- **38 profesjonelle treningsøkter** fordelt på 3 nivåer:
+  - **Beginner (23)**: Couch to 5K (9 uker), Steady State, Standard intervaller, Motbakke intro
+  - **Intermediate (9)**: VO2max 5x3, Threshold 2x10, Tempo 20 min, Hill Repeats, Pyramide
+  - **Advanced (8)**: VO2max 6x4, Speed 400m x12, Threshold 3x12, Hill Sprints, Long Runs
+- **Komplett progresjon**: Fra sofa til erfaren løper med treningsvitenskap-baserte økter
+- **Full tredemølle-utnyttelse**: 1-14 km/t hastighet, 0-12% stigning
 - **Egendefinerte økter**: Lag dine egne treningsøkter med flere segmenter
-- **Automatisk kjøring**: Start forhåndsdefinerte økter som kjører automatisk
-- **Segment-støtte**: Hvert segment med egen varighet, hastighet og stigning
-- **Filtrering & Tags**: Finn økter raskt basert på type (intervall, langkjøring), varighet og vanskelighetsgrad
+- **Automatisk kjøring**: Appen styrer hastighet og stigning automatisk gjennom segmentene
+- **Segment-støtte**: Hvert segment med eget navn, varighet, hastighet og stigning
+- **Smart filtrering**: Søk på difficulty, tags (c25k, vo2max, threshold, etc.) og varighet
 
 ### 📊 Historikk & Statistikk
 - **Tre visninger**: Oversikt, Økter, og Trender

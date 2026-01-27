@@ -33,14 +33,15 @@ ssh $PI_USER@$PI_HOST 'cd ~/treadmill-controller && docker compose up -d'
 Write-Host "Waiting for server to be ready..." -ForegroundColor Yellow
 Start-Sleep -Seconds 5
 
-$status = ssh pi@$PI_HOST 'docker ps --filter name=treadmill-controller --format "{{.Status}}"'
+$status = ssh $PI_USER@$PI_HOST 'docker ps --filter name=treadmill-controller --format "{{.Status}}"'
 
 if ($status) {
     Write-Host ""
-    Write-Host "Server started successfully!" -ForegroundColor Green
-    Write-Host "Access at: https://192.168.1.12:3001" -ForegroundColor Cyan
+    Write-Host "✅ Server started successfully!" -ForegroundColor Green
     Write-Host ""
-    Write-Host "Tip: Run stop-server.ps1 when done to save power" -ForegroundColor Gray
+    Write-Host "Access at: https://${PI_HOST}:3001" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "Tip: Run .\scripts\stop-server.ps1 when done to save power" -ForegroundColor Gray
 } else {
     Write-Host "Failed to start. Check logs with:" -ForegroundColor Red
     Write-Host "  ssh $PI_USER@$PI_HOST 'cd ~/treadmill-controller && docker compose logs'" -ForegroundColor Red
