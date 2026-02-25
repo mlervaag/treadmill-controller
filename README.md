@@ -233,11 +233,22 @@ treadmill-controller/
 ├── README.md                  # Denne filen
 ├── CLAUDE.md                  # Utviklingsdokumentasjon for Claude Code
 ├── STRAVA_INTEGRATION.md      # Teknisk Strava-dokumentasjon
+├── ROADMAP.md                 # Planlagte funksjoner og veikart
 ├── data/                      # Database (git-ignored)
 │   └── treadmill.db           # SQLite database
 ├── certs/                     # SSL-sertifikater (git-ignored)
 │   ├── server.key
 │   └── server.crt
+├── docs/                      # Brukerveiledninger
+│   ├── HOME_USAGE_GUIDE.md    # Komplett bruksanvisning
+│   └── WEB_BLUETOOTH_SETUP.md # Web Bluetooth oppsettguide
+├── scripts/                   # Hjelpeskript (PowerShell)
+│   ├── deploy-to-pi.ps1       # Deploy til Raspberry Pi
+│   ├── enable-https.ps1       # Aktiver HTTPS-sertifikater
+│   ├── start-server.ps1       # Start serveren
+│   ├── stop-server.ps1        # Stopp serveren
+│   ├── backup-database.ps1    # Sikkerhetskopier database
+│   └── restore-database.ps1   # Gjenopprett database fra backup
 └── public/                    # Frontend
     ├── index.html             # Hovedside med full UI
     ├── style.css              # Responsiv dark-theme styling
@@ -367,9 +378,64 @@ Heart Rate Service:   0000180d-0000-1000-8000-00805f9b34fb
 - **Lyd**: Web Audio API (oscillator-baserte varsler)
 - **Design**: Responsive, Mobile-first, Dark theme
 
+## 📚 Dokumentasjon
+
+- **[HOME_USAGE_GUIDE.md](docs/HOME_USAGE_GUIDE.md)** — Komplett bruksanvisning for daglig bruk
+- **[WEB_BLUETOOTH_SETUP.md](docs/WEB_BLUETOOTH_SETUP.md)** — Guide for å sette opp Web Bluetooth
+- **[STRAVA_INTEGRATION.md](STRAVA_INTEGRATION.md)** — Teknisk dokumentasjon for Strava-integrasjonen
+- **[ROADMAP.md](ROADMAP.md)** — Planlagte funksjoner og fremtidig utvikling
+- **[CLAUDE.md](CLAUDE.md)** — Utviklingsdokumentasjon for Claude Code
+
+## 🛠️ Hjelpeskript
+
+PowerShell-skript i `scripts/`-mappen for vanlige oppgaver:
+
+| Skript | Beskrivelse |
+|--------|-------------|
+| `deploy-to-pi.ps1` | Deploy applikasjonen til Raspberry Pi |
+| `enable-https.ps1` | Generer og aktiver SSL-sertifikater |
+| `start-server.ps1` | Start serveren lokalt |
+| `stop-server.ps1` | Stopp serveren |
+| `backup-database.ps1` | Ta backup av databasen |
+| `restore-database.ps1` | Gjenopprett database fra backup |
+
+## 🗺️ Veikart
+
+Se [ROADMAP.md](ROADMAP.md) for komplett veikart. Oppsummering:
+
+### ✅ Implementert
+- Strava-integrasjon (OAuth, TCX-opplasting, auto-sync)
+- Treningsdata-graf (Chart.js med fart/puls/stigning)
+- Lydvarsler (segmentbytte, fullføring)
+- Eksport (JSON, CSV, TCX)
+- Datofilter for historikk
+- Workout-redigering
+- Auto BLE-reconnect
+- Per-segment feedback
+- PWA med offline-støtte
+- View-only dashboard for iPad/iPhone
+
+### 🔜 Planlagt
+- **Heart Rate Zone Training** — Pulsbasert adaptiv trening med brukerprofil (høy prioritet)
+- **Workout Builder** — Visuell drag-and-drop segment-creator
+- **Avansert Analyse** — Treningsbelastning (TSS/TRIMP), fitness-trender
+- **Flerbruker-støtte** — Flere brukerprofiler med individuell statistikk
+- **Stemme-feedback** — Talevarsler under trening
+
 ## 📄 Lisens
 
 ISC License — se [LICENSE](LICENSE) for detaljer.
+
+## 🙏 Anerkjennelser
+
+- [Web Bluetooth API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Bluetooth_API) for trådløs tredemøllekontroll
+- [FTMS-standarden](https://www.bluetooth.com/specifications/specs/fitness-machine-service-1-0/) for Bluetooth fitness-maskin-kommunikasjon
+- [Chart.js](https://www.chartjs.org/) for interaktive grafer
+- [Strava API v3](https://developers.strava.com/) for treningssynkronisering
+
+## ⚠️ Ansvarsfraskrivelse
+
+Denne applikasjonen kontrollerer fysisk treningsutstyr. Bruk på eget ansvar. Sørg alltid for at du har kontroll over tredemøllen og at nødstoppfunksjonen er tilgjengelig. Forfatteren er ikke ansvarlig for skader eller uhell som følge av bruk av denne programvaren.
 
 ---
 
