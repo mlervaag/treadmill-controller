@@ -9,6 +9,8 @@
     <meta name="theme-color" content="#000000">
     <title>Tredemølle Kontroller</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="/manifest.json">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
 </head>
 
 <body>
@@ -16,10 +18,40 @@
         <header>
             <h1>🏃 Tredemølle Kontroller</h1>
             <div class="connection-status">
-                <button id="connectBtn" class="btn btn-primary">Koble til Tredemølle</button>
+                <button id="connectBtn" class="btn btn-primary">📱 Koble til Tredemølle</button>
+                <button id="connectHRMBtn" class="btn btn-secondary">❤️ Koble til Pulsbelte</button>
                 <button id="scanAllBtn" class="btn btn-secondary">Scan alle enheter</button>
                 <button id="discoverBtn" class="btn btn-secondary" disabled>Vis enhetsinformasjon</button>
-                <span id="connectionStatus" class="status-disconnected">Ikke tilkoblet</span>
+                <span id="connectionStatus" class="status-disconnected" role="status" aria-live="polite">Ikke tilkoblet</span>
+            </div>
+
+            <!-- Heart Rate Monitor Status Card -->
+            <div id="hrmStatusCard" class="hrm-status-card hidden">
+                <div class="hrm-header">
+                    <div class="hrm-device-info">
+                        <span class="hrm-icon">❤️</span>
+                        <span id="hrmDeviceName" class="hrm-device-name">Pulsbelte</span>
+                    </div>
+                    <span id="hrmHeartRate" class="hrm-heart-rate">-- bpm</span>
+                </div>
+                <button class="btn btn-danger btn-small" onclick="disconnectHRM()">
+                    Koble fra
+                </button>
+            </div>
+
+            <!-- Heart Rate Source Indicator -->
+            <div id="heartRateSourceIndicator" class="source-indicator">
+                <span class="source-label">📊 Aktiv pulskilde:</span>
+                <span id="heartRateSource" class="source-value">Ingen</span>
+            </div>
+
+            <div class="header-toggles">
+                <label class="sound-toggle-label" title="Lyd-varsler ved segmentbytte">
+                    <input type="checkbox" id="soundToggle" checked> 🔊
+                </label>
+                <label class="auto-reconnect-label">
+                    <input type="checkbox" id="autoReconnectToggle" checked> Auto-reconnect
+                </label>
             </div>
         </header>
 
@@ -152,7 +184,7 @@
                                 km/t</small></label>
                         <div class="control-input">
                             <button class="btn-small" onclick="adjustSpeed(-0.1)">-</button>
-                            <input type="number" id="speedInput" min="0.1" max="14.0" step="0.1" value="5.0">
+                            <input type="number" id="speedInput" min="0.1" max="14.0" step="0.1" value="5.0" inputmode="decimal" autocomplete="off">
                             <button class="btn-small" onclick="adjustSpeed(0.1)">+</button>
                             <button class="btn btn-secondary" onclick="setSpeed()">Sett</button>
                         </div>
@@ -162,7 +194,7 @@
                         <label>Stigning (%) <small style="color: var(--text-secondary);">• 0-12%</small></label>
                         <div class="control-input">
                             <button class="btn-small" onclick="adjustIncline(-1)">-</button>
-                            <input type="number" id="inclineInput" min="0" max="12" step="1" value="0">
+                            <input type="number" id="inclineInput" min="0" max="12" step="1" value="0" inputmode="numeric" autocomplete="off">
                             <button class="btn-small" onclick="adjustIncline(1)">+</button>
                             <button class="btn btn-secondary" onclick="setIncline()">Sett</button>
                         </div>
@@ -199,8 +231,8 @@
 
                 <div id="workoutProgress" class="workout-progress hidden">
                     <div class="workout-progress-header">
-                        <h3>🏃 <span id="workoutName"></span></h3>
-                        <button class="btn-close-workout" onclick="stopWorkout()" title="Avslutt økt">×</button>
+                        <h3>🏃 <span id="activeWorkoutName"></span></h3>
+                        <button class="btn-close-workout" onclick="stopWorkout()" title="Avslutt økt" aria-label="Avslutt økt">×</button>
                     </div>
 
                     <!-- Overall Progress Bar -->
@@ -226,26 +258,32 @@
                         </div>
                         <div class="segment-stats">
                             <div class="segment-stat">
-                                <span class="segment-icon">🏃</span>
+                                <span class="segment-icon" role="img" aria-hidden="true">🏃</span>
                                 <div class="segment-stat-content">
                                     <span class="segment-stat-value" id="currentSegmentSpeed">5.0 km/t</span>
                                     <span class="segment-stat-label">Hastighet</span>
                                 </div>
                             </div>
                             <div class="segment-stat">
-                                <span class="segment-icon">⛰️</span>
+                                <span class="segment-icon" role="img" aria-hidden="true">⛰️</span>
                                 <div class="segment-stat-content">
                                     <span class="segment-stat-value" id="currentSegmentIncline">0%</span>
                                     <span class="segment-stat-label">Stigning</span>
                                 </div>
                             </div>
                             <div class="segment-stat">
-                                <span class="segment-icon">⏱️</span>
+                                <span class="segment-icon" role="img" aria-hidden="true">⏱️</span>
                                 <div class="segment-stat-content">
                                     <span class="segment-stat-value" id="segmentTimeLeft">5:00</span>
                                     <span class="segment-stat-label">Tid igjen</span>
                                 </div>
                             </div>
+                        </div>
+                        <div class="segment-verification" id="segmentVerification" style="display:none;">
+                            <small class="verification-label">
+                                Faktisk: <span id="actualSpeedDisplay">--</span> km/t |
+                                <span id="actualInclineDisplay">--</span>%
+                            </small>
                         </div>
                         <div class="segment-progress">
                             <div class="segment-progress-bar">
@@ -290,6 +328,7 @@
 
                 <!-- Filter Section (Always Visible) -->
                 <div class="filter-section">
+                    <span id="filterIndicator" class="filter-indicator hidden"></span>
                     <div id="filterMenu" class="filter-menu">
                         <div class="filter-group">
                             <h4>Nivå</h4>
@@ -332,8 +371,8 @@
                 <!-- Create Workout Form -->
                 <div id="createWorkoutForm" class="workout-form hidden">
                     <div class="form-header">
-                        <h3>Lag ny treningsøkt</h3>
-                        <button class="btn-close" onclick="cancelCreateWorkout()">×</button>
+                        <h3 id="workoutFormTitle">Lag ny treningsøkt</h3>
+                        <button class="btn-close" onclick="cancelCreateWorkout()" aria-label="Lukk">×</button>
                     </div>
 
                     <div class="form-group">
@@ -345,11 +384,11 @@
 
                     <div class="form-group">
                         <label>Navn:</label>
-                        <input type="text" id="workoutName" placeholder="F.eks. Intervalltrening">
+                        <input type="text" id="workoutName" placeholder="F.eks. Intervalltrening" required>
                     </div>
                     <div class="form-group">
                         <label>Beskrivelse:</label>
-                        <textarea id="workoutDescription" placeholder="Beskrivelse av økten"></textarea>
+                        <textarea id="workoutDescription" placeholder="Beskrivelse av økten" maxlength="1000"></textarea>
                     </div>
                     <div class="form-group">
                         <label>Vanskelighetsgrad:</label>
@@ -386,6 +425,7 @@
 
                     <div class="form-actions">
                         <button class="btn btn-primary" onclick="saveWorkout()">Lagre Økt</button>
+                        <button type="button" id="cancelEditBtn" class="btn btn-secondary hidden" onclick="cancelEdit()" aria-label="Avbryt redigering">Avbryt redigering</button>
                         <button class="btn btn-secondary" onclick="cancelCreateWorkout()">Avbryt</button>
                     </div>
                 </div>
@@ -398,8 +438,8 @@
                 <div class="history-header">
                     <h2>Treningshistorikk</h2>
                     <div class="history-view-toggle">
-                        <button class="toggle-btn active" data-view="overview"
-                            onclick="switchHistoryView('overview')">📊 Oversikt</button>
+                        <button class="toggle-btn active" data-view="historyOverview"
+                            onclick="switchHistoryView('historyOverview')">📊 Oversikt</button>
                         <button class="toggle-btn" data-view="sessions" onclick="switchHistoryView('sessions')">📋
                             Økter</button>
                         <button class="toggle-btn" data-view="trends" onclick="switchHistoryView('trends')">📈
@@ -408,7 +448,7 @@
                 </div>
 
                 <!-- Overview View -->
-                <div id="overviewView" class="history-view active">
+                <div id="historyOverviewView" class="history-view active">
                     <!-- Overall Statistics -->
                     <div class="stats-section">
                         <h3>Total Statistikk</h3>
@@ -503,10 +543,51 @@
                     </div>
                 </div>
 
+                <!-- Strava Integration -->
+                <div class="strava-section">
+                    <div id="stravaDisconnected" class="strava-card">
+                        <div class="strava-logo">
+                            <svg viewBox="0 0 24 24" width="24" height="24" fill="#FC4C02"><path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169"/></svg>
+                        </div>
+                        <h3>Koble til Strava</h3>
+                        <p>Synkroniser treningsøktene dine til Strava</p>
+                        <button id="connectStravaBtn" class="btn strava-btn" onclick="window.location.href='/auth/strava'" aria-label="Koble til Strava">
+                            Koble til Strava
+                        </button>
+                    </div>
+                    <div id="stravaConnected" class="strava-card hidden">
+                        <h3>✅ Koblet til Strava</h3>
+                        <p><strong id="stravaAthleteName"></strong></p>
+                        <div class="strava-options">
+                            <label><input type="checkbox" id="autoSyncStrava" checked> Automatisk opplasting</label>
+                        </div>
+                        <button class="btn btn-danger btn-small" onclick="disconnectStrava()" aria-label="Koble fra Strava">Koble fra</button>
+                    </div>
+                </div>
+
                 <!-- Sessions View -->
                 <div id="sessionsView" class="history-view">
+                    <!-- Date Filter -->
+                    <div class="date-filter-section">
+                        <div class="date-quick-filters">
+                            <button class="date-quick-btn date-filter-btn active" data-preset="all" onclick="setDateFilter('all')" aria-label="Vis alle økter">Alle</button>
+                            <button class="date-quick-btn date-filter-btn" data-preset="week" onclick="setDateFilter('week')" aria-label="Vis siste 7 dager">7 dager</button>
+                            <button class="date-quick-btn date-filter-btn" data-preset="month" onclick="setDateFilter('month')" aria-label="Vis denne måneden">Denne mnd</button>
+                            <button class="date-quick-btn date-filter-btn" data-preset="quarter" onclick="setDateFilter('quarter')" aria-label="Vis siste 3 måneder">3 mnd</button>
+                        </div>
+                        <div class="date-custom-filter">
+                            <input type="date" id="dateFilterStart" class="date-input" aria-label="Startdato">
+                            <span>til</span>
+                            <input type="date" id="dateFilterEnd" class="date-input" aria-label="Sluttdato">
+                            <button class="btn btn-small" onclick="applyCustomDateFilter()" aria-label="Bruk datofilter">Filtrer</button>
+                        </div>
+                    </div>
+
                     <div id="sessionsList" class="sessions-list">
-                        <!-- Sessions will be loaded here -->
+                        <div class="empty-state" id="sessionsEmptyState">
+                            <p>Ingen økter registrert ennå</p>
+                            <p class="empty-state-hint">Start en treningsøkt fra Kontroll-fanen</p>
+                        </div>
                     </div>
                 </div>
 
@@ -535,7 +616,7 @@
         <div class="quick-modal-content">
             <div class="quick-modal-header">
                 <h3>Velg Hastighet</h3>
-                <button class="quick-modal-close" onclick="closeQuickModal('speedModal')">&times;</button>
+                <button class="quick-modal-close" onclick="closeQuickModal('speedModal')" aria-label="Lukk">&times;</button>
             </div>
             <div class="quick-modal-body">
                 <div class="quick-buttons-grid" id="speedButtons"></div>
@@ -547,7 +628,7 @@
         <div class="quick-modal-content">
             <div class="quick-modal-header">
                 <h3>Velg Stigning</h3>
-                <button class="quick-modal-close" onclick="closeQuickModal('inclineModal')">&times;</button>
+                <button class="quick-modal-close" onclick="closeQuickModal('inclineModal')" aria-label="Lukk">&times;</button>
             </div>
             <div class="quick-modal-body">
                 <div class="quick-buttons-grid" id="inclineButtons"></div>
@@ -555,8 +636,30 @@
         </div>
     </div>
 
+    <!-- Session Chart Modal -->
+    <div id="chartModal" class="chart-modal hidden">
+        <div class="chart-modal-content">
+            <div class="chart-modal-header">
+                <h3 id="chartModalTitle">Treningsdata</h3>
+                <button class="btn-close" onclick="closeChartModal()" aria-label="Lukk">✕</button>
+            </div>
+            <div class="chart-container">
+                <canvas id="sessionChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toastContainer" class="toast-container" aria-live="polite"></div>
+
     <script src="ftms.js"></script>
+    <script src="hrm.js"></script>
     <script src="app.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js').catch(() => {});
+        }
+    </script>
 </body>
 
 </html>

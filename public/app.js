@@ -11,7 +11,7 @@ let currentViewMode = 'focus';
 let localTimeTimer = null;
 let localElapsedTime = 0;
 let isRunning = false;
-let currentHistoryView = 'overview';
+let currentHistoryView = 'historyOverview';
 // Removed: currentWorkoutView - simplified to single list view
 let allWorkouts = [];
 let sessionData = {
@@ -20,6 +20,45 @@ let sessionData = {
     heartRates: [],
     calories: 0
 };
+let hrm = null; // Heart Rate Monitor instance
+let hrmHeartRate = null; // Current HR from HRM
+let treadmillHeartRate = null; // Current HR from treadmill
+let activeHeartRateSource = 'none'; // 'hrm', 'treadmill', or 'none'
+let driftCheckTimer = null;
+let currentTargetSpeed = null;
+let currentTargetIncline = null;
+let quickAccessInitialized = false;
+let stateBroadcastWs = null;
+let stateBroadcastTimer = null;
+
+// Session graph (Chart.js)
+let sessionChart = null;
+
+// Sound alerts
+let soundAlertsEnabled = localStorage.getItem('soundAlerts') !== 'false';
+
+// Workout editing
+let editingWorkoutId = null;
+
+// Auto BLE reconnect
+let shouldAutoReconnect = localStorage.getItem('autoReconnect') !== 'false';
+let reconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 5;
+let reconnectTimer = null;
+
+function showToast(message, type = 'info', duration = 3000) {
+    const container = document.getElementById('toastContainer');
+    if (!container) return;
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.textContent = message;
+    container.appendChild(toast);
+    requestAnimationFrame(() => toast.classList.add('toast-visible'));
+    setTimeout(() => {
+        toast.classList.remove('toast-visible');
+        toast.addEventListener('transitionend', () => toast.remove());
+    }, duration);
+}
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
@@ -33,6 +72,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Check if Web Bluetooth is supported
     checkBluetoothSupport();
+
+    // Check Strava connection status
+    checkStravaConnection();
+
+    // Sound alerts toggle
+    const soundToggle = document.getElementById('soundToggle');
+    if (soundToggle) {
+        soundToggle.checked = soundAlertsEnabled;
+        soundToggle.addEventListener('change', () => {
+            soundAlertsEnabled = soundToggle.checked;
+            localStorage.setItem('soundAlerts', soundAlertsEnabled ? 'true' : 'false');
+        });
+    }
+
+    // Auto reconnect toggle
+    const autoReconnectToggle = document.getElementById('autoReconnectToggle');
+    if (autoReconnectToggle) {
+        autoReconnectToggle.checked = shouldAutoReconnect;
+        autoReconnectToggle.addEventListener('change', () => {
+            shouldAutoReconnect = autoReconnectToggle.checked;
+            localStorage.setItem('autoReconnect', shouldAutoReconnect ? 'true' : 'false');
+        });
+    }
 });
 
 function setupTabs() {
@@ -91,6 +153,7 @@ function setupEventListeners() {
     document.getElementById('connectBtn').addEventListener('click', () => connectToTreadmill(false));
     document.getElementById('scanAllBtn').addEventListener('click', () => connectToTreadmill(true));
     document.getElementById('discoverBtn').addEventListener('click', discoverDeviceInfo);
+    document.getElementById('connectHRMBtn').addEventListener('click', connectHRM);
 }
 
 async function connectToTreadmill(acceptAllDevices = false) {
@@ -109,7 +172,7 @@ async function connectToTreadmill(acceptAllDevices = false) {
 
     try {
         btn.disabled = true;
-        btn.textContent = 'Kobler til...';
+        btn.innerHTML = '<span class="spinner"></span> Kobler til...';
 
         treadmill = new TreadmillController();
 
@@ -134,10 +197,32 @@ async function connectToTreadmill(acceptAllDevices = false) {
         status.className = 'status-connected';
         enableControls();
 
+        treadmill.device.addEventListener('gattserverdisconnected', () => {
+            console.log('Treadmill disconnected');
+            stopDriftDetection();
+            stopStateBroadcast();
+            stopLocalTimer();
+            if (workoutTimer) {
+                clearInterval(workoutTimer);
+                workoutTimer = null;
+            }
+            document.getElementById('connectionStatus').textContent = 'Frakoblet';
+            document.getElementById('connectionStatus').className = 'status-disconnected';
+            document.getElementById('connectBtn').textContent = '📱 Koble til Tredemølle';
+            document.getElementById('connectBtn').disabled = false;
+            showToast('Tredemølle frakoblet', 'error');
+
+            // Auto reconnect if enabled
+            if (shouldAutoReconnect) {
+                reconnectAttempts = 0;
+                setTimeout(() => attemptReconnect(), 2000);
+            }
+        });
+
     } catch (error) {
         console.error('Connection error:', error);
         alert('Kunne ikke koble til tredemølle: ' + error.message);
-        btn.textContent = 'Koble til Tredemølle';
+        btn.textContent = '📱 Koble til Tredemølle';
         btn.disabled = false;
     }
 }
@@ -177,42 +262,12 @@ function updateStats(data) {
     }
     // If treadmill doesn't provide time, updateLocalTime() will handle it
 
-    // Heart rate: Only show if valid (not 0 or 255)
+    // Heart rate: Track treadmill heart rate and update display with prioritized source
     if (data.heart_rate !== undefined) {
         const isValidHR = data.heart_rate > 0 && data.heart_rate < 255;
-
-        // Find all HR elements
-        const hrElements = [
-            document.getElementById('currentHR'),
-            document.getElementById('focusHR'),
-            document.getElementById('minimalHR')
-        ];
-
-        // Find parent stat containers
-        const hrContainers = [
-            document.getElementById('currentHR')?.closest('.stat-item'),
-            document.getElementById('focusHR')?.closest('.stat-card'),
-            document.getElementById('minimalHR')?.closest('.stat-item')
-        ];
-
-        if (isValidHR) {
-            // Show valid heart rate
-            document.getElementById('currentHR').textContent = data.heart_rate;
-            document.getElementById('focusHR').textContent = data.heart_rate + ' bpm';
-            document.getElementById('minimalHR').textContent = data.heart_rate;
-
-            // Show HR containers
-            hrContainers.forEach(container => {
-                if (container) container.style.display = '';
-            });
-
-            sessionData.heartRates.push(data.heart_rate);
-        } else {
-            // Hide HR display when invalid
-            hrContainers.forEach(container => {
-                if (container) container.style.display = 'none';
-            });
-        }
+        treadmillHeartRate = isValidHR ? data.heart_rate : null;
+        updateHeartRateSource();
+        updateHeartRateDisplay();
     }
     if (data.total_energy_kcal !== undefined) {
         const kcal = Math.round(data.total_energy_kcal);
@@ -299,16 +354,23 @@ function recordSessionData(data) {
     // Only record calories if present and valid
     const validCalories = (data.total_energy_kcal && data.total_energy_kcal > 0) ? Math.round(data.total_energy_kcal) : null;
 
+    const dataBody = {
+        speed_kmh: data.speed_kmh,
+        incline_percent: data.incline_percent,
+        distance_km: data.total_distance_m ? data.total_distance_m / 1000 : null,
+        heart_rate: validHR,
+        calories: validCalories
+    };
+
+    // Include segment index if a structured workout is active
+    if (currentWorkout && currentSegmentIndex !== undefined) {
+        dataBody.segment_index = currentSegmentIndex;
+    }
+
     fetch(`/api/sessions/${currentSession}/data`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            speed_kmh: data.speed_kmh,
-            incline_percent: data.incline_percent,
-            distance_km: data.total_distance_m ? data.total_distance_m / 1000 : null,
-            heart_rate: validHR,
-            calories: validCalories
-        })
+        body: JSON.stringify(dataBody)
     }).catch(err => console.error('Failed to record session data:', err));
 }
 
@@ -425,7 +487,8 @@ async function stopTreadmill() {
     if (!treadmill) return;
     try {
         await treadmill.stop();
-        stopLocalTimer(); // Stop local timer
+        stopLocalTimer();
+        stopDriftDetection();
         if (currentSession) {
             await endSession();
         }
@@ -439,20 +502,186 @@ async function stopTreadmill() {
     }
 }
 
-async function stopWorkout() {
-    if (!confirm('Er du sikker på at du vil avslutte økten?')) {
+function startDriftDetection() {
+    stopDriftDetection();
+    driftCheckTimer = setInterval(async () => {
+        if (!treadmill || !treadmill.isConnected() || !currentWorkout) return;
+        if (currentTargetSpeed === null) return;
+
+        const actualSpeed = treadmill.getLastReportedSpeed();
+        const actualIncline = treadmill.getLastReportedIncline();
+
+        // Update actual display
+        const verificationEl = document.getElementById('segmentVerification');
+        if (verificationEl) {
+            verificationEl.style.display = 'block';
+            document.getElementById('actualSpeedDisplay').textContent = actualSpeed !== null ? actualSpeed.toFixed(1) : '--';
+            document.getElementById('actualInclineDisplay').textContent = actualIncline !== null ? actualIncline.toFixed(1) : '--';
+        }
+
+        if (actualSpeed !== null && Math.abs(actualSpeed - currentTargetSpeed) > 0.3) {
+            console.warn(`Speed drift: target=${currentTargetSpeed}, actual=${actualSpeed}. Re-sending.`);
+            try { await treadmill.setSpeed(currentTargetSpeed); } catch (e) { console.error('Drift correction failed:', e); }
+        }
+
+        if (actualIncline !== null && Math.abs(actualIncline - currentTargetIncline) > 0.5) {
+            console.warn(`Incline drift: target=${currentTargetIncline}, actual=${actualIncline}. Re-sending.`);
+            try { await treadmill.setIncline(currentTargetIncline); } catch (e) { console.error('Drift correction failed:', e); }
+        }
+    }, 8000);
+}
+
+function stopDriftDetection() {
+    if (driftCheckTimer) {
+        clearInterval(driftCheckTimer);
+        driftCheckTimer = null;
+    }
+    currentTargetSpeed = null;
+    currentTargetIncline = null;
+    const verificationEl = document.getElementById('segmentVerification');
+    if (verificationEl) verificationEl.style.display = 'none';
+}
+
+// --- WebSocket State Broadcast for View-Only Clients ---
+function buildCurrentState() {
+    let hr = null;
+    if (hrmHeartRate !== null && hrmHeartRate > 0) {
+        hr = hrmHeartRate;
+    } else if (treadmillHeartRate !== null && treadmillHeartRate > 0 && treadmillHeartRate < 255) {
+        hr = treadmillHeartRate;
+    }
+
+    let workoutInfo = null;
+    if (currentWorkout && currentWorkout.segments) {
+        const segments = currentWorkout.segments;
+        const totalDuration = segments.reduce((sum, s) => sum + s.duration_seconds, 0);
+        const currentSeg = segments[currentSegmentIndex];
+        const elapsedSegments = segments.slice(0, currentSegmentIndex).reduce((sum, s) => sum + s.duration_seconds, 0);
+        const elapsedInCurrent = currentSeg ? currentSeg.duration_seconds - segmentTimeRemaining : 0;
+        const elapsedInWorkout = elapsedSegments + elapsedInCurrent;
+
+        workoutInfo = {
+            name: currentWorkout.name,
+            totalSegments: segments.length,
+            currentSegmentIndex: currentSegmentIndex,
+            currentSegment: currentSeg ? {
+                name: currentSeg.segment_name || `Segment ${currentSegmentIndex + 1}`,
+                targetSpeed: currentSeg.speed_kmh,
+                targetIncline: currentSeg.incline_percent,
+                durationSeconds: currentSeg.duration_seconds,
+                timeRemaining: segmentTimeRemaining
+            } : null,
+            nextSegment: segments[currentSegmentIndex + 1] ? {
+                name: segments[currentSegmentIndex + 1].segment_name || `Segment ${currentSegmentIndex + 2}`,
+                targetSpeed: segments[currentSegmentIndex + 1].speed_kmh,
+                targetIncline: segments[currentSegmentIndex + 1].incline_percent,
+                durationSeconds: segments[currentSegmentIndex + 1].duration_seconds
+            } : null,
+            totalDuration: totalDuration,
+            elapsedInWorkout: elapsedInWorkout,
+            overallProgress: totalDuration > 0 ? (elapsedInWorkout / totalDuration) * 100 : 0
+        };
+    }
+
+    return {
+        type: 'treadmill_state',
+        timestamp: Date.now(),
+        sessionActive: !!currentSession,
+        speed: treadmill ? treadmill.getLastReportedSpeed() : null,
+        incline: treadmill ? treadmill.getLastReportedIncline() : null,
+        heartRate: hr,
+        heartRateSource: activeHeartRateSource,
+        distance: sessionData.distance,
+        elapsedTime: sessionData.time,
+        calories: sessionData.calories,
+        targetSpeed: currentTargetSpeed,
+        targetIncline: currentTargetIncline,
+        workout: workoutInfo
+    };
+}
+
+function initStateBroadcast() {
+    if (stateBroadcastWs) return;
+
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}`;
+
+    try {
+        stateBroadcastWs = new WebSocket(wsUrl);
+    } catch (e) {
+        console.error('Failed to create broadcast WebSocket:', e);
+        return;
+    }
+
+    stateBroadcastWs.onopen = () => {
+        console.log('State broadcast WebSocket connected');
+        startStateBroadcastTimer();
+    };
+
+    stateBroadcastWs.onclose = () => {
+        console.log('State broadcast WebSocket disconnected');
+        stateBroadcastWs = null;
+        if (stateBroadcastTimer) {
+            clearInterval(stateBroadcastTimer);
+            stateBroadcastTimer = null;
+        }
+        // Auto-reconnect if session is still active
+        if (currentSession) {
+            setTimeout(initStateBroadcast, 3000);
+        }
+    };
+
+    stateBroadcastWs.onerror = () => {
+        if (stateBroadcastWs) stateBroadcastWs.close();
+    };
+}
+
+function startStateBroadcastTimer() {
+    if (stateBroadcastTimer) clearInterval(stateBroadcastTimer);
+    stateBroadcastTimer = setInterval(() => {
+        if (!stateBroadcastWs || stateBroadcastWs.readyState !== WebSocket.OPEN) return;
+        stateBroadcastWs.send(JSON.stringify(buildCurrentState()));
+    }, 2000);
+    // Send immediately
+    if (stateBroadcastWs && stateBroadcastWs.readyState === WebSocket.OPEN) {
+        stateBroadcastWs.send(JSON.stringify(buildCurrentState()));
+    }
+}
+
+function stopStateBroadcast() {
+    if (stateBroadcastTimer) {
+        clearInterval(stateBroadcastTimer);
+        stateBroadcastTimer = null;
+    }
+    // Send final state with sessionActive=false
+    if (stateBroadcastWs && stateBroadcastWs.readyState === WebSocket.OPEN) {
+        stateBroadcastWs.send(JSON.stringify({
+            type: 'treadmill_state',
+            timestamp: Date.now(),
+            sessionActive: false
+        }));
+        stateBroadcastWs.close();
+    }
+    stateBroadcastWs = null;
+}
+
+async function stopWorkout(autoStop = false) {
+    if (!autoStop && !confirm('Er du sikker på at du vil avslutte økten?')) {
         return;
     }
 
     currentWorkout = null;
     currentSegmentIndex = 0;
+    stopDriftDetection();
 
     if (workoutTimer) {
         clearInterval(workoutTimer);
         workoutTimer = null;
     }
 
-    await stopTreadmill();
+    if (!autoStop) {
+        await stopTreadmill();
+    }
 }
 
 async function resetTreadmill() {
@@ -485,9 +714,9 @@ function resetStats() {
 
     // Show HR containers again (they might have been hidden)
     const hrContainers = [
-        document.getElementById('currentHR')?.closest('.stat-item'),
+        document.getElementById('currentHR')?.closest('.stat-card'),
         document.getElementById('focusHR')?.closest('.stat-card'),
-        document.getElementById('minimalHR')?.closest('.stat-item')
+        document.getElementById('minimalHR')?.closest('.minimal-stat-small')
     ];
     hrContainers.forEach(container => {
         if (container) container.style.display = '';
@@ -530,6 +759,9 @@ async function setIncline() {
 
 // Workouts Management
 async function loadWorkouts() {
+    const workoutsList = document.getElementById('workoutsList');
+    if (workoutsList) workoutsList.innerHTML = '<div class="loading-state"><span class="spinner"></span> Laster treningsøkter...</div>';
+
     try {
         const response = await fetch('/api/workouts');
         allWorkouts = await response.json();
@@ -689,7 +921,7 @@ function displayWorkouts(workoutsToDisplay = allWorkouts) {
     list.innerHTML = '';
 
     if (workoutsToDisplay.length === 0) {
-        list.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">Ingen økter matcher filteret.</p>';
+        list.innerHTML = '<div class="empty-state"><p>Ingen treningsøkter funnet</p><p class="empty-state-hint">Opprett din første treningsøkt med knappen over</p></div>';
         return;
     }
 
@@ -753,6 +985,7 @@ function createWorkoutCard(workout, isTemplate) {
         </div>
         <div class="workout-actions">
             <button class="btn btn-primary" onclick="loadWorkoutFromCard(${workout.id})">Last økt</button>
+            ${!isTemplate ? `<button class="btn btn-secondary" onclick="editWorkout(${workout.id})">Rediger</button>` : ''}
             ${!isTemplate ? `<button class="btn btn-danger" onclick="deleteWorkout(${workout.id})">Slett</button>` : ''}
         </div>
     `;
@@ -818,6 +1051,9 @@ function showCreateWorkout() {
 }
 
 function cancelCreateWorkout() {
+    editingWorkoutId = null;
+    const formTitle = document.querySelector('#createWorkoutForm .form-header h3');
+    if (formTitle) formTitle.textContent = 'Lag ny treningsøkt';
     document.getElementById('createWorkoutForm').classList.add('hidden');
     document.getElementById('workoutsListView').classList.remove('hidden');
 }
@@ -1007,15 +1243,29 @@ async function saveWorkout() {
     if (!isValid) return;
 
     try {
-        const response = await fetch('/api/workouts', {
-            method: 'POST',
+        let url = '/api/workouts';
+        let method = 'POST';
+
+        if (editingWorkoutId) {
+            url = `/api/workouts/${editingWorkoutId}`;
+            method = 'PUT';
+        }
+
+        const response = await fetch(url, {
+            method: method,
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name, description, difficulty, segments })
         });
 
         if (response.ok) {
+            const wasEditing = !!editingWorkoutId;
+            editingWorkoutId = null;
+            // Reset form title
+            const formTitle = document.querySelector('#createWorkoutForm .form-header h3');
+            if (formTitle) formTitle.textContent = 'Lag ny treningsøkt';
             cancelCreateWorkout();
             await loadWorkouts();
+            showToast(wasEditing ? 'Treningsøkt oppdatert!' : 'Treningsøkt lagret!', 'success');
         } else {
             const errorData = await response.json().catch(() => ({}));
             alert(errorData.error || 'Kunne ikke lagre økt');
@@ -1032,6 +1282,7 @@ async function deleteWorkout(id) {
     try {
         await fetch(`/api/workouts/${id}`, { method: 'DELETE' });
         loadWorkouts();
+        showToast('Treningsøkt slettet', 'info');
     } catch (error) {
         alert('Kunne ikke slette økt: ' + error.message);
     }
@@ -1044,6 +1295,7 @@ async function deleteSession(id) {
         await fetch(`/api/sessions/${id}`, { method: 'DELETE' });
         loadSessions();
         loadOverallStats();
+        showToast('Økt slettet', 'info');
     } catch (error) {
         alert('Kunne ikke slette økt: ' + error.message);
     }
@@ -1126,7 +1378,7 @@ async function startLoadedWorkout() {
 
         // Show workout progress panel
         document.getElementById('workoutProgress').classList.remove('hidden');
-        document.getElementById('workoutName').textContent = currentWorkout.name;
+        document.getElementById('activeWorkoutName').textContent = currentWorkout.name;
         document.getElementById('totalSegments').textContent = currentWorkout.segments.length;
 
         // Build timeline
@@ -1139,7 +1391,10 @@ async function startLoadedWorkout() {
         loadedWorkout = null;
         updateLoadedWorkoutUI();
     } catch (error) {
-        alert('Kunne ikke starte økt: ' + error.message);
+        console.error('Failed to start workout:', error);
+        currentWorkout = null;
+        currentSegmentIndex = 0;
+        showToast('Kunne ikke starte økt: ' + error.message, 'error');
     }
 }
 
@@ -1195,9 +1450,10 @@ function buildWorkoutTimeline() {
 
 async function executeSegment(index) {
     if (!currentWorkout || index >= currentWorkout.segments.length) {
+        playSegmentAlert('complete');
         await stopTreadmill();
         document.getElementById('workoutProgress').classList.add('hidden');
-        alert('🎉 Treningsøkt fullført! Godt jobbet!');
+        showToast('Treningsøkt fullført! 🎉', 'success', 5000);
         return;
     }
 
@@ -1234,12 +1490,35 @@ async function executeSegment(index) {
         nextSegmentCard.style.display = 'none';
     }
 
-    // Set treadmill speed and incline
-    await treadmill.setSpeed(segment.speed_kmh);
-    await treadmill.setIncline(segment.incline_percent);
+    // Set treadmill speed and incline with confirmation
+    try {
+        if (index === 0) {
+            // First segment: start treadmill, then set targets
+            await treadmill.start();
+            await new Promise(resolve => setTimeout(resolve, 500));
+        }
 
-    if (index === 0) {
-        await treadmill.start();
+        currentTargetSpeed = segment.speed_kmh;
+        currentTargetIncline = segment.incline_percent;
+
+        const speedConfirmed = await treadmill.setSpeedAndConfirm(segment.speed_kmh);
+        if (!speedConfirmed) {
+            console.warn('Speed confirmation not received, proceeding anyway');
+        }
+
+        const inclineConfirmed = await treadmill.setInclineAndConfirm(segment.incline_percent);
+        if (!inclineConfirmed) {
+            console.warn('Incline confirmation not received, proceeding anyway');
+        }
+
+        startDriftDetection();
+    } catch (error) {
+        console.error('Error setting treadmill parameters:', error);
+    }
+
+    if (index > 0) {
+        playSegmentAlert('segment');
+        showToast(`Segment ${index + 1}: ${segment.speed_kmh} km/t, ${segment.incline_percent}% stigning`, 'info', 5000);
     }
 
     segmentTimeRemaining = segment.duration_seconds;
@@ -1247,6 +1526,13 @@ async function executeSegment(index) {
     if (workoutTimer) clearInterval(workoutTimer);
 
     workoutTimer = setInterval(async () => {
+        if (!treadmill || !treadmill.isConnected()) {
+            clearInterval(workoutTimer);
+            workoutTimer = null;
+            showToast('Tredemølle frakoblet - økt pauset', 'error');
+            return;
+        }
+
         segmentTimeRemaining--;
 
         // Update segment time remaining
@@ -1291,12 +1577,16 @@ async function startSession(workoutId = null) {
         const response = await fetch('/api/sessions', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ workout_id: workoutId })
+            body: JSON.stringify({
+                workout_id: workoutId,
+                heart_rate_source: activeHeartRateSource
+            })
         });
         const data = await response.json();
         currentSession = data.id;
         sessionStartTime = Date.now();
         sessionData = { distance: 0, time: 0, heartRates: [], calories: 0 };
+        initStateBroadcast();
     } catch (error) {
         console.error('Failed to start session:', error);
     }
@@ -1326,7 +1616,18 @@ async function endSession() {
             })
         });
 
+        // Auto-sync to Strava if connected and enabled
+        const autoSyncCheckbox = document.getElementById('autoSyncStrava');
+        if (autoSyncCheckbox && autoSyncCheckbox.checked) {
+            try {
+                await uploadToStrava(currentSession);
+            } catch (e) {
+                console.error('Auto Strava upload failed:', e);
+            }
+        }
+
         currentSession = null;
+        stopStateBroadcast();
         loadSessions();
     } catch (error) {
         console.error('Failed to end session:', error);
@@ -1348,26 +1649,37 @@ function handleTreadmillStatus(status, code) {
         }
     }
 
+    // 0x0A/0x0B = Target confirmations (handled by ftms.js, logged here)
+    if (code === 0x0A) console.log('Treadmill confirmed: Target Speed Changed');
+    if (code === 0x0B) console.log('Treadmill confirmed: Target Incline Changed');
+
     // 0x02 = Stopped - treadmill has stopped
     // 0x01 = Reset - treadmill was reset
     if (code === 0x02 || code === 0x01) {
-        // Auto-end the current session if one is active
+        stopDriftDetection();
         if (currentSession) {
             console.log('Treadmill stopped - auto-ending session');
             endSession();
 
             // If this was a structured workout, also stop it
             if (currentWorkout) {
-                stopWorkout();
+                stopWorkout(true); // autoStop = skip confirm
             }
         }
     }
 }
 
-async function loadSessions() {
+async function loadSessions(startDate = null, endDate = null) {
+    const sessionsList = document.getElementById('sessionsList');
+    if (sessionsList) sessionsList.innerHTML = '<div class="loading-state"><span class="spinner"></span> Laster økter...</div>';
+
     try {
-        const response = await fetch('/api/sessions');
-        const sessions = await response.json();
+        let url = '/api/sessions?limit=50';
+        if (startDate) url += `&startDate=${startDate}`;
+        if (endDate) url += `&endDate=${endDate}`;
+        const response = await fetch(url);
+        const data = await response.json();
+        const sessions = Array.isArray(data) ? data : data.sessions || [];
         displaySessions(sessions);
     } catch (error) {
         console.error('Failed to load sessions:', error);
@@ -1379,7 +1691,7 @@ function displaySessions(sessions) {
     list.innerHTML = '';
 
     if (sessions.length === 0) {
-        list.innerHTML = '<p style="text-align: center; color: var(--text-secondary);">Ingen treningshistorikk ennå.</p>';
+        list.innerHTML = '<div class="empty-state"><p>Ingen treningshistorikk ennå</p><p class="empty-state-hint">Start din første treningsøkt fra kontrollpanelet</p></div>';
         return;
     }
 
@@ -1414,6 +1726,16 @@ function displaySessions(sessions) {
                 ${paceStr}
                 ${session.avg_heart_rate ? `<span>❤️ ${session.avg_heart_rate} bpm</span>` : ''}
                 ${session.calories_burned ? `<span>🔥 ${session.calories_burned} kcal</span>` : ''}
+            </div>
+            <div class="session-actions" style="display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap;">
+                <button class="btn btn-secondary btn-small" onclick="showSessionGraph(${session.id})">📊 Graf</button>
+                <button class="btn btn-secondary btn-small" onclick="exportSession(${session.id}, 'json')">JSON</button>
+                <button class="btn btn-secondary btn-small" onclick="exportSession(${session.id}, 'csv')">CSV</button>
+                <button class="btn btn-secondary btn-small" onclick="exportSession(${session.id}, 'tcx')">TCX</button>
+                <button class="btn btn-secondary btn-small" onclick="showSegmentFeedback(${session.id})">Segmenter</button>
+                <button class="strava-upload-btn" onclick="uploadToStrava(${session.id})" title="Last opp til Strava"${session.strava_upload_status === 'uploading' || session.strava_upload_status === 'complete' ? ' disabled' : ''}>
+                    ${session.strava_upload_status === 'uploading' || session.strava_upload_status === 'complete' ? '✅ Strava' : '🔶 Strava'}
+                </button>
             </div>
             <div class="session-details" id="sessionDetails${session.id}" style="display: none;">
                 <div class="session-details-loading">Laster detaljer...</div>
@@ -1507,6 +1829,9 @@ async function loadSessionDetails(sessionId) {
 
 // Quick Access Modal Functions
 function setupQuickAccessModals() {
+    if (quickAccessInitialized) return;
+    quickAccessInitialized = true;
+
     // Create speed buttons (1-14 km/t)
     const speedButtonsContainer = document.getElementById('speedButtons');
     for (let i = 1; i <= 14; i++) {
@@ -1615,8 +1940,8 @@ function switchHistoryView(view) {
         v.classList.remove('active');
     });
 
-    if (view === 'overview') {
-        document.getElementById('overviewView').classList.add('active');
+    if (view === 'historyOverview') {
+        document.getElementById('historyOverviewView').classList.add('active');
         loadOverallStats();
     } else if (view === 'sessions') {
         document.getElementById('sessionsView').classList.add('active');
@@ -1871,4 +2196,774 @@ function displayMonthlyTrends(monthlyData) {
         `;
         container.appendChild(card);
     });
+}
+
+// ========================================
+// Heart Rate Monitor (HRM) Functions
+// ========================================
+
+async function connectHRM() {
+    try {
+        const btn = document.getElementById('connectHRMBtn');
+        btn.disabled = true;
+        btn.textContent = 'Kobler til...';
+
+        hrm = new HeartRateMonitor();
+
+        hrm.onHeartRate((heartRate) => {
+            hrmHeartRate = heartRate;
+            updateHeartRateSource();
+            updateHeartRateDisplay();
+        });
+
+        hrm.onDisconnect(() => {
+            hrmHeartRate = null;
+            updateHeartRateSource();
+            updateHeartRateDisplay();
+            document.getElementById('hrmStatusCard').classList.add('hidden');
+            const btn = document.getElementById('connectHRMBtn');
+            btn.disabled = false;
+            btn.textContent = '❤️ Koble til Pulsbelte';
+            alert('Pulsbelte frakoblet');
+        });
+
+        await hrm.connect();
+
+        document.getElementById('hrmStatusCard').classList.remove('hidden');
+        document.getElementById('hrmDeviceName').textContent = hrm.getDeviceName() || 'Pulsbelte';
+        btn.textContent = '❤️ Tilkoblet';
+        updateHeartRateSource();
+        alert('Tilkoblet til pulsbelte! Pulsdata vil nå bli brukt i treningsøkter.');
+
+    } catch (error) {
+        console.error('Failed to connect to HRM:', error);
+        alert('Kunne ikke koble til pulsbelte: ' + error.message);
+        const btn = document.getElementById('connectHRMBtn');
+        btn.disabled = false;
+        btn.textContent = '❤️ Koble til Pulsbelte';
+    }
+}
+
+function disconnectHRM() {
+    if (hrm) {
+        hrm.disconnect();
+        hrm = null;
+        hrmHeartRate = null;
+        updateHeartRateSource();
+        updateHeartRateDisplay();
+        document.getElementById('hrmStatusCard').classList.add('hidden');
+        const btn = document.getElementById('connectHRMBtn');
+        btn.disabled = false;
+        btn.textContent = '❤️ Koble til Pulsbelte';
+    }
+}
+
+function updateHeartRateSource() {
+    let newSource = 'none';
+    if (hrmHeartRate !== null && hrmHeartRate > 0) {
+        newSource = 'hrm';
+    } else if (treadmillHeartRate !== null && treadmillHeartRate > 0 && treadmillHeartRate < 255) {
+        newSource = 'treadmill';
+    }
+    activeHeartRateSource = newSource;
+    const sourceLabels = { 'hrm': '❤️ Pulsbelte', 'treadmill': '🏃 Tredemølle', 'none': 'Ingen' };
+    document.getElementById('heartRateSource').textContent = sourceLabels[newSource];
+}
+
+function updateHeartRateDisplay() {
+    let displayHR = null;
+    if (hrmHeartRate !== null && hrmHeartRate > 0) {
+        displayHR = hrmHeartRate;
+    } else if (treadmillHeartRate !== null && treadmillHeartRate > 0 && treadmillHeartRate < 255) {
+        displayHR = treadmillHeartRate;
+    }
+
+    if (hrm && hrm.isConnected()) {
+        const hrmHRDisplay = document.getElementById('hrmHeartRate');
+        if (hrmHeartRate !== null && hrmHeartRate > 0) {
+            hrmHRDisplay.textContent = hrmHeartRate + ' bpm';
+            hrmHRDisplay.classList.add('pulse-animation');
+        } else {
+            hrmHRDisplay.textContent = '-- bpm';
+            hrmHRDisplay.classList.remove('pulse-animation');
+        }
+    }
+
+    const hrContainers = [
+        document.getElementById('currentHR')?.closest('.stat-card'),
+        document.getElementById('focusHR')?.closest('.stat-card'),
+        document.getElementById('minimalHR')?.closest('.minimal-stat-small')
+    ];
+
+    if (displayHR !== null) {
+        document.getElementById('currentHR').textContent = displayHR;
+        document.getElementById('focusHR').textContent = displayHR + ' bpm';
+        document.getElementById('minimalHR').textContent = displayHR;
+        hrContainers.forEach(container => {
+            if (container) container.style.display = '';
+        });
+        if (currentSession) {
+            if (sessionData.heartRates.length > 7200) { // Cap at 2 hours of data
+                sessionData.heartRates.shift();
+            }
+            sessionData.heartRates.push(displayHR);
+        }
+    } else {
+        hrContainers.forEach(container => {
+            if (container) container.style.display = 'none';
+        });
+    }
+}
+
+// ========================================
+// 1. Training Data Graph (Chart.js)
+// ========================================
+
+async function showSessionGraph(sessionId) {
+    try {
+        const response = await fetch(`/api/sessions/${sessionId}/details`);
+        const data = await response.json();
+
+        if (!data.dataPoints || data.dataPoints.length === 0) {
+            showToast('Ingen data tilgjengelig for graf', 'error');
+            return;
+        }
+
+        const dataPoints = data.dataPoints;
+
+        // Build labels (MM:SS from index, 1 per second)
+        const labels = dataPoints.map((_, i) => {
+            const min = Math.floor(i / 60);
+            const sec = i % 60;
+            return `${String(min).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+        });
+
+        const speeds = dataPoints.map(d => d.speed_kmh);
+        const heartRates = dataPoints.map(d => d.heart_rate);
+        const inclines = dataPoints.map(d => d.incline_percent);
+
+        const hasHR = heartRates.some(hr => hr != null && hr > 0);
+        const hasIncline = inclines.some(inc => inc != null && inc > 0);
+
+        // Show modal
+        const modal = document.getElementById('chartModal');
+        if (!modal) {
+            showToast('Graf-modal ikke funnet', 'error');
+            return;
+        }
+        modal.classList.remove('hidden');
+        modal.style.display = 'flex';
+
+        // Destroy existing chart
+        if (sessionChart) {
+            sessionChart.destroy();
+            sessionChart = null;
+        }
+
+        const ctx = document.getElementById('sessionChart').getContext('2d');
+
+        const datasets = [];
+
+        // Speed dataset - left Y-axis
+        datasets.push({
+            label: 'Hastighet (km/t)',
+            data: speeds,
+            borderColor: '#3b82f6',
+            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+            yAxisID: 'ySpeed',
+            tension: 0.3,
+            pointRadius: 0,
+            borderWidth: 2
+        });
+
+        // Incline as area fill (light gray)
+        if (hasIncline) {
+            datasets.push({
+                label: 'Stigning (%)',
+                data: inclines,
+                borderColor: 'rgba(156, 163, 175, 0.5)',
+                backgroundColor: 'rgba(156, 163, 175, 0.15)',
+                yAxisID: 'ySpeed',
+                tension: 0.3,
+                pointRadius: 0,
+                borderWidth: 1,
+                fill: true
+            });
+        }
+
+        // Heart rate dataset - right Y-axis
+        if (hasHR) {
+            datasets.push({
+                label: 'Puls (bpm)',
+                data: heartRates,
+                borderColor: '#ef4444',
+                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                yAxisID: 'yHR',
+                tension: 0.3,
+                pointRadius: 0,
+                borderWidth: 2
+            });
+        }
+
+        const scales = {
+            x: {
+                title: { display: true, text: 'Tid' },
+                ticks: {
+                    maxTicksLimit: 15,
+                    maxRotation: 0
+                }
+            },
+            ySpeed: {
+                type: 'linear',
+                position: 'left',
+                title: { display: true, text: 'Hastighet (km/t)' },
+                beginAtZero: true
+            }
+        };
+
+        if (hasHR) {
+            scales.yHR = {
+                type: 'linear',
+                position: 'right',
+                title: { display: true, text: 'Puls (bpm)' },
+                grid: { drawOnChartArea: false },
+                beginAtZero: false,
+                min: 40
+            };
+        }
+
+        sessionChart = new Chart(ctx, {
+            type: 'line',
+            data: { labels, datasets },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false
+                },
+                plugins: {
+                    legend: { position: 'top' },
+                    title: {
+                        display: true,
+                        text: 'Treningsdata'
+                    }
+                },
+                scales: scales
+            }
+        });
+
+    } catch (error) {
+        console.error('Failed to show session graph:', error);
+        showToast('Kunne ikke laste graf', 'error');
+    }
+}
+
+function closeChartModal() {
+    const modal = document.getElementById('chartModal');
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.style.display = 'none';
+    }
+    if (sessionChart) {
+        sessionChart.destroy();
+        sessionChart = null;
+    }
+}
+
+// ========================================
+// 2. Sound Alerts (Web Audio API)
+// ========================================
+
+function playSegmentAlert(type = 'segment') {
+    if (!soundAlertsEnabled) return;
+
+    try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        if (type === 'segment') {
+            // Two short beeps (440Hz, 150ms each, 100ms gap)
+            [0, 0.25].forEach(startTime => {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.frequency.value = 440;
+                osc.type = 'sine';
+                gain.gain.setValueAtTime(0.3, audioCtx.currentTime + startTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + startTime + 0.15);
+                osc.start(audioCtx.currentTime + startTime);
+                osc.stop(audioCtx.currentTime + startTime + 0.15);
+            });
+            setTimeout(() => audioCtx.close(), 600);
+
+        } else if (type === 'complete') {
+            // Rising tone (440 -> 880Hz over 500ms)
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.frequency.setValueAtTime(440, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.5);
+            osc.type = 'sine';
+            gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
+            osc.start(audioCtx.currentTime);
+            osc.stop(audioCtx.currentTime + 0.5);
+            setTimeout(() => audioCtx.close(), 700);
+
+        } else if (type === 'warning') {
+            // Single low beep (220Hz, 300ms)
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.frequency.value = 220;
+            osc.type = 'sine';
+            gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+            osc.start(audioCtx.currentTime);
+            osc.stop(audioCtx.currentTime + 0.3);
+            setTimeout(() => audioCtx.close(), 500);
+        }
+    } catch (e) {
+        console.warn('Could not play sound alert:', e);
+    }
+}
+
+// ========================================
+// 3. Workout Editing
+// ========================================
+
+async function editWorkout(workoutId) {
+    try {
+        // Try to fetch from API first, fall back to allWorkouts
+        let workout;
+        try {
+            const response = await fetch(`/api/workouts/${workoutId}`);
+            if (response.ok) {
+                workout = await response.json();
+            }
+        } catch (e) {
+            // Ignore fetch error, try local
+        }
+
+        if (!workout) {
+            workout = allWorkouts.find(w => w.id === workoutId);
+        }
+
+        if (!workout) {
+            showToast('Kunne ikke finne treningsøkt', 'error');
+            return;
+        }
+
+        editingWorkoutId = workoutId;
+
+        // Populate the create form
+        document.getElementById('workoutName').value = workout.name;
+        document.getElementById('workoutDescription').value = workout.description || '';
+        document.getElementById('workoutDifficulty').value = workout.difficulty || 'intermediate';
+
+        // Clear existing segments in UI
+        document.getElementById('segmentsList').innerHTML = '';
+
+        // Add each segment from workout
+        if (workout.segments && workout.segments.length > 0) {
+            workout.segments.forEach(segment => {
+                addSegment();
+                const lastSegment = document.getElementById('segmentsList').lastElementChild;
+                lastSegment.querySelector('.segment-name').value = segment.segment_name || '';
+                lastSegment.querySelector('.segment-duration').value = Math.round(segment.duration_seconds / 60);
+                lastSegment.querySelector('.segment-speed').value = segment.speed_kmh.toFixed(1);
+                lastSegment.querySelector('.segment-incline').value = segment.incline_percent.toFixed(1);
+            });
+        } else {
+            addSegment();
+        }
+
+        // Switch to Workouts tab if not already there
+        const workoutsTab = document.querySelector('.tab-btn[data-tab="workouts"]');
+        if (workoutsTab && !workoutsTab.classList.contains('active')) {
+            workoutsTab.click();
+        }
+
+        // Show the create form
+        document.getElementById('createWorkoutForm').classList.remove('hidden');
+        document.getElementById('workoutsListView').classList.add('hidden');
+
+        // Update form title
+        const formTitle = document.querySelector('#createWorkoutForm .form-header h3');
+        if (formTitle) formTitle.textContent = 'Rediger treningsøkt';
+
+        updateWorkoutSummary();
+
+        // Scroll to form
+        document.getElementById('createWorkoutForm').scrollIntoView({ behavior: 'smooth' });
+
+    } catch (error) {
+        console.error('Failed to load workout for editing:', error);
+        showToast('Kunne ikke laste økt for redigering', 'error');
+    }
+}
+
+function cancelEdit() {
+    editingWorkoutId = null;
+    const formTitle = document.querySelector('#createWorkoutForm .form-header h3');
+    if (formTitle) formTitle.textContent = 'Lag ny treningsøkt';
+    cancelCreateWorkout();
+}
+
+// ========================================
+// 4. Date Filter
+// ========================================
+
+function setDateFilter(preset) {
+    const now = new Date();
+    let startDate = null;
+    let endDate = null;
+
+    if (preset === 'week') {
+        const weekAgo = new Date(now);
+        weekAgo.setDate(weekAgo.getDate() - 7);
+        startDate = weekAgo.toISOString();
+        endDate = now.toISOString();
+    } else if (preset === 'month') {
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        startDate = monthStart.toISOString();
+        endDate = now.toISOString();
+    } else if (preset === 'quarter') {
+        const quarterAgo = new Date(now);
+        quarterAgo.setMonth(quarterAgo.getMonth() - 3);
+        startDate = quarterAgo.toISOString();
+        endDate = now.toISOString();
+    }
+    // 'all' — no filter, startDate and endDate remain null
+
+    // Update active button state
+    document.querySelectorAll('.date-filter-btn').forEach(btn => btn.classList.remove('active'));
+    const activeBtn = document.querySelector(`.date-filter-btn[data-preset="${preset}"]`);
+    if (activeBtn) activeBtn.classList.add('active');
+
+    loadSessions(startDate, endDate);
+}
+
+function applyCustomDateFilter() {
+    const startInput = document.getElementById('dateFilterStart');
+    const endInput = document.getElementById('dateFilterEnd');
+
+    const startDate = startInput && startInput.value ? new Date(startInput.value).toISOString() : null;
+    const endDate = endInput && endInput.value ? new Date(endInput.value + 'T23:59:59').toISOString() : null;
+
+    // Clear preset button active state
+    document.querySelectorAll('.date-filter-btn').forEach(btn => btn.classList.remove('active'));
+
+    loadSessions(startDate, endDate);
+}
+
+// ========================================
+// 5. Export Functions
+// ========================================
+
+async function exportSession(sessionId, format) {
+    try {
+        const response = await fetch(`/api/sessions/${sessionId}/details`);
+        const data = await response.json();
+
+        if (!data.dataPoints || data.dataPoints.length === 0) {
+            showToast('Ingen data tilgjengelig for eksport', 'error');
+            return;
+        }
+
+        let blob, filename;
+
+        if (format === 'json') {
+            blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            filename = `treningsokt_${sessionId}.json`;
+
+        } else if (format === 'csv') {
+            const headers = ['tidspunkt', 'hastighet_kmh', 'stigning_prosent', 'distanse_km', 'puls', 'kalorier'];
+            const rows = data.dataPoints.map(dp => [
+                dp.recorded_at || '',
+                dp.speed_kmh != null ? dp.speed_kmh : '',
+                dp.incline_percent != null ? dp.incline_percent : '',
+                dp.distance_km != null ? dp.distance_km : '',
+                dp.heart_rate != null ? dp.heart_rate : '',
+                dp.calories != null ? dp.calories : ''
+            ]);
+            const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+            blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' });
+            filename = `treningsokt_${sessionId}.csv`;
+
+        } else if (format === 'tcx') {
+            // Build TCX XML
+            const startTime = data.session && data.session.started_at
+                ? new Date(data.session.started_at).toISOString()
+                : new Date().toISOString();
+
+            let trackpoints = '';
+            data.dataPoints.forEach((dp, i) => {
+                const time = new Date(new Date(startTime).getTime() + i * 1000).toISOString();
+                trackpoints += `
+          <Trackpoint>
+            <Time>${time}</Time>
+            ${dp.heart_rate ? `<HeartRateBpm><Value>${dp.heart_rate}</Value></HeartRateBpm>` : ''}
+            ${dp.distance_km != null ? `<DistanceMeters>${(dp.distance_km * 1000).toFixed(1)}</DistanceMeters>` : ''}
+            <Extensions>
+              <ns3:TPX>
+                ${dp.speed_kmh != null ? `<ns3:Speed>${(dp.speed_kmh / 3.6).toFixed(2)}</ns3:Speed>` : ''}
+              </ns3:TPX>
+            </Extensions>
+          </Trackpoint>`;
+            });
+
+            const tcxContent = `<?xml version="1.0" encoding="UTF-8"?>
+<TrainingCenterDatabase xmlns="http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2"
+  xmlns:ns3="http://www.garmin.com/xmlschemas/ActivityExtension/v2">
+  <Activities>
+    <Activity Sport="Running">
+      <Id>${startTime}</Id>
+      <Lap StartTime="${startTime}">
+        <TotalTimeSeconds>${data.dataPoints.length}</TotalTimeSeconds>
+        <Track>${trackpoints}
+        </Track>
+      </Lap>
+    </Activity>
+  </Activities>
+</TrainingCenterDatabase>`;
+
+            blob = new Blob([tcxContent], { type: 'application/xml' });
+            filename = `treningsokt_${sessionId}.tcx`;
+        } else {
+            showToast('Ukjent eksportformat', 'error');
+            return;
+        }
+
+        // Trigger download
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        showToast(`Eksportert som ${format.toUpperCase()}`, 'success');
+
+    } catch (error) {
+        console.error('Export failed:', error);
+        showToast('Eksport feilet: ' + error.message, 'error');
+    }
+}
+
+async function uploadToStrava(sessionId) {
+    try {
+        const response = await fetch(`/api/strava/upload/${sessionId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            showToast('Lastet opp til Strava!', 'success');
+            return result;
+        } else {
+            const errorData = await response.json().catch(() => ({}));
+            showToast('Strava-opplasting feilet: ' + (errorData.error || 'Ukjent feil'), 'error');
+        }
+    } catch (error) {
+        console.error('Strava upload failed:', error);
+        showToast('Strava-opplasting feilet: ' + error.message, 'error');
+    }
+}
+
+// ========================================
+// 6. Auto BLE Reconnect
+// ========================================
+
+async function attemptReconnect() {
+    if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+        showToast('Kunne ikke gjenopprette tilkobling. Koble til manuelt.', 'error');
+        reconnectAttempts = 0;
+        return;
+    }
+
+    // Check if navigator.bluetooth.getDevices is available
+    if (!navigator.bluetooth || !navigator.bluetooth.getDevices) {
+        showToast('Automatisk gjentilkobling ikke støttet i denne nettleseren', 'error');
+        return;
+    }
+
+    reconnectAttempts++;
+    const delay = Math.min(2000 * Math.pow(2, reconnectAttempts - 1), 30000);
+
+    document.getElementById('connectionStatus').textContent = `Gjentilkobler... (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`;
+    document.getElementById('connectionStatus').className = 'status-reconnecting';
+
+    try {
+        const devices = await navigator.bluetooth.getDevices();
+        if (devices.length === 0) {
+            showToast('Ingen tidligere sammenkoblede enheter funnet', 'error');
+            reconnectAttempts = MAX_RECONNECT_ATTEMPTS; // Stop retrying
+            document.getElementById('connectionStatus').textContent = 'Frakoblet';
+            document.getElementById('connectionStatus').className = 'status-disconnected';
+            return;
+        }
+
+        const device = devices[0];
+
+        // Try to connect to the device
+        const server = await device.gatt.connect();
+        if (server && server.connected) {
+            // Successfully reconnected - re-initialize the treadmill controller
+            reconnectAttempts = 0;
+            document.getElementById('connectionStatus').textContent = 'Tilkoblet';
+            document.getElementById('connectionStatus').className = 'status-connected';
+            document.getElementById('connectBtn').textContent = 'Koble fra';
+            enableControls();
+            showToast('Gjenopprettet tilkobling!', 'success');
+            return;
+        }
+    } catch (error) {
+        console.warn(`Reconnect attempt ${reconnectAttempts} failed:`, error);
+    }
+
+    // Schedule next attempt with exponential backoff
+    if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+        reconnectTimer = setTimeout(() => attemptReconnect(), delay);
+    } else {
+        document.getElementById('connectionStatus').textContent = 'Frakoblet';
+        document.getElementById('connectionStatus').className = 'status-disconnected';
+        showToast('Kunne ikke gjenopprette tilkobling. Koble til manuelt.', 'error');
+        reconnectAttempts = 0;
+    }
+}
+
+// ========================================
+// 7. Strava UI
+// ========================================
+
+async function disconnectStrava() {
+    try {
+        const response = await fetch('/api/strava/disconnect', { method: 'DELETE' });
+        if (response.ok) {
+            showToast('Koblet fra Strava', 'info');
+            checkStravaConnection();
+        }
+    } catch (error) {
+        console.error('Failed to disconnect Strava:', error);
+        showToast('Kunne ikke koble fra Strava', 'error');
+    }
+}
+
+async function checkStravaConnection() {
+    try {
+        const response = await fetch('/api/strava/status');
+        if (!response.ok) return; // Endpoint may not exist yet
+
+        const data = await response.json();
+
+        const connectedSection = document.getElementById('stravaConnected');
+        const disconnectedSection = document.getElementById('stravaDisconnected');
+
+        if (connectedSection && disconnectedSection) {
+            if (data.connected) {
+                connectedSection.classList.remove('hidden');
+                disconnectedSection.classList.add('hidden');
+                const athleteNameEl = document.getElementById('stravaAthleteName');
+                if (athleteNameEl && data.athlete_name) {
+                    athleteNameEl.textContent = data.athlete_name;
+                }
+            } else {
+                connectedSection.classList.add('hidden');
+                disconnectedSection.classList.remove('hidden');
+            }
+        }
+    } catch (error) {
+        // Strava endpoint not available yet, silently ignore
+        console.log('Strava status check skipped (endpoint not available)');
+    }
+}
+
+// ========================================
+// 8. Per-Segment Feedback
+// ========================================
+
+async function showSegmentFeedback(sessionId) {
+    try {
+        const response = await fetch(`/api/sessions/${sessionId}/details`);
+        const data = await response.json();
+
+        if (!data.dataPoints || data.dataPoints.length === 0) {
+            showToast('Ingen segmentdata tilgjengelig', 'error');
+            return;
+        }
+
+        const dataPoints = data.dataPoints;
+
+        // Group data points by segment_index
+        const segments = {};
+        dataPoints.forEach(dp => {
+            const segIdx = dp.segment_index != null ? dp.segment_index : 0;
+            if (!segments[segIdx]) {
+                segments[segIdx] = { speeds: [], heartRates: [], inclines: [], count: 0 };
+            }
+            segments[segIdx].count++;
+            if (dp.speed_kmh != null) segments[segIdx].speeds.push(dp.speed_kmh);
+            if (dp.heart_rate != null && dp.heart_rate > 0) segments[segIdx].heartRates.push(dp.heart_rate);
+            if (dp.incline_percent != null) segments[segIdx].inclines.push(dp.incline_percent);
+        });
+
+        // Build HTML table
+        let tableHTML = `
+            <div class="segment-feedback-modal" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:1000;">
+                <div style="background:var(--card-bg, #1a1a2e);border-radius:12px;padding:24px;max-width:90%;max-height:80vh;overflow:auto;color:var(--text-primary, #fff);">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+                        <h3>Segmentoversikt</h3>
+                        <button class="btn btn-secondary btn-small" onclick="this.closest('.segment-feedback-modal').remove()">Lukk</button>
+                    </div>
+                    <table style="width:100%;border-collapse:collapse;font-size:14px;">
+                        <thead>
+                            <tr style="border-bottom:1px solid rgba(255,255,255,0.2);">
+                                <th style="padding:8px;text-align:left;">Segment</th>
+                                <th style="padding:8px;text-align:right;">Gj.sn. Hast.</th>
+                                <th style="padding:8px;text-align:right;">Gj.sn. Puls</th>
+                                <th style="padding:8px;text-align:right;">Maks Puls</th>
+                                <th style="padding:8px;text-align:right;">Varighet</th>
+                            </tr>
+                        </thead>
+                        <tbody>`;
+
+        Object.keys(segments).sort((a, b) => Number(a) - Number(b)).forEach(segIdx => {
+            const seg = segments[segIdx];
+            const avgSpeed = seg.speeds.length > 0 ? (seg.speeds.reduce((a, b) => a + b, 0) / seg.speeds.length).toFixed(1) : '-';
+            const avgHR = seg.heartRates.length > 0 ? Math.round(seg.heartRates.reduce((a, b) => a + b, 0) / seg.heartRates.length) : '-';
+            const maxHR = seg.heartRates.length > 0 ? Math.max(...seg.heartRates) : '-';
+            const durationMin = Math.round(seg.count / 60);
+
+            tableHTML += `
+                <tr style="border-bottom:1px solid rgba(255,255,255,0.1);">
+                    <td style="padding:8px;">Segment ${Number(segIdx) + 1}</td>
+                    <td style="padding:8px;text-align:right;">${avgSpeed} km/t</td>
+                    <td style="padding:8px;text-align:right;">${avgHR} bpm</td>
+                    <td style="padding:8px;text-align:right;">${maxHR} bpm</td>
+                    <td style="padding:8px;text-align:right;">${durationMin} min</td>
+                </tr>`;
+        });
+
+        tableHTML += `
+                        </tbody>
+                    </table>
+                </div>
+            </div>`;
+
+        // Insert into DOM
+        const container = document.createElement('div');
+        container.innerHTML = tableHTML;
+        document.body.appendChild(container.firstElementChild);
+
+    } catch (error) {
+        console.error('Failed to show segment feedback:', error);
+        showToast('Kunne ikke laste segmentdata', 'error');
+    }
 }

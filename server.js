@@ -26,14 +26,25 @@ if (useHTTPS) {
 }
 
 const wss = new WebSocket.Server({ server });
+let latestTreadmillState = null;
 
 // Middleware
-app.use(cors());
-app.use(express.json());
+app.use(cors({
+    origin: function(origin, callback) {
+        // Allow requests with no origin (mobile apps, curl, etc.)
+        if (!origin) return callback(null, true);
+        // Allow local network and localhost
+        if (origin.match(/^https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+)(:\d+)?$/)) {
+            return callback(null, true);
+        }
+        callback(new Error('Not allowed by CORS'));
+    }
+}));
+app.use(express.json({ limit: '1mb' }));
 app.use(express.static('public'));
 
 // Database setup
-const dbPath = process.env.DATABASE_PATH || 'treadmill.db';
+const dbPath = process.env.DATABASE_PATH || './data/treadmill.db';
 const db = new Database(dbPath);
 db.pragma('journal_mode = WAL');
 
@@ -69,6 +80,7 @@ db.exec(`
     total_time_seconds INTEGER,
     avg_heart_rate INTEGER,
     calories_burned INTEGER,
+    heart_rate_source TEXT DEFAULT 'none',
     FOREIGN KEY (workout_id) REFERENCES workouts(id)
   );
 
@@ -85,6 +97,30 @@ db.exec(`
   );
 `);
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS strava_auth (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    athlete_id INTEGER UNIQUE NOT NULL,
+    access_token TEXT NOT NULL,
+    refresh_token TEXT NOT NULL,
+    expires_at INTEGER NOT NULL,
+    scope TEXT,
+    athlete_name TEXT,
+    connected_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+`);
+
+db.exec(`CREATE INDEX IF NOT EXISTS idx_session_data_session_id ON session_data(session_id)`);
+db.exec(`CREATE INDEX IF NOT EXISTS idx_workout_sessions_started_at ON workout_sessions(started_at)`);
+db.exec(`CREATE INDEX IF NOT EXISTS idx_workout_segments_workout_id ON workout_segments(workout_id)`);
+
+// Add Strava columns to workout_sessions if missing
+try { db.exec('ALTER TABLE workout_sessions ADD COLUMN strava_activity_id INTEGER'); } catch(e) {}
+try { db.exec('ALTER TABLE workout_sessions ADD COLUMN strava_upload_status TEXT'); } catch(e) {}
+
+// Add segment_index column to session_data if missing
+try { db.exec('ALTER TABLE session_data ADD COLUMN segment_index INTEGER'); } catch(e) {}
+
 // API Routes
 app.get('/api/workouts', (req, res) => {
   const workouts = db.prepare(`
@@ -100,15 +136,14 @@ app.get('/api/workouts', (req, res) => {
   `).all();
 
   // Parse tags from JSON string
-  const workoutsWithTags = workouts.map(w => ({
-    ...w,
-    tags: w.tags ? JSON.parse(w.tags) : []
-  }));
+  const workoutsWithTags = workouts.map(w => {
+    try { w.tags = JSON.parse(w.tags); } catch { w.tags = []; }
+    return { ...w };
+  });
 
   res.json(workoutsWithTags);
 });
 
-// Get template workouts - MUST come before /api/workouts/:id
 // Get template workouts - MUST come before /api/workouts/:id
 app.get('/api/workouts/templates', (req, res) => {
   const templates = db.prepare(`
@@ -124,10 +159,10 @@ app.get('/api/workouts/templates', (req, res) => {
     ORDER BY w.id ASC
   `).all();
 
-  const templatesWithTags = templates.map(t => ({
-    ...t,
-    tags: t.tags ? JSON.parse(t.tags) : []
-  }));
+  const templatesWithTags = templates.map(t => {
+    try { t.tags = JSON.parse(t.tags); } catch { t.tags = []; }
+    return { ...t };
+  });
 
   res.json(templatesWithTags);
 });
@@ -220,6 +255,76 @@ app.post('/api/workouts', (req, res) => {
   }
 });
 
+app.put('/api/workouts/:id', (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id) || id <= 0) {
+      return res.status(400).json({ error: 'Ugyldig ID' });
+    }
+
+    const { name, description, difficulty, segments } = req.body;
+
+    if (!name || typeof name !== 'string' || name.trim().length === 0) {
+      return res.status(400).json({ error: 'Navn er påkrevd' });
+    }
+
+    if (name.length > 200) {
+      return res.status(400).json({ error: 'Navn kan ikke være lengre enn 200 tegn' });
+    }
+
+    const existing = db.prepare('SELECT id FROM workouts WHERE id = ?').get(id);
+    if (!existing) {
+      return res.status(404).json({ error: 'Treningsøkt ikke funnet' });
+    }
+
+    const validDifficulties = ['beginner', 'intermediate', 'advanced'];
+    const validatedDifficulty = validDifficulties.includes(difficulty) ? difficulty : 'beginner';
+
+    const updateWorkout = db.prepare('UPDATE workouts SET name = ?, description = ?, difficulty = ? WHERE id = ?');
+    const deleteSegments = db.prepare('DELETE FROM workout_segments WHERE workout_id = ?');
+    const insertSegment = db.prepare(`
+      INSERT INTO workout_segments (workout_id, segment_order, duration_seconds, speed_kmh, incline_percent, segment_name)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `);
+
+    db.transaction(() => {
+      updateWorkout.run(name.trim(), description ? description.trim().substring(0, 1000) : '', validatedDifficulty, id);
+      deleteSegments.run(id);
+
+      if (segments && Array.isArray(segments) && segments.length > 0) {
+        segments.forEach((segment, index) => {
+          const duration = parseInt(segment.duration_seconds) || 60;
+          const speed = parseFloat(segment.speed_kmh) || 0;
+          const incline = parseFloat(segment.incline_percent) || 0;
+
+          const validDuration = Math.max(1, Math.min(7200, duration));
+          const validSpeed = Math.max(0, Math.min(14, speed));
+          const validIncline = Math.max(0, Math.min(12, incline));
+
+          insertSegment.run(
+            id,
+            index,
+            validDuration,
+            validSpeed,
+            validIncline,
+            segment.segment_name ? segment.segment_name.substring(0, 100) : null
+          );
+        });
+      }
+    })();
+
+    const updated = db.prepare('SELECT * FROM workouts WHERE id = ?').get(id);
+    if (updated.tags) {
+      try { updated.tags = JSON.parse(updated.tags); } catch { updated.tags = []; }
+    }
+    const updatedSegments = db.prepare('SELECT * FROM workout_segments WHERE workout_id = ? ORDER BY segment_order').all(id);
+    res.json({ ...updated, segments: updatedSegments });
+  } catch (error) {
+    console.error('Error updating workout:', error);
+    res.status(500).json({ error: 'Kunne ikke oppdatere treningsøkt' });
+  }
+});
+
 app.delete('/api/workouts/:id', (req, res) => {
   try {
     const id = parseInt(req.params.id);
@@ -259,23 +364,46 @@ app.delete('/api/sessions/:id', (req, res) => {
 });
 
 app.get('/api/sessions', (req, res) => {
+  const { limit: limitParam, offset: offsetParam, startDate, endDate } = req.query;
+  const limit = Math.min(parseInt(limitParam) || 50, 100);
+  const offset = parseInt(offsetParam) || 0;
+
+  // Build WHERE clause dynamically for date filtering
+  const conditions = [];
+  const params = [];
+
+  if (startDate) {
+    conditions.push('s.started_at >= ?');
+    params.push(startDate);
+  }
+  if (endDate) {
+    conditions.push('s.started_at <= ?');
+    params.push(endDate);
+  }
+
+  const whereClause = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
+
+  const total = db.prepare(`SELECT COUNT(*) as count FROM workout_sessions s ${whereClause}`).get(...params).count;
+
   const sessions = db.prepare(`
     SELECT s.*, w.name as workout_name
     FROM workout_sessions s
     LEFT JOIN workouts w ON s.workout_id = w.id
+    ${whereClause}
     ORDER BY s.started_at DESC
-    LIMIT 50
-  `).all();
-  res.json(sessions);
+    LIMIT ? OFFSET ?
+  `).all(...params, limit, offset);
+  res.json({ sessions, total, limit, offset });
 });
 
 app.post('/api/sessions', (req, res) => {
   try {
-    const { workout_id } = req.body;
+    const { workout_id, heart_rate_source } = req.body;
     const validWorkoutId = workout_id && !isNaN(parseInt(workout_id)) ? parseInt(workout_id) : null;
+    const validHRSource = heart_rate_source || 'none';
 
-    const insert = db.prepare('INSERT INTO workout_sessions (workout_id) VALUES (?)');
-    const result = insert.run(validWorkoutId);
+    const insert = db.prepare('INSERT INTO workout_sessions (workout_id, heart_rate_source) VALUES (?, ?)');
+    const result = insert.run(validWorkoutId, validHRSource);
     res.json({ id: result.lastInsertRowid });
   } catch (error) {
     console.error('Error creating session:', error);
@@ -288,6 +416,11 @@ app.put('/api/sessions/:id', (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id) || id <= 0) {
       return res.status(400).json({ error: 'Ugyldig ID' });
+    }
+
+    const existing = db.prepare('SELECT completed_at FROM workout_sessions WHERE id = ?').get(id);
+    if (existing && existing.completed_at) {
+        return res.status(409).json({ error: 'Session already completed' });
     }
 
     const { total_distance_km, total_time_seconds, avg_heart_rate, calories_burned } = req.body;
@@ -326,7 +459,16 @@ app.post('/api/sessions/:id/data', (req, res) => {
       return res.status(400).json({ error: 'Ugyldig ID' });
     }
 
-    const { speed_kmh, incline_percent, distance_km, heart_rate, calories } = req.body;
+    const { speed_kmh, incline_percent, distance_km, heart_rate, calories, segment_index } = req.body;
+    if (speed_kmh !== undefined && (typeof speed_kmh !== 'number' || speed_kmh < 0 || speed_kmh > 30)) {
+        return res.status(400).json({ error: 'Invalid speed_kmh' });
+    }
+    if (incline_percent !== undefined && (typeof incline_percent !== 'number' || incline_percent < -5 || incline_percent > 20)) {
+        return res.status(400).json({ error: 'Invalid incline_percent' });
+    }
+    if (heart_rate !== undefined && (typeof heart_rate !== 'number' || heart_rate < 0 || heart_rate > 250)) {
+        return res.status(400).json({ error: 'Invalid heart_rate' });
+    }
 
     // Validate and sanitize
     const speed = parseFloat(speed_kmh) || 0;
@@ -334,11 +476,12 @@ app.post('/api/sessions/:id/data', (req, res) => {
     const distance = parseFloat(distance_km) || 0;
     const hr = heart_rate && !isNaN(parseInt(heart_rate)) ? parseInt(heart_rate) : null;
     const cal = calories && !isNaN(parseInt(calories)) ? parseInt(calories) : null;
+    const segIdx = (segment_index !== undefined && segment_index !== null && !isNaN(parseInt(segment_index))) ? parseInt(segment_index) : null;
 
     db.prepare(`
-      INSERT INTO session_data (session_id, speed_kmh, incline_percent, distance_km, heart_rate, calories)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(id, Math.max(0, speed), Math.max(0, incline), Math.max(0, distance), hr, cal);
+      INSERT INTO session_data (session_id, speed_kmh, incline_percent, distance_km, heart_rate, calories, segment_index)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(id, Math.max(0, speed), Math.max(0, incline), Math.max(0, distance), hr, cal, segIdx);
 
     res.json({ success: true });
   } catch (error) {
@@ -410,6 +553,334 @@ app.get('/api/sessions/:id/details', (req, res) => {
   }
 });
 
+// Export session as JSON
+app.get('/api/sessions/:id/export/json', (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id) || id <= 0) {
+      return res.status(400).json({ error: 'Ugyldig ID' });
+    }
+
+    const session = db.prepare(`
+      SELECT s.*, w.name as workout_name
+      FROM workout_sessions s
+      LEFT JOIN workouts w ON s.workout_id = w.id
+      WHERE s.id = ?
+    `).get(id);
+
+    if (!session) {
+      return res.status(404).json({ error: 'Økt ikke funnet' });
+    }
+
+    const dataPoints = db.prepare(`
+      SELECT * FROM session_data
+      WHERE session_id = ?
+      ORDER BY timestamp ASC
+    `).all(id);
+
+    const exportData = { ...session, dataPoints };
+
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename="session_${id}.json"`);
+    res.json(exportData);
+  } catch (error) {
+    console.error('Error exporting session as JSON:', error);
+    res.status(500).json({ error: 'Kunne ikke eksportere økt' });
+  }
+});
+
+// Export session as CSV
+app.get('/api/sessions/:id/export/csv', (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id) || id <= 0) {
+      return res.status(400).json({ error: 'Ugyldig ID' });
+    }
+
+    const session = db.prepare('SELECT * FROM workout_sessions WHERE id = ?').get(id);
+    if (!session) {
+      return res.status(404).json({ error: 'Økt ikke funnet' });
+    }
+
+    const dataPoints = db.prepare(`
+      SELECT * FROM session_data
+      WHERE session_id = ?
+      ORDER BY timestamp ASC
+    `).all(id);
+
+    let csv = 'Timestamp,Speed (km/h),Incline (%),Distance (km),Heart Rate (bpm),Calories\n';
+    dataPoints.forEach(point => {
+      csv += `${point.timestamp},${point.speed_kmh || 0},${point.incline_percent || 0},${point.distance_km || 0},${point.heart_rate || ''},${point.calories || ''}\n`;
+    });
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="session_${id}.csv"`);
+    res.send(csv);
+  } catch (error) {
+    console.error('Error exporting session as CSV:', error);
+    res.status(500).json({ error: 'Kunne ikke eksportere økt' });
+  }
+});
+
+// Export session as TCX
+app.get('/api/sessions/:id/export/tcx', (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id) || id <= 0) {
+      return res.status(400).json({ error: 'Ugyldig ID' });
+    }
+
+    const session = db.prepare(`
+      SELECT s.*, w.name as workout_name
+      FROM workout_sessions s
+      LEFT JOIN workouts w ON s.workout_id = w.id
+      WHERE s.id = ?
+    `).get(id);
+
+    if (!session) {
+      return res.status(404).json({ error: 'Økt ikke funnet' });
+    }
+
+    const dataPoints = db.prepare(`
+      SELECT * FROM session_data
+      WHERE session_id = ?
+      ORDER BY timestamp ASC
+    `).all(id);
+
+    const tcxContent = generateTCX(session, dataPoints);
+
+    res.setHeader('Content-Type', 'application/xml');
+    res.setHeader('Content-Disposition', `attachment; filename="session_${id}.tcx"`);
+    res.send(tcxContent);
+  } catch (error) {
+    console.error('Error exporting session as TCX:', error);
+    res.status(500).json({ error: 'Kunne ikke eksportere økt' });
+  }
+});
+
+// Get per-segment feedback for a session
+app.get('/api/sessions/:id/segments', (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id) || id <= 0) {
+      return res.status(400).json({ error: 'Ugyldig ID' });
+    }
+
+    const session = db.prepare('SELECT * FROM workout_sessions WHERE id = ?').get(id);
+    if (!session) {
+      return res.status(404).json({ error: 'Økt ikke funnet' });
+    }
+
+    const segments = db.prepare(`
+      SELECT
+        segment_index,
+        AVG(speed_kmh) as avg_speed,
+        AVG(CASE WHEN heart_rate > 0 AND heart_rate < 255 THEN heart_rate ELSE NULL END) as avg_heart_rate,
+        MAX(CASE WHEN heart_rate > 0 AND heart_rate < 255 THEN heart_rate ELSE NULL END) as max_heart_rate,
+        MAX(distance_km) - MIN(distance_km) as distance,
+        COUNT(*) as time_seconds
+      FROM session_data
+      WHERE session_id = ? AND segment_index IS NOT NULL
+      GROUP BY segment_index
+      ORDER BY segment_index ASC
+    `).all(id);
+
+    const segmentSummaries = segments.map(seg => ({
+      segment_index: seg.segment_index,
+      avg_speed: seg.avg_speed ? Math.round(seg.avg_speed * 100) / 100 : 0,
+      avg_heart_rate: seg.avg_heart_rate ? Math.round(seg.avg_heart_rate) : null,
+      max_heart_rate: seg.max_heart_rate || null,
+      distance: seg.distance ? Math.round(seg.distance * 1000) / 1000 : 0,
+      time_seconds: seg.time_seconds || 0
+    }));
+
+    res.json(segmentSummaries);
+  } catch (error) {
+    console.error('Error fetching segment data:', error);
+    res.status(500).json({ error: 'Kunne ikke hente segmentdata' });
+  }
+});
+
+// Strava OAuth: Redirect to Strava authorize
+app.get('/auth/strava', (req, res) => {
+  const clientId = process.env.STRAVA_CLIENT_ID;
+  if (!clientId) {
+    return res.status(500).json({ error: 'STRAVA_CLIENT_ID not configured' });
+  }
+  const redirectUri = `${req.protocol}://${req.get('host')}/auth/strava/callback`;
+  const scope = 'activity:write,activity:read';
+  const authUrl = `https://www.strava.com/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}`;
+  res.redirect(authUrl);
+});
+
+// Strava OAuth: Callback — exchange code for tokens
+app.get('/auth/strava/callback', async (req, res) => {
+  const { code } = req.query;
+
+  if (!code) {
+    return res.redirect('/?strava=error');
+  }
+
+  try {
+    const response = await fetch('https://www.strava.com/oauth/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        client_id: process.env.STRAVA_CLIENT_ID,
+        client_secret: process.env.STRAVA_CLIENT_SECRET,
+        code: code,
+        grant_type: 'authorization_code'
+      })
+    });
+
+    if (!response.ok) {
+      console.error('Strava token exchange failed:', response.status);
+      return res.redirect('/?strava=error');
+    }
+
+    const data = await response.json();
+
+    db.prepare(`
+      INSERT OR REPLACE INTO strava_auth (athlete_id, access_token, refresh_token, expires_at, scope, athlete_name, connected_at)
+      VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    `).run(
+      data.athlete.id,
+      data.access_token,
+      data.refresh_token,
+      data.expires_at,
+      'activity:write,activity:read',
+      `${data.athlete.firstname} ${data.athlete.lastname}`
+    );
+
+    res.redirect('/?strava=connected');
+  } catch (error) {
+    console.error('Strava auth error:', error);
+    res.redirect('/?strava=error');
+  }
+});
+
+// Get Strava connection status
+app.get('/api/strava/status', (req, res) => {
+  try {
+    const auth = db.prepare('SELECT * FROM strava_auth ORDER BY connected_at DESC LIMIT 1').get();
+
+    if (!auth) {
+      return res.json({ connected: false });
+    }
+
+    res.json({
+      connected: true,
+      athlete_id: auth.athlete_id,
+      athlete_name: auth.athlete_name,
+      connected_at: auth.connected_at
+    });
+  } catch (error) {
+    console.error('Error checking Strava status:', error);
+    res.status(500).json({ error: 'Kunne ikke sjekke Strava-status' });
+  }
+});
+
+// Disconnect Strava
+app.delete('/api/strava/disconnect', (req, res) => {
+  try {
+    db.prepare('DELETE FROM strava_auth').run();
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error disconnecting Strava:', error);
+    res.status(500).json({ error: 'Kunne ikke koble fra Strava' });
+  }
+});
+
+// Upload session to Strava
+app.post('/api/strava/upload/:sessionId', async (req, res) => {
+  const sessionId = parseInt(req.params.sessionId);
+  if (isNaN(sessionId) || sessionId <= 0) {
+    return res.status(400).json({ error: 'Ugyldig session ID' });
+  }
+
+  try {
+    const accessToken = await getValidStravaToken();
+
+    const session = db.prepare(`
+      SELECT s.*, w.name as workout_name
+      FROM workout_sessions s
+      LEFT JOIN workouts w ON s.workout_id = w.id
+      WHERE s.id = ?
+    `).get(sessionId);
+
+    if (!session) {
+      return res.status(404).json({ error: 'Økt ikke funnet' });
+    }
+
+    const dataPoints = db.prepare(`
+      SELECT * FROM session_data
+      WHERE session_id = ?
+      ORDER BY timestamp ASC
+    `).all(sessionId);
+
+    if (dataPoints.length === 0) {
+      return res.status(400).json({ error: 'Økten har ingen datapunkter å laste opp' });
+    }
+
+    // Generate TCX file
+    const tcxContent = generateTCX(session, dataPoints);
+
+    // Upload to Strava via multipart/form-data
+    const formData = new FormData();
+    formData.append('file', new Blob([tcxContent], { type: 'application/xml' }), 'activity.tcx');
+    formData.append('data_type', 'tcx');
+    formData.append('name', session.workout_name || 'Tredemølle-økt');
+    formData.append('description', `${Math.round((session.total_distance_km || 0) * 1000)}m, ${Math.floor((session.total_time_seconds || 0) / 60)} min`);
+    formData.append('trainer', 'true');
+    // Note: Strava API no longer supports setting privacy via API.
+    // User must set default privacy to "Only You" in Strava settings.
+    formData.append('external_id', `treadmill_${sessionId}`);
+
+    const uploadResponse = await fetch('https://www.strava.com/api/v3/uploads', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`
+      },
+      body: formData
+    });
+
+    const uploadData = await uploadResponse.json();
+
+    if (!uploadResponse.ok) {
+      db.prepare(`
+        UPDATE workout_sessions
+        SET strava_upload_status = 'failed'
+        WHERE id = ?
+      `).run(sessionId);
+      return res.status(uploadResponse.status).json({ error: uploadData.error || 'Strava upload failed', details: uploadData });
+    }
+
+    // Update session with upload status
+    db.prepare(`
+      UPDATE workout_sessions
+      SET strava_upload_status = 'uploading', strava_activity_id = ?
+      WHERE id = ?
+    `).run(uploadData.activity_id || null, sessionId);
+
+    res.json({
+      success: true,
+      upload_id: uploadData.id,
+      status: uploadData.status,
+      activity_id: uploadData.activity_id
+    });
+  } catch (error) {
+    console.error('Strava upload error:', error);
+
+    db.prepare(`
+      UPDATE workout_sessions
+      SET strava_upload_status = 'failed'
+      WHERE id = ?
+    `).run(sessionId);
+
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Get overall statistics
 app.get('/api/stats/overall', (req, res) => {
   const stats = db.prepare(`
@@ -454,7 +925,7 @@ app.get('/api/stats/overall', (req, res) => {
   const records = {
     fastestPace: db.prepare(`
       SELECT id, started_at, total_distance_km, total_time_seconds,
-             (total_time_seconds / 60.0) / total_distance_km as pace
+             CASE WHEN total_distance_km > 0 THEN (total_time_seconds / 60.0) / total_distance_km ELSE 0 END as pace
       FROM workout_sessions
       WHERE completed_at IS NOT NULL
         AND total_distance_km > 0
@@ -650,22 +1121,123 @@ function initializeTemplates() {
 // Initialize templates on startup
 initializeTemplates();
 
+// Strava helper: Get valid access token (refresh if expired)
+async function getValidStravaToken() {
+  const auth = db.prepare('SELECT * FROM strava_auth ORDER BY connected_at DESC LIMIT 1').get();
+
+  if (!auth) {
+    throw new Error('Not connected to Strava');
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+
+  // Token still valid (5 min buffer)
+  if (auth.expires_at > now + 300) {
+    return auth.access_token;
+  }
+
+  // Refresh token
+  const response = await fetch('https://www.strava.com/oauth/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      client_id: process.env.STRAVA_CLIENT_ID,
+      client_secret: process.env.STRAVA_CLIENT_SECRET,
+      refresh_token: auth.refresh_token,
+      grant_type: 'refresh_token'
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to refresh Strava token');
+  }
+
+  const data = await response.json();
+
+  // Update tokens in database
+  db.prepare(`
+    UPDATE strava_auth
+    SET access_token = ?, refresh_token = ?, expires_at = ?
+    WHERE id = ?
+  `).run(data.access_token, data.refresh_token, data.expires_at, auth.id);
+
+  return data.access_token;
+}
+
+// Strava helper: Generate TCX (Training Center XML) from session data
+function generateTCX(session, dataPoints) {
+  const startTime = new Date(session.started_at).toISOString();
+
+  let trackpoints = '';
+  dataPoints.forEach(point => {
+    const time = new Date(point.timestamp).toISOString();
+    const distance = (point.distance_km || 0) * 1000; // km to meters
+    const speed = (point.speed_kmh || 0) / 3.6; // km/h to m/s
+    const hr = point.heart_rate || 0;
+
+    trackpoints += `
+          <Trackpoint>
+            <Time>${time}</Time>
+            <DistanceMeters>${distance.toFixed(2)}</DistanceMeters>
+            ${hr > 0 ? `<HeartRateBpm><Value>${hr}</Value></HeartRateBpm>` : ''}
+            <Extensions>
+              <TPX xmlns="http://www.garmin.com/xmlschemas/ActivityExtension/v2">
+                <Speed>${speed.toFixed(2)}</Speed>
+              </TPX>
+            </Extensions>
+          </Trackpoint>`;
+  });
+
+  const avgHR = session.avg_heart_rate || 0;
+  const maxHR = dataPoints.length > 0 ? Math.max(...dataPoints.map(p => p.heart_rate || 0)) : 0;
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<TrainingCenterDatabase xmlns="http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2">
+  <Activities>
+    <Activity Sport="Running">
+      <Id>${startTime}</Id>
+      <Lap StartTime="${startTime}">
+        <TotalTimeSeconds>${session.total_time_seconds || 0}</TotalTimeSeconds>
+        <DistanceMeters>${((session.total_distance_km || 0) * 1000).toFixed(2)}</DistanceMeters>
+        <Calories>${session.calories_burned || 0}</Calories>
+        ${avgHR > 0 ? `<AverageHeartRateBpm><Value>${avgHR}</Value></AverageHeartRateBpm>` : ''}
+        ${maxHR > 0 ? `<MaximumHeartRateBpm><Value>${maxHR}</Value></MaximumHeartRateBpm>` : ''}
+        <Intensity>Active</Intensity>
+        <TriggerMethod>Manual</TriggerMethod>
+        <Track>${trackpoints}
+        </Track>
+      </Lap>
+    </Activity>
+  </Activities>
+</TrainingCenterDatabase>`;
+}
+
 // WebSocket for real-time treadmill data
 wss.on('connection', (ws) => {
   console.log('Client connected');
 
+  // Send cached state to new clients immediately
+  if (latestTreadmillState) {
+    ws.send(JSON.stringify(latestTreadmillState));
+  }
+
   ws.on('message', (message) => {
     try {
       const data = JSON.parse(message);
+      if (typeof data !== 'object' || data === null) return;
+
+      // Cache treadmill state for new client hydration
+      if (data.type === 'treadmill_state') {
+        latestTreadmillState = data.sessionActive ? data : null;
+      }
+
       // Broadcast to all clients
       wss.clients.forEach((client) => {
         if (client.readyState === WebSocket.OPEN) {
           client.send(JSON.stringify(data));
         }
       });
-    } catch (err) {
-      console.error('WebSocket message error:', err);
-    }
+    } catch { return; }
   });
 
   ws.on('close', () => {

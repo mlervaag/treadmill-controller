@@ -17,6 +17,18 @@ class TreadmillController {
     this.statusCharacteristic = null;
     this.onDataCallback = null;
     this.onStatusCallback = null;
+
+    // Command timing
+    this.lastWriteTime = 0;
+    this.minCommandInterval = 400; // ms between BLE writes
+
+    // Status confirmation promises
+    this.pendingSpeedConfirm = null;
+    this.pendingInclineConfirm = null;
+
+    // Tracked actuals from treadmill data notifications
+    this.lastReportedSpeed = null;
+    this.lastReportedIncline = null;
   }
 
   async connect(acceptAllDevices = false) {
@@ -91,8 +103,24 @@ class TreadmillController {
     }
   }
 
+  async _ensureCommandGap() {
+    const now = Date.now();
+    const elapsed = now - this.lastWriteTime;
+    if (elapsed < this.minCommandInterval) {
+      await new Promise(resolve => setTimeout(resolve, this.minCommandInterval - elapsed));
+    }
+  }
+
   handleTreadmillData(value) {
     const data = this.parseTreadmillData(value);
+
+    if (data.speed_kmh !== undefined) {
+      this.lastReportedSpeed = data.speed_kmh;
+    }
+    if (data.incline_percent !== undefined) {
+      this.lastReportedIncline = data.incline_percent;
+    }
+
     if (this.onDataCallback) {
       this.onDataCallback(data);
     }
@@ -226,6 +254,19 @@ class TreadmillController {
     const statusCode = value.getUint8(0);
     const status = this.getStatusString(statusCode);
     console.log('Treadmill status:', status);
+
+    // Resolve pending confirmations
+    if (statusCode === 0x0A && this.pendingSpeedConfirm) {
+      clearTimeout(this.pendingSpeedConfirm.timeoutId);
+      this.pendingSpeedConfirm.resolve(true);
+      this.pendingSpeedConfirm = null;
+    }
+    if (statusCode === 0x0B && this.pendingInclineConfirm) {
+      clearTimeout(this.pendingInclineConfirm.timeoutId);
+      this.pendingInclineConfirm.resolve(true);
+      this.pendingInclineConfirm = null;
+    }
+
     if (this.onStatusCallback) {
       this.onStatusCallback(status, statusCode);
     }
@@ -255,77 +296,135 @@ class TreadmillController {
   async setSpeed(speedKmh) {
     if (!this.controlPoint) throw new Error('Not connected');
 
-    // Control Point OpCode 0x02 = Set Target Speed
+    await this._ensureCommandGap();
+
     const buffer = new ArrayBuffer(3);
     const view = new DataView(buffer);
-    view.setUint8(0, 0x02); // OpCode
-    view.setUint16(1, Math.round(speedKmh * 100), true); // Speed in 0.01 km/h
+    view.setUint8(0, 0x02);
+    view.setUint16(1, Math.round(speedKmh * 100), true);
 
     await this.controlPoint.writeValue(buffer);
+    this.lastWriteTime = Date.now();
     console.log(`Set speed to ${speedKmh} km/h`);
+  }
+
+  async setSpeedAndConfirm(speedKmh, timeoutMs = 3000) {
+    if (this.pendingSpeedConfirm) {
+      clearTimeout(this.pendingSpeedConfirm.timeoutId);
+      this.pendingSpeedConfirm.resolve(false);
+    }
+
+    const confirmPromise = new Promise((resolve) => {
+      const timeoutId = setTimeout(() => {
+        this.pendingSpeedConfirm = null;
+        console.warn(`Speed confirmation timeout for ${speedKmh} km/h`);
+        resolve(false);
+      }, timeoutMs);
+      this.pendingSpeedConfirm = { resolve, timeoutId };
+    });
+
+    await this.setSpeed(speedKmh);
+    return confirmPromise;
   }
 
   async setIncline(inclinePercent) {
     if (!this.controlPoint) throw new Error('Not connected');
 
-    // Control Point OpCode 0x03 = Set Target Inclination
+    await this._ensureCommandGap();
+
     const buffer = new ArrayBuffer(3);
     const view = new DataView(buffer);
-    view.setUint8(0, 0x03); // OpCode
-    view.setInt16(1, Math.round(inclinePercent * 10), true); // Incline in 0.1%
+    view.setUint8(0, 0x03);
+    view.setInt16(1, Math.round(inclinePercent * 10), true);
 
     await this.controlPoint.writeValue(buffer);
+    this.lastWriteTime = Date.now();
     console.log(`Set incline to ${inclinePercent}%`);
+  }
+
+  async setInclineAndConfirm(inclinePercent, timeoutMs = 3000) {
+    if (this.pendingInclineConfirm) {
+      clearTimeout(this.pendingInclineConfirm.timeoutId);
+      this.pendingInclineConfirm.resolve(false);
+    }
+
+    const confirmPromise = new Promise((resolve) => {
+      const timeoutId = setTimeout(() => {
+        this.pendingInclineConfirm = null;
+        console.warn(`Incline confirmation timeout for ${inclinePercent}%`);
+        resolve(false);
+      }, timeoutMs);
+      this.pendingInclineConfirm = { resolve, timeoutId };
+    });
+
+    await this.setIncline(inclinePercent);
+    return confirmPromise;
   }
 
   async start() {
     if (!this.controlPoint) throw new Error('Not connected');
 
-    // Control Point OpCode 0x07 = Start or Resume
+    await this._ensureCommandGap();
+
     const buffer = new ArrayBuffer(1);
     const view = new DataView(buffer);
     view.setUint8(0, 0x07);
 
     await this.controlPoint.writeValue(buffer);
+    this.lastWriteTime = Date.now();
     console.log('Started treadmill');
   }
 
   async stop() {
     if (!this.controlPoint) throw new Error('Not connected');
 
-    // Control Point OpCode 0x08 = Stop or Pause
+    await this._ensureCommandGap();
+
     const buffer = new ArrayBuffer(2);
     const view = new DataView(buffer);
-    view.setUint8(0, 0x08); // OpCode
-    view.setUint8(1, 0x01); // Parameter: 0x01 = Stop
+    view.setUint8(0, 0x08);
+    view.setUint8(1, 0x01);
 
     await this.controlPoint.writeValue(buffer);
+    this.lastWriteTime = Date.now();
     console.log('Stopped treadmill');
   }
 
   async pause() {
     if (!this.controlPoint) throw new Error('Not connected');
 
-    // Control Point OpCode 0x08 = Stop or Pause
+    await this._ensureCommandGap();
+
     const buffer = new ArrayBuffer(2);
     const view = new DataView(buffer);
-    view.setUint8(0, 0x08); // OpCode
-    view.setUint8(1, 0x02); // Parameter: 0x02 = Pause
+    view.setUint8(0, 0x08);
+    view.setUint8(1, 0x02);
 
     await this.controlPoint.writeValue(buffer);
+    this.lastWriteTime = Date.now();
     console.log('Paused treadmill');
   }
 
   async reset() {
     if (!this.controlPoint) throw new Error('Not connected');
 
-    // Control Point OpCode 0x01 = Reset
+    await this._ensureCommandGap();
+
     const buffer = new ArrayBuffer(1);
     const view = new DataView(buffer);
     view.setUint8(0, 0x01);
 
     await this.controlPoint.writeValue(buffer);
+    this.lastWriteTime = Date.now();
     console.log('Reset treadmill');
+  }
+
+  getLastReportedSpeed() {
+    return this.lastReportedSpeed;
+  }
+
+  getLastReportedIncline() {
+    return this.lastReportedIncline;
   }
 
   onData(callback) {
@@ -337,6 +436,17 @@ class TreadmillController {
   }
 
   disconnect() {
+    if (this.pendingSpeedConfirm) {
+      clearTimeout(this.pendingSpeedConfirm.timeoutId);
+      this.pendingSpeedConfirm.resolve(false);
+      this.pendingSpeedConfirm = null;
+    }
+    if (this.pendingInclineConfirm) {
+      clearTimeout(this.pendingInclineConfirm.timeoutId);
+      this.pendingInclineConfirm.resolve(false);
+      this.pendingInclineConfirm = null;
+    }
+
     if (this.device && this.device.gatt.connected) {
       this.device.gatt.disconnect();
       console.log('Disconnected from treadmill');

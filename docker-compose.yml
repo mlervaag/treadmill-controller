@@ -4,6 +4,11 @@ services:
     container_name: treadmill-controller
     ports:
       - "3001:3001"
+    # Load Strava credentials and other env vars from .env file
+    # Create .env from .env.example: cp .env.example .env
+    env_file:
+      - path: .env
+        required: false
     volumes:
       # Persist database outside container
       - ./data:/app/data
@@ -14,7 +19,7 @@ services:
       - DATABASE_PATH=/app/data/treadmill.db
     # Change to "no" if you want manual control (save power)
     # Use "unless-stopped" for 24/7 operation
-    restart: "no"
+    restart: unless-stopped
     networks:
       - treadmill-network
     # Resource limits for Raspberry Pi

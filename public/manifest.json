@@ -1,0 +1,18 @@
+{
+    "name": "Tredem\u00f8lle Kontroller",
+    "short_name": "Tredem\u00f8lle",
+    "description": "Styr tredem\u00f8llen via Bluetooth og spor trenings\u00f8ktene dine",
+    "start_url": "/",
+    "display": "standalone",
+    "orientation": "portrait-primary",
+    "theme_color": "#000000",
+    "background_color": "#000000",
+    "lang": "no",
+    "icons": [
+        {
+            "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>\ud83c\udfc3</text></svg>",
+            "sizes": "any",
+            "type": "image/svg+xml"
+        }
+    ]
+}

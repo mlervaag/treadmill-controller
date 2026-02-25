@@ -17,7 +17,7 @@
     --card-bg: #1C1C1E;
     --card-hover: #2C2C2E;
     --text-primary: #FFFFFF;
-    --text-secondary: #98989D;
+    --text-secondary: #ABABAF;
     --border-color: #38383A;
     --accent-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     --success-gradient: linear-gradient(135deg, #34C759 0%, #30D158 100%);
@@ -173,6 +173,17 @@ h1 {
     opacity: 0.4;
     cursor: not-allowed;
     transform: none !important;
+}
+
+button:focus-visible,
+.btn:focus-visible,
+.tab-btn:focus-visible,
+.view-mode-btn:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
 }
 
 /* Tabs */
@@ -855,6 +866,16 @@ h1 {
     letter-spacing: 0.5px;
 }
 
+.segment-verification {
+    margin-top: 8px;
+    text-align: center;
+}
+
+.verification-label {
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+}
+
 .segment-progress {
     margin-top: 12px;
 }
@@ -1386,6 +1407,363 @@ h1 {
     border-color: var(--primary-color);
 }
 
+/* Toast Notifications */
+.toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    pointer-events: none;
+}
+
+.toast {
+    padding: 12px 20px;
+    border-radius: 12px;
+    color: white;
+    font-size: 0.9rem;
+    font-weight: 500;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    opacity: 0;
+    transform: translateX(100%);
+    transition: all 0.3s ease;
+    pointer-events: auto;
+    max-width: 350px;
+}
+
+.toast-visible {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.toast-success {
+    background: var(--success-color);
+}
+
+.toast-error {
+    background: var(--danger-color);
+}
+
+.toast-info {
+    background: var(--primary-color);
+}
+
+.toast-warning {
+    background: var(--warning-color);
+}
+
+/* Loading Spinner */
+.spinner {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.loading-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-secondary);
+}
+
+.loading-state .spinner {
+    width: 24px;
+    height: 24px;
+    margin-bottom: 12px;
+}
+
+/* Empty States */
+.empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-secondary);
+}
+
+.empty-state p {
+    margin: 4px 0;
+}
+
+.empty-state-hint {
+    font-size: 0.85rem;
+    opacity: 0.7;
+}
+
+/* ========================================
+   Chart Modal
+   ======================================== */
+.chart-modal {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.9);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+}
+.chart-modal.hidden { display: none; }
+.chart-modal-content {
+    background: var(--card-bg);
+    border-radius: 16px;
+    width: 100%;
+    max-width: 900px;
+    max-height: 90vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+.chart-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border-color);
+}
+.chart-modal-header h3 { font-size: 18px; }
+.chart-container {
+    padding: 16px;
+    flex: 1;
+    min-height: 300px;
+    position: relative;
+}
+.chart-container canvas { width: 100% !important; height: 100% !important; }
+
+/* ========================================
+   Strava Styles
+   ======================================== */
+.strava-section { margin-bottom: 16px; }
+.strava-card {
+    background: var(--card-bg);
+    border-radius: 12px;
+    padding: 16px;
+    border: 1px solid var(--border-color);
+    text-align: center;
+}
+.strava-card h3 { margin-bottom: 8px; font-size: 16px; }
+.strava-card p { color: var(--text-secondary); font-size: 14px; margin-bottom: 12px; }
+.strava-logo { margin-bottom: 8px; }
+.strava-logo svg { vertical-align: middle; }
+.strava-btn {
+    background: #FC4C02 !important;
+    color: white !important;
+    border: none;
+    font-weight: 600;
+}
+.strava-btn:hover { background: #E34402 !important; }
+.strava-options { margin: 12px 0; text-align: left; }
+.strava-options label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: var(--text-secondary);
+}
+.strava-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+}
+.strava-badge-synced {
+    background: rgba(252, 76, 2, 0.15);
+    color: #FC4C02;
+}
+.strava-badge-pending { color: var(--text-secondary); }
+.strava-upload-btn {
+    background: transparent;
+    border: 1px solid #FC4C02;
+    color: #FC4C02;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.strava-upload-btn:hover { background: #FC4C02; color: white; }
+
+/* ========================================
+   Date Filter
+   ======================================== */
+.date-filter-section {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 16px;
+    padding: 12px;
+    background: var(--card-bg);
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+}
+.date-quick-filters {
+    display: flex;
+    gap: 6px;
+}
+.date-quick-btn {
+    padding: 6px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.date-quick-btn:hover { border-color: var(--primary-color); color: var(--text-primary); }
+.date-quick-btn.active {
+    background: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+}
+.date-custom-filter {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+}
+.date-custom-filter span { color: var(--text-secondary); font-size: 13px; }
+.date-input {
+    background: var(--bg-color);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 6px 10px;
+    border-radius: 8px;
+    font-size: 13px;
+}
+.date-input::-webkit-calendar-picker-indicator { filter: invert(1); }
+
+/* ========================================
+   Export Buttons
+   ======================================== */
+.export-btn-group {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+}
+.export-btn {
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.export-btn:hover { border-color: var(--primary-color); color: var(--primary-color); }
+
+/* ========================================
+   Segment Feedback Table
+   ======================================== */
+.segment-feedback-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    margin-top: 12px;
+}
+.segment-feedback-table th {
+    text-align: left;
+    padding: 8px;
+    color: var(--text-secondary);
+    font-weight: 600;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.segment-feedback-table td {
+    padding: 8px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.segment-feedback-table tr:last-child td { border-bottom: none; }
+.segment-on-target { color: var(--success-color); }
+.segment-off-target { color: var(--warning-color); }
+
+/* ========================================
+   Sound Toggle & Reconnect
+   ======================================== */
+.sound-toggle-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    user-select: none;
+}
+.sound-toggle-label input { width: 16px; height: 16px; }
+.auto-reconnect-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-top: 8px;
+}
+.auto-reconnect-label input { width: 14px; height: 14px; }
+.reconnect-status {
+    font-size: 12px;
+    color: var(--warning-color);
+    margin-top: 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.reconnect-status .spinner { width: 12px; height: 12px; border-width: 2px; }
+
+/* ========================================
+   Edit Mode Indicator
+   ======================================== */
+.edit-indicator {
+    display: inline-block;
+    background: var(--warning-color);
+    color: #000;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    margin-left: 8px;
+}
+.edit-btn {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.edit-btn:hover { border-color: var(--primary-color); color: var(--primary-color); }
+
+/* Focus-visible styles for new interactive elements */
+.date-quick-btn:focus-visible,
+.date-input:focus-visible,
+.export-btn:focus-visible,
+.strava-btn:focus-visible,
+.strava-upload-btn:focus-visible,
+.sound-toggle-label input:focus-visible,
+.auto-reconnect-label input:focus-visible,
+.edit-btn:focus-visible,
+.chart-modal-header .btn-close:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+}
+
 /* Responsive - Tablet (iPad) */
 @media (max-width: 1024px) {
     .container {
@@ -1705,11 +2083,37 @@ h1 {
     .form-actions .btn {
         width: 100%;
     }
+
+    .toast-container {
+        top: auto;
+        bottom: 20px;
+        right: 12px;
+        left: 12px;
+    }
+
+    .toast {
+        max-width: 100%;
+    }
+
+    /* Chart Modal, Date Filter, Export, Strava - Mobile */
+    .date-filter-section { flex-direction: column; }
+    .date-custom-filter { margin-left: 0; width: 100%; }
+    .date-input { flex: 1; }
+    .chart-modal-content { max-height: 80vh; }
+    .chart-container { min-height: 200px; }
+    .export-btn-group { gap: 4px; }
+    .strava-section { margin-bottom: 12px; }
 }
 
 /* Smooth scrolling */
 html {
     scroll-behavior: smooth;
+}
+
+/* Firefox scrollbar */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-color) transparent;
 }
 
 /* Scrollbar styling */
@@ -2932,4 +3336,125 @@ input[type=range]::-moz-range-thumb:hover {
     margin-top: 16px;
     padding-top: 16px;
     border-top: 1px solid var(--border-color);
+}
+
+/* ========================================
+   Heart Rate Monitor (HRM) Styling
+   ======================================== */
+
+.hrm-status-card {
+    margin-top: 16px;
+    padding: 16px;
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(220, 38, 38, 0.05) 100%);
+    border-radius: 12px;
+    border: 2px solid rgba(239, 68, 68, 0.3);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    animation: slideDown 0.3s ease;
+}
+
+.hrm-status-card.hidden {
+    display: none;
+}
+
+.hrm-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.hrm-device-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.hrm-icon {
+    font-size: 20px;
+}
+
+.hrm-device-name {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.hrm-heart-rate {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--primary-color);
+}
+
+.hrm-heart-rate.pulse-animation {
+    animation: pulse 1s ease infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1.1);
+        opacity: 0.8;
+    }
+}
+
+.source-indicator {
+    margin-top: 12px;
+    padding: 8px 12px;
+    background: var(--card-bg);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+}
+
+.source-label {
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.source-value {
+    color: var(--primary-color);
+    font-weight: 600;
+}
+
+/* ========================================
+   Header Toggles
+   ======================================== */
+.header-toggles {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    margin-top: 8px;
+    font-size: 14px;
+}
+.header-toggles label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+.header-toggles input[type="checkbox"] {
+    cursor: pointer;
+}
+
+/* ========================================
+   Status Reconnecting
+   ======================================== */
+.status-reconnecting {
+    color: #f59e0b;
+    font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
 }
