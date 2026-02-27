@@ -21,7 +21,11 @@ COPY public ./public
 
 # Create directory for database with proper permissions
 RUN mkdir -p /app/data && \
-    chmod 755 /app/data
+    chown -R node:node /app && \
+    chmod 700 /app/data
+
+# Switch to non-root user (node user is built into node:alpine, uid 1000)
+USER node
 
 # Expose port
 EXPOSE 3001

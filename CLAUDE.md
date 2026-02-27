@@ -103,6 +103,5 @@ Note: Strava API does not support setting activity privacy. Users must set "Defa
 ## Known Issues
 
 - Drift detection can conflict with manual speed adjustments during workout
-- `JSON.parse(workout.tags)` in GET /api/workouts lacks try-catch
 - Strava upload status stays as "uploading" — no polling for final status implemented
 - Service worker cache may need manual clear after deploy (version bump in sw.js)

@@ -41,6 +41,16 @@ app.use(cors({
     }
 }));
 app.use(express.json({ limit: '1mb' }));
+
+// Security headers
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  next();
+});
+
 app.use(express.static('public'));
 
 // Database setup
@@ -852,7 +862,8 @@ app.post('/api/strava/upload/:sessionId', async (req, res) => {
         SET strava_upload_status = 'failed'
         WHERE id = ?
       `).run(sessionId);
-      return res.status(uploadResponse.status).json({ error: uploadData.error || 'Strava upload failed', details: uploadData });
+      console.error('Strava upload error:', uploadData);
+      return res.status(uploadResponse.status).json({ error: 'Strava-opplasting feilet. Prøv igjen senere.' });
     }
 
     // Update session with upload status
@@ -1213,7 +1224,13 @@ function generateTCX(session, dataPoints) {
 }
 
 // WebSocket for real-time treadmill data
-wss.on('connection', (ws) => {
+wss.on('connection', (ws, req) => {
+  // Validate origin — only allow local network connections
+  const origin = req.headers.origin || '';
+  if (origin && !origin.match(/^https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+)(:\d+)?$/)) {
+    ws.close(1008, 'Origin not allowed');
+    return;
+  }
   console.log('Client connected');
 
   // Send cached state to new clients immediately

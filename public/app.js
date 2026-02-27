@@ -1,3 +1,9 @@
+// HTML escape utility to prevent XSS in innerHTML
+function escapeHtml(str) {
+    if (str == null) return '';
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 // Global state
 let treadmill = null;
 let currentSession = null;
@@ -964,16 +970,16 @@ function createWorkoutCard(workout, isTemplate) {
     let tagsHtml = '';
     if (workout.tags && Array.isArray(workout.tags) && workout.tags.length > 0) {
         tagsHtml = `<div class="workout-tags">
-            ${workout.tags.map(tag => `<span class="tag-badge">${tag}</span>`).join('')}
+            ${workout.tags.map(tag => `<span class="tag-badge">${escapeHtml(tag)}</span>`).join('')}
         </div>`;
     }
 
     card.innerHTML = `
         <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
-            <h3>${workout.name}</h3>
-            <span class="difficulty-badge ${workout.difficulty || 'beginner'}">${difficultyText}</span>
+            <h3>${escapeHtml(workout.name)}</h3>
+            <span class="difficulty-badge ${escapeHtml(workout.difficulty || 'beginner')}">${escapeHtml(difficultyText)}</span>
         </div>
-        <p>${workout.description || 'Ingen beskrivelse'}</p>
+        <p>${escapeHtml(workout.description || 'Ingen beskrivelse')}</p>
         ${tagsHtml}
         <div class="workout-meta">
             <span>📋 ${workout.segment_count} segmenter</span>
@@ -1023,7 +1029,7 @@ async function loadWorkoutDetailsPreview(workoutId) {
                 const segmentEl = document.createElement('div');
                 segmentEl.className = 'segment-preview';
                 segmentEl.innerHTML = `
-                    <span class="segment-preview-name">${segment.segment_name || `Segment ${index + 1}`}</span>
+                    <span class="segment-preview-name">${escapeHtml(segment.segment_name || `Segment ${index + 1}`)}</span>
                     <div class="segment-preview-stats">
                         <span>⏱️ ${Math.round(segment.duration_seconds / 60)} min</span>
                         <span>🏃 ${segment.speed_kmh} km/t</span>
@@ -1713,7 +1719,7 @@ function displaySessions(sessions) {
         card.className = 'session-card';
         card.innerHTML = `
             <div class="session-header">
-                <h3>${session.workout_name || 'Fri trening'}</h3>
+                <h3>${escapeHtml(session.workout_name || 'Fri trening')}</h3>
                 <div style="display: flex; gap: 8px;">
                     <button class="btn-expand" onclick="toggleSessionDetails(${session.id})">▼</button>
                     <button class="btn btn-danger btn-small" onclick="deleteSession(${session.id})">Slett</button>
