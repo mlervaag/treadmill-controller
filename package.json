@@ -4,8 +4,7 @@
   "description": "A modern web application to control your treadmill via Bluetooth FTMS and track your workouts. Fully responsive for desktop, tablet, and mobile.",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node server.js"
+    "start": "node server.js"
   },
   "keywords": [
     "treadmill",

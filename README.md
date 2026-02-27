@@ -225,12 +225,11 @@ treadmill-controller/
 ├── package.json               # npm konfigurasjon
 ├── templates.json             # 38 standard treningsøkter
 ├── migrate.js                 # Database migrations (ALTER TABLE)
+├── deploy-to-pi.sh            # Bash deploy-skript for Raspberry Pi
 ├── Dockerfile                 # Docker container build
 ├── docker-compose.yml         # Docker Compose med volumes og env
 ├── .env.example               # Miljøvariabel-mal
-├── .gitignore                 # Git ignore
 ├── LICENSE                    # ISC lisens
-├── README.md                  # Denne filen
 ├── CLAUDE.md                  # Utviklingsdokumentasjon for Claude Code
 ├── STRAVA_INTEGRATION.md      # Teknisk Strava-dokumentasjon
 ├── ROADMAP.md                 # Planlagte funksjoner og veikart
@@ -241,7 +240,8 @@ treadmill-controller/
 │   └── server.crt
 ├── docs/                      # Brukerveiledninger
 │   ├── HOME_USAGE_GUIDE.md    # Komplett bruksanvisning
-│   └── WEB_BLUETOOTH_SETUP.md # Web Bluetooth oppsettguide
+│   ├── WEB_BLUETOOTH_SETUP.md # Web Bluetooth oppsettguide
+│   └── RASPBERRY_PI_SETUP.md  # Raspberry Pi deployment guide
 ├── scripts/                   # Hjelpeskript (PowerShell)
 │   ├── deploy-to-pi.ps1       # Deploy til Raspberry Pi
 │   ├── enable-https.ps1       # Aktiver HTTPS-sertifikater
@@ -382,6 +382,7 @@ Heart Rate Service:   0000180d-0000-1000-8000-00805f9b34fb
 
 - **[HOME_USAGE_GUIDE.md](docs/HOME_USAGE_GUIDE.md)** — Komplett bruksanvisning for daglig bruk
 - **[WEB_BLUETOOTH_SETUP.md](docs/WEB_BLUETOOTH_SETUP.md)** — Guide for å sette opp Web Bluetooth
+- **[RASPBERRY_PI_SETUP.md](docs/RASPBERRY_PI_SETUP.md)** — Raspberry Pi deployment og drift
 - **[STRAVA_INTEGRATION.md](STRAVA_INTEGRATION.md)** — Teknisk dokumentasjon for Strava-integrasjonen
 - **[ROADMAP.md](ROADMAP.md)** — Planlagte funksjoner og fremtidig utvikling
 - **[CLAUDE.md](CLAUDE.md)** — Utviklingsdokumentasjon for Claude Code

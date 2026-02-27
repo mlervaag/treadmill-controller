@@ -40,37 +40,37 @@ rsync -avz --progress \
 
 # Deploy and start with Docker
 echo "🐳 Building and starting Docker container..."
-ssh ${PI_USER}@${PI_HOST} << 'ENDSSH'
-cd /home/pi/treadmill-controller
+ssh ${PI_USER}@${PI_HOST} << ENDSSH
+cd ${APP_DIR}
 
 # Create data directory for database
 mkdir -p data
 
 # Stop and remove old container if exists
-docker-compose down 2>/dev/null || true
+docker compose down 2>/dev/null || true
 
 # Build and start container
-docker-compose up -d --build
+docker compose up -d --build
 
 # Show logs
 echo ""
 echo "✅ Deployment complete!"
 echo ""
 echo "📊 Container status:"
-docker-compose ps
+docker compose ps
 
 echo ""
 echo "📝 Recent logs:"
-docker-compose logs --tail=20
+docker compose logs --tail=20
 
 echo ""
 echo "🌐 Access the app at: http://$PI_HOST:3001"
 echo ""
 echo "Useful commands:"
-echo "  View logs:    ssh $PI_USER@$PI_HOST 'cd ~/treadmill-controller && docker-compose logs -f'"
-echo "  Restart:      ssh $PI_USER@$PI_HOST 'cd ~/treadmill-controller && docker-compose restart'"
-echo "  Stop:         ssh $PI_USER@$PI_HOST 'cd ~/treadmill-controller && docker-compose down'"
-echo "  View status:  ssh $PI_USER@$PI_HOST 'cd ~/treadmill-controller && docker-compose ps'"
+echo "  View logs:    ssh $PI_USER@$PI_HOST 'cd ~/treadmill-controller && docker compose logs -f'"
+echo "  Restart:      ssh $PI_USER@$PI_HOST 'cd ~/treadmill-controller && docker compose restart'"
+echo "  Stop:         ssh $PI_USER@$PI_HOST 'cd ~/treadmill-controller && docker compose down'"
+echo "  View status:  ssh $PI_USER@$PI_HOST 'cd ~/treadmill-controller && docker compose ps'"
 ENDSSH
 
 echo ""

@@ -1091,7 +1091,6 @@ function initializeTemplates() {
           addedCount++;
         } else {
           // Update existing template to ensure tags and description are fresh
-          // console.log(`   ↻ Updating existing template: ${template.name}`);
           updateWorkout.run(
             template.description || '',
             template.difficulty || 'beginner',

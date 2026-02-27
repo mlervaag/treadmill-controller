@@ -17,6 +17,9 @@ certs/
 .env.local
 .env.*.local
 
+# Claude Code editor config
+.claude/
+
 # Editor directories and files
 .vscode/
 .idea/
