@@ -1,0 +1,60 @@
+Treadmill controller web app using Web Bluetooth (FTMS protocol) to control a treadmill and track workouts. Runs on a Raspberry Pi via Docker, served over HTTPS (required for Web Bluetooth). All data is local — no cloud services (except optional Strava sync). UI is in Norwegian.
+
+# Commands
+- npm install (needs python3, make, g++ for better-sqlite3)
+- npm start (starts server on http://localhost:3001)
+- node migrate.js (database migrations)
+- docker compose build / up -d / down (production)
+- No test suite. No linter.
+
+# Architecture
+Backend: Express 5 + better-sqlite3 (WAL mode) + WebSocket (ws). Single server.js (~1250 lines): REST API, WebSocket relay, template syncing, Strava OAuth/upload, session exports (JSON/CSV/TCX), HTTPS/HTTP auto-detection.
+
+Frontend: Vanilla JS (no framework).
+- public/ftms.js — FTMS Bluetooth protocol (connect, parse data, write speed/incline/start/stop). Commands throttled 400ms minimum gap.
+- public/hrm.js — Heart Rate Monitor Bluetooth (UUID 0x180D). HRM takes priority over treadmill HR.
+- public/app.js — Main app (~3000 lines). UI tabs, workout execution, session recording (1pt/sec), drift detection, Chart.js graphs, sound alerts, Strava, date filtering, export, auto BLE reconnect, segment feedback, WebSocket state broadcast.
+- public/view.html — Read-only dashboard for iPad/iPhone via WebSocket.
+- public/sw.js — Service worker (cache-first static, network-first API).
+- public/manifest.json — PWA manifest (Norwegian locale).
+
+Database: workouts → workout_segments (1:N), workout_sessions → session_data (1:N), strava_auth. 38 templates from templates.json.
+
+# Data Flow
+Template segments → executeSegment() → BLE write → Treadmill notification (200ms) → updateStats() → UI + recordSessionData() → DB → WebSocket broadcast (2s) → view.html on iPad/iPhone
+
+# Key API Routes
+- GET/POST /api/workouts — CRUD workouts with segments
+- PUT /api/workouts/:id — Update workout
+- GET/POST/PUT/DELETE /api/sessions — Session lifecycle
+- POST /api/sessions/:id/data — Record data point each second
+- GET /api/sessions/:id/details — Full session with data points
+- GET /api/sessions/:id/segments — Per-segment feedback
+- GET /api/sessions/:id/export/json|csv|tcx — Export
+- GET /api/stats/overall|weekly|monthly — Statistics
+- GET /auth/strava, GET /auth/strava/callback — Strava OAuth
+- GET /api/strava/status, DELETE /api/strava/disconnect — Strava management
+- POST /api/strava/upload/:sessionId — Upload to Strava
+
+# FTMS Protocol
+Control Point writes (little-endian):
+- 0x02 [speed*100 uint16] — Set speed (km/h)
+- 0x03 [incline*10 int16] — Set incline (%)
+- 0x07 — Start/Resume
+- 0x08 0x01 — Stop, 0x08 0x02 — Pause
+Status: 0x0A=speed accepted, 0x0B=incline accepted, 0x04=started, 0x02=stopped
+Speed: 0.1–14.0 km/h. Incline: 0–12%.
+
+# Conventions
+- UI text in Norwegian
+- Use escapeHtml() for user data in innerHTML (XSS prevention)
+- SQL uses parameterized prepared statements (better-sqlite3)
+- BLE commands throttled 400ms minimum
+- Session data: 1 point/second
+- WebSocket broadcast: every 2 seconds
+- API errors use Norwegian messages
+
+# Known Issues
+- Drift detection can conflict with manual speed adjustments
+- Strava upload status stays "uploading" (no polling for final status)
+- Service worker cache may need manual clear after deploy

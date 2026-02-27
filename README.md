@@ -230,7 +230,11 @@ treadmill-controller/
 ├── docker-compose.yml         # Docker Compose med volumes og env
 ├── .env.example               # Miljøvariabel-mal
 ├── LICENSE                    # ISC lisens
-├── CLAUDE.md                  # Utviklingsdokumentasjon for Claude Code
+├── CLAUDE.md                  # AI-instrukser for Claude Code
+├── .cursorrules               # AI-instrukser for Cursor
+├── .windsurfrules             # AI-instrukser for Windsurf
+├── .github/
+│   └── copilot-instructions.md # AI-instrukser for GitHub Copilot
 ├── STRAVA_INTEGRATION.md      # Teknisk Strava-dokumentasjon
 ├── ROADMAP.md                 # Planlagte funksjoner og veikart
 ├── data/                      # Database (git-ignored)
@@ -385,7 +389,10 @@ Heart Rate Service:   0000180d-0000-1000-8000-00805f9b34fb
 - **[RASPBERRY_PI_SETUP.md](docs/RASPBERRY_PI_SETUP.md)** — Raspberry Pi deployment og drift
 - **[STRAVA_INTEGRATION.md](STRAVA_INTEGRATION.md)** — Teknisk dokumentasjon for Strava-integrasjonen
 - **[ROADMAP.md](ROADMAP.md)** — Planlagte funksjoner og fremtidig utvikling
-- **[CLAUDE.md](CLAUDE.md)** — Utviklingsdokumentasjon for Claude Code
+- **[CLAUDE.md](CLAUDE.md)** — AI-instrukser for Claude Code
+- **[.cursorrules](.cursorrules)** — AI-instrukser for Cursor
+- **[.windsurfrules](.windsurfrules)** — AI-instrukser for Windsurf
+- **[copilot-instructions.md](.github/copilot-instructions.md)** — AI-instrukser for GitHub Copilot
 
 ## 🛠️ Hjelpeskript
 
