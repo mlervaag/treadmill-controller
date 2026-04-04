@@ -1084,10 +1084,12 @@
                 }
 
                 var commandId = (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2) + Date.now().toString(36));
+                // BLE operations can take up to 60s (scan + connect)
+                var timeoutMs = (command.indexOf('ble_') === 0) ? 60000 : 12000;
                 var timeout = setTimeout(function () {
                     pendingCommands.delete(commandId);
                     reject(new Error('Kommando tidsavbrutt'));
-                }, 12000);
+                }, timeoutMs);
 
                 pendingCommands.set(commandId, { resolve: resolve, reject: reject, timer: timeout });
 

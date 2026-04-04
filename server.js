@@ -1363,7 +1363,9 @@ function handleConnection(ws, req) {
 
         const commandId = data.commandId || crypto.randomUUID();
 
-        // Track pending command for response routing (10s timeout)
+        // BLE operations can take up to 60s; other commands 10s
+        const isBleCommand = data.command && data.command.indexOf('ble_') === 0;
+        const timeoutMs = isBleCommand ? 60000 : 10000;
         const timer = setTimeout(() => {
           pendingCommands.delete(commandId);
           if (ws.readyState === WebSocket.OPEN) {
@@ -1372,10 +1374,10 @@ function handleConnection(ws, req) {
               commandId,
               command: data.command,
               success: false,
-              error: 'Command timed out (10s)'
+              error: `Command timed out (${timeoutMs / 1000}s)`
             }));
           }
-        }, 10000);
+        }, timeoutMs);
         pendingCommands.set(commandId, { viewer: ws, timer });
 
         // Forward as remote_command to the controller
