@@ -12,6 +12,7 @@ const { EventEmitter } = require('events');
 
 const FTMSNative = require('./ftms-native');
 const HRMNative = require('./hrm-native');
+const FitshowNative = require('./fitshow-native');
 
 // ── Config ──────────────────────────────────────────────────────────────────
 const CONFIG_PATH = path.join(__dirname, 'ble-config.json');
@@ -38,6 +39,7 @@ function httpBase() {
 // ── State ───────────────────────────────────────────────────────────────────
 const ftms = new FTMSNative();
 const hrm = new HRMNative();
+const fitshow = new FitshowNative();
 
 let ws = null;
 let wsReconnectDelay = 1000;
@@ -192,7 +194,8 @@ function buildCurrentState() {
     workout: workoutInfo,
     bleBackend: 'native',
     ftmsConnected: ftms.isConnected(),
-    hrmConnected: hrm.isConnected()
+    hrmConnected: hrm.isConnected(),
+    fitshow: fitshow.isConnected() ? fitshow.getState() : null
   };
 }
 
@@ -247,6 +250,24 @@ function handleServerMessage(msg) {
       break;
     case 'skip_segment':
       handleSkipSegment(commandId, params);
+      break;
+    case 'fitshow_query':
+      if (!fitshow.isConnected()) {
+        sendCommandResponse(commandId, 'fitshow_query', false, 'FitShow not connected');
+      } else {
+        sendCommandResponse(commandId, 'fitshow_query', true, null, fitshow.getState());
+      }
+      break;
+    case 'fitshow_key':
+      if (!fitshow.isConnected()) {
+        sendCommandResponse(commandId, 'fitshow_key', false, 'FitShow not connected');
+      } else {
+        fitshow.sendKey(params.keyCode || 0).then(() => {
+          sendCommandResponse(commandId, 'fitshow_key', true);
+        }).catch((err) => {
+          sendCommandResponse(commandId, 'fitshow_key', false, err.message);
+        });
+      }
       break;
     case 'ble_scan':
       handleBleScan(commandId, params);
@@ -367,10 +388,18 @@ async function handleBleConnect(commandId, params) {
     if (deviceType === 'treadmill') {
       await ftms.connect(peripheral);
       setupFtmsListeners();
+      // Also connect FitShow FFF0 using pre-discovered characteristics
+      try {
+        await fitshow.connectWithCharacteristics(peripheral, ftms.getAllCharacteristics());
+        setupFitshowListeners();
+        console.log('[BLE] FitShow FFF0 protocol connected');
+      } catch (e) {
+        console.log('[BLE] FitShow FFF0 not available:', e.message);
+      }
       config.treadmillAddress = address;
       saveConfig(config);
       ftmsReconnectDelay = 1000;
-      sendCommandResponse(commandId, 'ble_connect', true, null, { deviceType: 'treadmill', name: peripheral.advertisement.localName });
+      sendCommandResponse(commandId, 'ble_connect', true, null, { deviceType: 'treadmill', name: peripheral.advertisement.localName, fitshow: fitshow.isConnected() });
     } else if (deviceType === 'hrm') {
       await hrm.connect(peripheral);
       setupHrmListeners();
@@ -527,6 +556,41 @@ function setupHrmListeners() {
   });
 }
 
+// ── FitShow Event Wiring ───────────────────────────────────────────────────
+function setupFitshowListeners() {
+  fitshow.removeAllListeners();
+
+  fitshow.on('deviceInfo', (info) => {
+    console.log('[FitShow] Device info updated');
+    wsSend({ type: 'fitshow_info', info });
+  });
+
+  fitshow.on('data', (data) => {
+    // FitShow provides steps which FTMS doesn't
+    if (data.steps > 0) {
+      wsSend({ type: 'fitshow_data', steps: data.steps, calories: data.calories });
+    }
+  });
+
+  fitshow.on('error', (code, name) => {
+    console.error('[FitShow] Error:', name);
+    wsSend({ type: 'fitshow_error', errorCode: code, errorName: name });
+  });
+
+  fitshow.on('status', (status, details) => {
+    if (status === 'safety_key_removed') {
+      wsSend({ type: 'fitshow_alert', alert: 'safety_key_removed', message: 'Sikkerhetsnøkkel fjernet!' });
+    }
+    if (status === 'error') {
+      wsSend({ type: 'fitshow_alert', alert: 'error', message: details.errorName || 'Ukjent feil' });
+    }
+  });
+
+  fitshow.on('disconnect', () => {
+    console.log('[FitShow] Disconnected');
+  });
+}
+
 // ── Auto-Reconnect with Exponential Backoff ─────────────────────────────────
 function scheduleReconnect(deviceType) {
   if (deviceType === 'treadmill' && config.treadmillAddress) {
@@ -568,6 +632,13 @@ async function reconnectFtms() {
   const peripheral = await findPeripheralByAddress(config.treadmillAddress);
   await ftms.connect(peripheral);
   setupFtmsListeners();
+  try {
+    await fitshow.connectWithCharacteristics(peripheral, ftms.getAllCharacteristics());
+    setupFitshowListeners();
+    console.log('[BLE] FitShow reconnected');
+  } catch (e) {
+    console.log('[BLE] FitShow reconnect skipped:', e.message);
+  }
   broadcastDeviceStatus();
   console.log('[BLE] Treadmill reconnected');
 }

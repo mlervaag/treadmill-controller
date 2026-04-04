@@ -52,16 +52,18 @@ class FTMSNative extends EventEmitter {
     });
 
     console.log('[FTMS] Discovering services and characteristics...');
-    const { characteristics } = await new Promise((resolve, reject) => {
-      peripheral.discoverSomeServicesAndCharacteristics(
-        [FTMS_SERVICE_UUID],
-        [TREADMILL_DATA_UUID, FITNESS_MACHINE_CONTROL_POINT_UUID, FITNESS_MACHINE_STATUS_UUID],
+    const { characteristics: allCharacteristics } = await new Promise((resolve, reject) => {
+      peripheral.discoverAllServicesAndCharacteristics(
         (err, services, characteristics) => {
           if (err) return reject(err);
           resolve({ services, characteristics });
         }
       );
     });
+
+    // Store all characteristics so callers can pass them to other protocol handlers (e.g. FitShow)
+    this._allCharacteristics = allCharacteristics;
+    const characteristics = allCharacteristics;
 
     for (const char of characteristics) {
       const uuid = char.uuid.toLowerCase();
@@ -410,6 +412,10 @@ class FTMSNative extends EventEmitter {
 
   getLastReportedIncline() {
     return this.lastReportedIncline;
+  }
+
+  getAllCharacteristics() {
+    return this._allCharacteristics || [];
   }
 
   isConnected() {
