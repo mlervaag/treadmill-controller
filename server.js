@@ -414,6 +414,7 @@ app.post('/api/sessions', (req, res) => {
 
     const insert = db.prepare('INSERT INTO workout_sessions (workout_id, heart_rate_source) VALUES (?, ?)');
     const result = insert.run(validWorkoutId, validHRSource);
+    console.log(`Session ${result.lastInsertRowid} created (workout: ${validWorkoutId || 'manual'}, HR source: ${validHRSource})`);
     res.json({ id: result.lastInsertRowid });
   } catch (error) {
     console.error('Error creating session:', error);
@@ -455,6 +456,7 @@ app.put('/api/sessions/:id', (req, res) => {
       return res.status(404).json({ error: 'Økt ikke funnet' });
     }
 
+    console.log(`Session ${id} completed: ${distance}km, ${time}s, HR:${hr || 'n/a'}, Cal:${calories}`);
     res.json({ success: true });
   } catch (error) {
     console.error('Error updating session:', error);
@@ -471,12 +473,15 @@ app.post('/api/sessions/:id/data', (req, res) => {
 
     const { speed_kmh, incline_percent, distance_km, heart_rate, calories, segment_index } = req.body;
     if (speed_kmh !== undefined && (typeof speed_kmh !== 'number' || speed_kmh < 0 || speed_kmh > 30)) {
+        console.warn(`Rejected data for session ${id}: invalid speed_kmh`, JSON.stringify(req.body));
         return res.status(400).json({ error: 'Invalid speed_kmh' });
     }
     if (incline_percent !== undefined && (typeof incline_percent !== 'number' || incline_percent < -5 || incline_percent > 20)) {
+        console.warn(`Rejected data for session ${id}: invalid incline_percent`, JSON.stringify(req.body));
         return res.status(400).json({ error: 'Invalid incline_percent' });
     }
-    if (heart_rate !== undefined && (typeof heart_rate !== 'number' || heart_rate < 0 || heart_rate > 250)) {
+    if (heart_rate !== undefined && heart_rate !== null && (typeof heart_rate !== 'number' || heart_rate < 0 || heart_rate > 250)) {
+        console.warn(`Rejected data for session ${id}: invalid heart_rate`, JSON.stringify(req.body));
         return res.status(400).json({ error: 'Invalid heart_rate' });
     }
 

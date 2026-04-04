@@ -28,6 +28,16 @@ let sessionData = {
 };
 let hrm = null; // Heart Rate Monitor instance
 let hrmHeartRate = null; // Current HR from HRM
+
+// Data recording buffer for retry on failure
+let dataBuffer = [];
+let isFlushingBuffer = false;
+let consecutiveFailures = 0;
+const MAX_BUFFER_SIZE = 300; // 5 min of data at 1/sec
+
+// Manual override tracking for drift detection
+let lastManualOverrideTime = 0;
+const MANUAL_OVERRIDE_COOLDOWN = 15000; // 15s pause after manual change
 let treadmillHeartRate = null; // Current HR from treadmill
 let activeHeartRateSource = 'none'; // 'hrm', 'treadmill', or 'none'
 let driftCheckTimer = null;
@@ -187,13 +197,15 @@ async function connectToTreadmill(acceptAllDevices = false) {
             updateStats(data);
             if (currentSession) {
                 recordSessionData(data);
+            } else {
+                console.warn('Data received but no active session (currentSession is null)');
             }
         });
 
-        // Set up status callback
-        treadmill.onStatus((status, code) => {
-            console.log('Treadmill status:', status);
-            handleTreadmillStatus(status, code);
+        // Set up status callback (isAppInitiated = true when status is response to our command)
+        treadmill.onStatus((status, code, isAppInitiated) => {
+            console.log('Treadmill status:', status, isAppInitiated ? '(app-initiated)' : '');
+            handleTreadmillStatus(status, code, isAppInitiated);
         });
 
         await treadmill.connect(acceptAllDevices);
@@ -206,17 +218,27 @@ async function connectToTreadmill(acceptAllDevices = false) {
         treadmill.device.addEventListener('gattserverdisconnected', () => {
             console.log('Treadmill disconnected');
             stopDriftDetection();
-            stopStateBroadcast();
-            stopLocalTimer();
+            // Do NOT stop broadcast or timer — keep session alive during reconnect
+            // stopStateBroadcast();
+            // stopLocalTimer();
             if (workoutTimer) {
                 clearInterval(workoutTimer);
                 workoutTimer = null;
             }
             document.getElementById('connectionStatus').textContent = 'Frakoblet';
             document.getElementById('connectionStatus').className = 'status-disconnected';
-            document.getElementById('connectBtn').textContent = '📱 Koble til Tredemølle';
+            document.getElementById('connectBtn').textContent = 'Koble til Tredemølle';
             document.getElementById('connectBtn').disabled = false;
-            showToast('Tredemølle frakoblet', 'error');
+
+            if (currentSession) {
+                // Session is active — keep timer running, show reconnect message
+                showToast('Tredemølle frakoblet — forsøker gjentilkobling. Økt pågår fortsatt.', 'error', 8000);
+                pauseLocalTimer(); // Pause timer during disconnect (treadmill isn't running)
+            } else {
+                showToast('Tredemølle frakoblet', 'error');
+                stopStateBroadcast();
+                stopLocalTimer();
+            }
 
             // Auto reconnect if enabled
             if (shouldAutoReconnect) {
@@ -373,11 +395,75 @@ function recordSessionData(data) {
         dataBody.segment_index = currentSegmentIndex;
     }
 
-    fetch(`/api/sessions/${currentSession}/data`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(dataBody)
-    }).catch(err => console.error('Failed to record session data:', err));
+    // Buffer data point and flush asynchronously
+    dataBuffer.push(dataBody);
+
+    // Trim buffer if too large (keep newest data)
+    if (dataBuffer.length > MAX_BUFFER_SIZE) {
+        console.warn(`Data buffer overflow (${dataBuffer.length}), dropping oldest points`);
+        dataBuffer = dataBuffer.slice(-MAX_BUFFER_SIZE);
+    }
+
+    flushDataBuffer();
+}
+
+async function flushDataBuffer() {
+    if (isFlushingBuffer || dataBuffer.length === 0 || !currentSession) return;
+    isFlushingBuffer = true;
+
+    try {
+        while (dataBuffer.length > 0) {
+            const item = dataBuffer[0];
+            try {
+                const resp = await fetch(`/api/sessions/${currentSession}/data`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(item)
+                });
+
+                if (!resp.ok) {
+                    const errText = await resp.text().catch(() => 'unknown');
+                    console.error(`Session data rejected (${resp.status}):`, errText, JSON.stringify(item));
+
+                    // 4xx = bad data, skip it and continue with next
+                    if (resp.status >= 400 && resp.status < 500) {
+                        dataBuffer.shift();
+                        continue;
+                    }
+                    // 5xx = server error, stop and retry later
+                    consecutiveFailures++;
+                    break;
+                }
+
+                // Success
+                dataBuffer.shift();
+                if (consecutiveFailures > 0) {
+                    consecutiveFailures = 0;
+                    console.log(`Data recording recovered, buffer: ${dataBuffer.length} remaining`);
+                }
+            } catch (networkErr) {
+                // Network failure — keep item in buffer for retry
+                consecutiveFailures++;
+                console.error(`Network error recording data (attempt ${consecutiveFailures}):`, networkErr.message);
+
+                if (consecutiveFailures === 5) {
+                    showToast('Problemer med datalagring — prøver på nytt...', 'error', 5000);
+                }
+                if (consecutiveFailures >= 15) {
+                    showToast('Kan ikke lagre treningsdata. Sjekk nettverkstilkobling.', 'error', 10000);
+                    consecutiveFailures = 0; // Reset to avoid spamming
+                }
+                break; // Stop flushing, retry on next data point
+            }
+        }
+    } finally {
+        isFlushingBuffer = false;
+    }
+
+    // If there's still data in buffer, schedule a retry
+    if (dataBuffer.length > 0 && currentSession) {
+        setTimeout(() => flushDataBuffer(), 2000);
+    }
 }
 
 function enableControls() {
@@ -513,6 +599,12 @@ function startDriftDetection() {
     driftCheckTimer = setInterval(async () => {
         if (!treadmill || !treadmill.isConnected() || !currentWorkout) return;
         if (currentTargetSpeed === null) return;
+
+        // Respect manual override cooldown — user changed speed/incline on treadmill
+        if (Date.now() - lastManualOverrideTime < MANUAL_OVERRIDE_COOLDOWN) {
+            console.log('Drift check skipped — manual override cooldown active');
+            return;
+        }
 
         const actualSpeed = treadmill.getLastReportedSpeed();
         const actualIncline = treadmill.getLastReportedIncline();
@@ -1391,6 +1483,7 @@ async function startLoadedWorkout() {
         buildWorkoutTimeline();
 
         await startSession(loadedWorkout.id);
+        startLocalTimer(); // Ensure timer runs for loaded workouts
         await executeSegment(0);
 
         // Clear loaded workout UI
@@ -1588,18 +1681,33 @@ async function startSession(workoutId = null) {
                 heart_rate_source: activeHeartRateSource
             })
         });
+        if (!response.ok) {
+            const errText = await response.text().catch(() => 'unknown');
+            throw new Error(`Server returned ${response.status}: ${errText}`);
+        }
         const data = await response.json();
         currentSession = data.id;
         sessionStartTime = Date.now();
         sessionData = { distance: 0, time: 0, heartRates: [], calories: 0 };
+        dataBuffer = []; // Clear any stale buffer
+        consecutiveFailures = 0;
+        console.log(`Session ${currentSession} started (workout: ${workoutId || 'manual'})`);
         initStateBroadcast();
     } catch (error) {
         console.error('Failed to start session:', error);
+        showToast('Kunne ikke starte økt: ' + error.message, 'error');
     }
 }
 
 async function endSession() {
     if (!currentSession) return;
+
+    // Flush any remaining buffered data before closing session
+    try {
+        await flushDataBuffer();
+    } catch (e) {
+        console.warn('Failed to flush data buffer before ending session:', e);
+    }
 
     try {
         // Get actual data from server (calculated from all datapunkter)
@@ -1611,14 +1719,27 @@ async function endSession() {
             ? Math.round(sessionData.heartRates.reduce((a, b) => a + b, 0) / sessionData.heartRates.length)
             : null);
 
+        // Fallback time calculation: use server stats, then local timer, then wall clock
+        const elapsedFromWallClock = sessionStartTime ? Math.floor((Date.now() - sessionStartTime) / 1000) : 0;
+        const totalTime = stats.total_seconds || sessionData.time || elapsedFromWallClock;
+
+        if (!stats.total_seconds && totalTime > 0) {
+            console.warn(`Server had no recorded time, using fallback: ${totalTime}s (local: ${sessionData.time}s, wall: ${elapsedFromWallClock}s)`);
+        }
+
+        const totalDistance = stats.max_distance || sessionData.distance;
+        const totalCalories = stats.max_calories || sessionData.calories;
+
+        console.log(`Ending session ${currentSession}: ${totalDistance}km, ${totalTime}s, HR:${avgHR}, Cal:${totalCalories}, Buffer remaining:${dataBuffer.length}`);
+
         await fetch(`/api/sessions/${currentSession}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                total_distance_km: stats.max_distance || sessionData.distance,
-                total_time_seconds: stats.total_seconds || sessionData.time,
+                total_distance_km: totalDistance,
+                total_time_seconds: totalTime,
                 avg_heart_rate: avgHR,
-                calories_burned: stats.max_calories || sessionData.calories
+                calories_burned: totalCalories
             })
         });
 
@@ -1640,32 +1761,68 @@ async function endSession() {
     }
 }
 
-function handleTreadmillStatus(status, code) {
+function handleTreadmillStatus(status, code, isAppInitiated = false) {
     // 0x04 = Started - treadmill has started running
     if (code === 0x04) {
         // Priority 1: If a workout is loaded but not started, start it
         if (loadedWorkout && !currentSession) {
             console.log('Treadmill started - auto-starting loaded workout');
-            startLoadedWorkout();
+            // startLoadedWorkout() will call startSession() + startLocalTimer() + executeSegment(0)
+            startLoadedWorkout().catch(err => {
+                console.error('Failed to auto-start loaded workout:', err);
+                showToast('Kunne ikke starte økt automatisk', 'error');
+            });
         }
         // Priority 2: If no workout is loaded, start a manual session
         else if (!currentSession) {
             console.log('Treadmill started - auto-starting manual session');
-            startSession(); // No workoutId = manual session
+            startSession().then(() => {
+                console.log('Manual session started from treadmill button, currentSession:', currentSession);
+                // Start timer only for manual sessions (loaded workouts handle it themselves)
+                if (!isRunning) {
+                    startLocalTimer();
+                }
+            }).catch(err => {
+                console.error('Failed to auto-start session:', err);
+                showToast('Kunne ikke starte økt automatisk', 'error');
+            });
+        }
+        // If session already exists but timer stopped (e.g. after reconnect), restart it
+        else if (currentSession && !isRunning) {
+            startLocalTimer();
         }
     }
 
-    // 0x0A/0x0B = Target confirmations (handled by ftms.js, logged here)
-    if (code === 0x0A) console.log('Treadmill confirmed: Target Speed Changed');
-    if (code === 0x0B) console.log('Treadmill confirmed: Target Incline Changed');
+    // 0x0A/0x0B = Target confirmations
+    // Only treat as manual override if NOT initiated by our app commands
+    if (code === 0x0A) {
+        if (isAppInitiated) {
+            console.log('Treadmill confirmed app-initiated speed change');
+        } else if (currentWorkout) {
+            lastManualOverrideTime = Date.now();
+            console.log('Manual speed override detected on treadmill, pausing drift correction for 15s');
+            showToast('Manuell hastighetsendring registrert', 'info', 3000);
+        }
+    }
+    if (code === 0x0B) {
+        if (isAppInitiated) {
+            console.log('Treadmill confirmed app-initiated incline change');
+        } else if (currentWorkout) {
+            lastManualOverrideTime = Date.now();
+            console.log('Manual incline override detected on treadmill, pausing drift correction for 15s');
+            showToast('Manuell stigningsendring registrert', 'info', 3000);
+        }
+    }
 
     // 0x02 = Stopped - treadmill has stopped
     // 0x01 = Reset - treadmill was reset
     if (code === 0x02 || code === 0x01) {
         stopDriftDetection();
+        stopLocalTimer();
         if (currentSession) {
             console.log('Treadmill stopped - auto-ending session');
-            endSession();
+            // Flush any remaining buffered data before ending session
+            flushDataBuffer().then(() => endSession()).catch(() => endSession());
 
             // If this was a structured workout, also stop it
             if (currentWorkout) {
@@ -2821,14 +2978,30 @@ async function attemptReconnect() {
         // Try to connect to the device
         const server = await device.gatt.connect();
         if (server && server.connected) {
-            // Successfully reconnected - re-initialize the treadmill controller
-            reconnectAttempts = 0;
-            document.getElementById('connectionStatus').textContent = 'Tilkoblet';
-            document.getElementById('connectionStatus').className = 'status-connected';
-            document.getElementById('connectBtn').textContent = 'Koble fra';
-            enableControls();
-            showToast('Gjenopprettet tilkobling!', 'success');
-            return;
+            // Successfully reconnected - re-initialize FTMS subscriptions
+            try {
+                await treadmill.resubscribe(server);
+                reconnectAttempts = 0;
+                document.getElementById('connectionStatus').textContent = 'Tilkoblet';
+                document.getElementById('connectionStatus').className = 'status-connected';
+                document.getElementById('connectBtn').textContent = 'Koble fra';
+                enableControls();
+
+                // Resume session if active
+                if (currentSession) {
+                    startLocalTimer();
+                    if (currentWorkout) {
+                        startDriftDetection();
+                    }
+                    initStateBroadcast();
+                }
+
+                showToast('Gjenopprettet tilkobling!', 'success');
+                return;
+            } catch (subErr) {
+                console.error('Reconnected but failed to resubscribe:', subErr);
+                // Fall through to retry
+            }
         }
     } catch (error) {
         console.warn(`Reconnect attempt ${reconnectAttempts} failed:`, error);

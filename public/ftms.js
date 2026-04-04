@@ -29,6 +29,10 @@ class TreadmillController {
     // Tracked actuals from treadmill data notifications
     this.lastReportedSpeed = null;
     this.lastReportedIncline = null;
+
+    // Flags to distinguish app-initiated commands from manual treadmill changes
+    this._expectingSpeedConfirm = false;
+    this._expectingInclineConfirm = false;
   }
 
   async connect(acceptAllDevices = false) {
@@ -255,20 +259,35 @@ class TreadmillController {
     const status = this.getStatusString(statusCode);
     console.log('Treadmill status:', status);
 
-    // Resolve pending confirmations
+    // Track whether this status is a response to an app-issued command
+    let isAppInitiated = false;
+
+    // Resolve pending confirmations (from setSpeedAndConfirm / setInclineAndConfirm)
     if (statusCode === 0x0A && this.pendingSpeedConfirm) {
       clearTimeout(this.pendingSpeedConfirm.timeoutId);
       this.pendingSpeedConfirm.resolve(true);
       this.pendingSpeedConfirm = null;
+      isAppInitiated = true;
     }
     if (statusCode === 0x0B && this.pendingInclineConfirm) {
       clearTimeout(this.pendingInclineConfirm.timeoutId);
       this.pendingInclineConfirm.resolve(true);
       this.pendingInclineConfirm = null;
+      isAppInitiated = true;
+    }
+
+    // Also check non-confirm app-initiated flags (from setSpeed / setIncline without confirm)
+    if (statusCode === 0x0A && this._expectingSpeedConfirm) {
+      isAppInitiated = true;
+      this._expectingSpeedConfirm = false;
+    }
+    if (statusCode === 0x0B && this._expectingInclineConfirm) {
+      isAppInitiated = true;
+      this._expectingInclineConfirm = false;
     }
 
     if (this.onStatusCallback) {
-      this.onStatusCallback(status, statusCode);
+      this.onStatusCallback(status, statusCode, isAppInitiated);
     }
   }
 
@@ -297,6 +316,10 @@ class TreadmillController {
     if (!this.controlPoint) throw new Error('Not connected');
 
     await this._ensureCommandGap();
+
+    // Mark next 0x0A as app-initiated (for drift correction calls that don't use setSpeedAndConfirm)
+    this._expectingSpeedConfirm = true;
+    setTimeout(() => { this._expectingSpeedConfirm = false; }, 3000);
 
     const buffer = new ArrayBuffer(3);
     const view = new DataView(buffer);
@@ -331,6 +354,10 @@ class TreadmillController {
     if (!this.controlPoint) throw new Error('Not connected');
 
     await this._ensureCommandGap();
+
+    // Mark next 0x0B as app-initiated (for drift correction calls that don't use setInclineAndConfirm)
+    this._expectingInclineConfirm = true;
+    setTimeout(() => { this._expectingInclineConfirm = false; }, 3000);
 
     const buffer = new ArrayBuffer(3);
     const view = new DataView(buffer);
@@ -455,6 +482,37 @@ class TreadmillController {
 
   isConnected() {
     return this.device && this.device.gatt.connected;
+  }
+
+  // Re-subscribe to FTMS notifications after a reconnect
+  async resubscribe(server) {
+    this.server = server;
+
+    console.log('Re-subscribing to FTMS service...');
+    this.service = await this.server.getPrimaryService(FTMS_SERVICE_UUID);
+
+    // Re-get control point
+    this.controlPoint = await this.service.getCharacteristic(FITNESS_MACHINE_CONTROL_POINT_UUID);
+
+    // Re-subscribe to treadmill data
+    this.treadmillData = await this.service.getCharacteristic(TREADMILL_DATA_UUID);
+    await this.treadmillData.startNotifications();
+    this.treadmillData.addEventListener('characteristicvaluechanged', (event) => {
+      this.handleTreadmillData(event.target.value);
+    });
+
+    // Re-subscribe to status
+    try {
+      this.statusCharacteristic = await this.service.getCharacteristic(FITNESS_MACHINE_STATUS_UUID);
+      await this.statusCharacteristic.startNotifications();
+      this.statusCharacteristic.addEventListener('characteristicvaluechanged', (event) => {
+        this.handleStatusChange(event.target.value);
+      });
+    } catch (err) {
+      console.log('Status characteristic not available on resubscribe:', err);
+    }
+
+    console.log('Re-subscribed to FTMS notifications');
   }
 
   async discoverServices() {

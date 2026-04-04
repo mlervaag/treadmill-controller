@@ -575,11 +575,23 @@
                 label.textContent = 'Tilkoblet';
                 if (msg) msg.textContent = 'Start en treningsøkt fra kontrollpanelet';
             } else if (status === 'connecting') {
-                label.textContent = 'Kobler til...';
-                if (msg) msg.textContent = 'Kobler til serveren...';
+                const attempt = reconnectAttempts > 0 ? ` (forsøk ${reconnectAttempts})` : '';
+                label.textContent = 'Kobler til...' + attempt;
+                if (msg) {
+                    if (reconnectAttempts >= 3) {
+                        msg.innerHTML = 'Kan ikke koble til serveren.<br><br>' +
+                            '<small style="opacity:0.7">Tips: Åpne <a href="' + window.location.origin + '" style="color: var(--primary-color);">' +
+                            window.location.origin + '</a> direkte i nettleseren først og godta SSL-sertifikatet.</small>';
+                    } else {
+                        msg.textContent = 'Kobler til serveren...';
+                    }
+                }
             } else {
                 label.textContent = 'Frakoblet';
-                if (msg) msg.textContent = 'Kan ikke koble til serveren. Sjekk at sertifikatet er godkjent.';
+                if (msg) {
+                    msg.innerHTML = 'Mistet forbindelsen til serveren.<br>' +
+                        '<small style="opacity:0.7">Prøver igjen automatisk...</small>';
+                }
             }
         }
 
