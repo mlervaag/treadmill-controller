@@ -27,12 +27,12 @@ RUN mkdir -p /app/data && \
 # Switch to non-root user (node user is built into node:alpine, uid 1000)
 USER node
 
-# Expose port
-EXPOSE 3001
+# Expose ports (HTTP for view.html, HTTPS for Web Bluetooth)
+EXPOSE 3000 3001
 
-# Health check (HTTPS required for Web Bluetooth)
+# Health check (use HTTP port which is always available)
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD node -e "require('https').get({hostname:'localhost',port:3001,rejectUnauthorized:false},(r)=>{process.exit(r.statusCode===200?0:1)}).on('error',()=>process.exit(1))"
+  CMD node -e "require('http').get({hostname:'localhost',port:3000},(r)=>{process.exit(r.statusCode===200?0:1)}).on('error',()=>process.exit(1))"
 
 # Start application
 CMD ["node", "server.js"]

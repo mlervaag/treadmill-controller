@@ -4,14 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Treadmill controller web app using Web Bluetooth (FTMS protocol) to control a treadmill and track workouts. Runs on a Raspberry Pi via Docker, served over HTTPS (required for Web Bluetooth). All data is local — no cloud services (except optional Strava sync). UI is in Norwegian.
+Treadmill controller web app using Bluetooth (FTMS protocol) to control a treadmill and track workouts. Runs on a Raspberry Pi via Docker. Two BLE backends: browser-based (Web Bluetooth via desktop PC) or native (systemd service on RPi host using @abandonware/noble). All data is local — no cloud services (except optional Strava sync). UI is in Norwegian.
 
 ## Commands
 
 ```bash
 # Development
 npm install           # Install deps (needs python3, make, g++ for better-sqlite3)
-npm start             # Start server on http://localhost:3001
+npm start             # Start server on http://localhost:3000 + https://localhost:3001
 
 # Database migration
 node migrate.js       # Add missing columns to existing tables (strava_auth, segment_index, etc.)
@@ -28,6 +28,12 @@ ssh pi@192.168.1.12 "cd ~/treadmill-controller && docker compose build && docker
 
 # SSL cert generation (required for Web Bluetooth over network)
 openssl req -x509 -newkey rsa:4096 -nodes -out certs/server.crt -keyout certs/server.key -days 365
+
+# BLE Service (on RPi host, outside Docker)
+cd ~/treadmill-controller/ble-service && bash install.sh  # First-time setup
+sudo systemctl start treadmill-ble    # Start BLE service
+sudo systemctl status treadmill-ble   # Check status
+sudo journalctl -u treadmill-ble -f   # View logs
 ```
 
 No test suite exists. No linter configured.
@@ -40,9 +46,15 @@ No test suite exists. No linter configured.
 - `public/ftms.js` — FTMS Bluetooth protocol: connect, parse treadmill data notifications, write control point commands (speed/incline/start/stop). Commands throttled with 400ms minimum gap. Confirmation mechanism waits for FTMS status codes 0x0A/0x0B.
 - `public/hrm.js` — Heart Rate Monitor Bluetooth protocol (UUID 0x180D). Optional; HRM takes priority over treadmill's built-in HR sensor.
 - `public/app.js` — Main application (~3000 lines). Manages UI tabs (Control/Workouts/History), workout execution with segment progression, session recording (1 data point/second), drift detection, Chart.js graphs, sound alerts, Strava integration, date filtering, export, auto BLE reconnect, segment feedback, WebSocket state broadcast.
-- `public/view.html` — Standalone read-only dashboard for iPad/iPhone (no Web Bluetooth needed). Receives treadmill state via WebSocket. Dark theme, responsive, auto-reconnect, HR zone coloring.
+- `public/view.html` — Remote control + dashboard for iPad/iPhone. Three states: idle (workout selector), ready (workout loaded), active (live dashboard + controls). Sends commands via WebSocket, receives state broadcasts. Dark theme, responsive, auto-reconnect, HR zone coloring.
 - `public/sw.js` — Service worker for PWA offline support. Cache-first for static assets, network-first for API.
 - `public/manifest.json` — PWA manifest with Norwegian locale.
+
+**BLE Service** (`ble-service/`): Separate Node.js process on RPi host (not Docker). Uses `@abandonware/noble` for BLE. Runs as systemd service (`treadmill-ble.service`). Connects to server via WebSocket on `ws://localhost:3000`. Stores known device addresses in `ble-config.json`.
+
+**Dual HTTP/HTTPS**: server.js listens on HTTP (port 3000, env `HTTP_PORT`) and HTTPS (port 3001 if certs exist, env `HTTPS_PORT`). view.html uses HTTP (no cert warnings on iOS). index.html uses HTTPS for Web Bluetooth.
+
+**WebSocket Hub**: server.js routes commands between viewer clients (view.html) and the active controller (index.html browser or native BLE service). Controllers register with `{ type: "register", role: "controller" }`. Native BLE service takes priority over browser controllers. Protocol: `command` → `remote_command` → `command_response`.
 
 **Database tables**: `workouts` → `workout_segments` (1:N), `workout_sessions` → `session_data` (1:N), `strava_auth`. 38 professional templates loaded from `templates.json` on startup.
 

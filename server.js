@@ -7,26 +7,38 @@ const path = require('path');
 const cors = require('cors');
 const Database = require('better-sqlite3');
 
+const crypto = require('crypto');
+
 const app = express();
 
-// Check if SSL certificates exist
-const useHTTPS = fs.existsSync('./certs/server.key') && fs.existsSync('./certs/server.crt');
+// --- Dual HTTP / HTTPS server setup ---
+const HTTP_PORT = parseInt(process.env.HTTP_PORT, 10) || 3000;
+const HTTPS_PORT = parseInt(process.env.HTTPS_PORT, 10) || 3001;
+const HOST = '0.0.0.0';
 
-let server;
-if (useHTTPS) {
+const httpServer = http.createServer(app);
+
+const certsExist = fs.existsSync('./certs/server.key') && fs.existsSync('./certs/server.crt');
+let httpsServer = null;
+if (certsExist) {
   const httpsOptions = {
     key: fs.readFileSync('./certs/server.key'),
     cert: fs.readFileSync('./certs/server.crt')
   };
-  server = https.createServer(httpsOptions, app);
-  console.log('🔒 HTTPS enabled');
-} else {
-  server = http.createServer(app);
-  console.log('⚠️  HTTP mode (HTTPS certificates not found)');
+  httpsServer = https.createServer(httpsOptions, app);
 }
 
-const wss = new WebSocket.Server({ server });
+// WebSocket servers — one per HTTP(S) server
+const wssHTTP = new WebSocket.Server({ server: httpServer });
+const wssHTTPS = httpsServer ? new WebSocket.Server({ server: httpsServer }) : null;
+
+// --- Shared client tracking across both WS servers ---
+// Map<ws, { role: string|null, registeredAt: Date|null, bleBackend: string|null }>
+const clients = new Map();
+const pendingCommands = new Map(); // Map<commandId, { viewer: ws, timer: Timeout }>
+
 let latestTreadmillState = null;
+let latestDeviceStatus = null;
 
 // Middleware
 app.use(cors({
@@ -1227,19 +1239,61 @@ function generateTCX(session, dataPoints) {
 </TrainingCenterDatabase>`;
 }
 
-// WebSocket for real-time treadmill data
-wss.on('connection', (ws, req) => {
+// ---------------------------------------------------------------------------
+// WebSocket hub — shared across HTTP and HTTPS servers
+// ---------------------------------------------------------------------------
+
+/** Broadcast a message to every connected client (all roles, including unregistered). */
+function broadcast(data) {
+  const payload = typeof data === 'string' ? data : JSON.stringify(data);
+  for (const [ws] of clients) {
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(payload);
+    }
+  }
+}
+
+/** Broadcast a message only to viewer clients. */
+function broadcastToViewers(data) {
+  const payload = typeof data === 'string' ? data : JSON.stringify(data);
+  for (const [ws, info] of clients) {
+    if (info.role === 'viewer' && ws.readyState === WebSocket.OPEN) {
+      ws.send(payload);
+    }
+  }
+}
+
+/** Find the active controller — native BLE backend takes priority. */
+function getActiveController() {
+  let best = null;
+  for (const [ws, info] of clients) {
+    if (info.role === 'controller' && ws.readyState === WebSocket.OPEN) {
+      if (info.bleBackend === 'native') return ws;
+      if (!best) best = ws;
+    }
+  }
+  return best;
+}
+
+/** Handle an incoming WebSocket connection (shared logic for both servers). */
+function handleConnection(ws, req) {
   // Validate origin — only allow local network connections
   const origin = req.headers.origin || '';
   if (origin && !origin.match(/^https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+)(:\d+)?$/)) {
     ws.close(1008, 'Origin not allowed');
     return;
   }
-  console.log('Client connected');
 
-  // Send cached state to new clients immediately
+  // Track every connection immediately (role starts as null)
+  clients.set(ws, { role: null, registeredAt: null, bleBackend: null });
+  console.log(`Client connected (total: ${clients.size})`);
+
+  // Hydrate new client with cached state
   if (latestTreadmillState) {
     ws.send(JSON.stringify(latestTreadmillState));
+  }
+  if (latestDeviceStatus) {
+    ws.send(JSON.stringify(latestDeviceStatus));
   }
 
   ws.on('message', (message) => {
@@ -1247,31 +1301,164 @@ wss.on('connection', (ws, req) => {
       const data = JSON.parse(message);
       if (typeof data !== 'object' || data === null) return;
 
-      // Cache treadmill state for new client hydration
+      // --- Role registration ---
+      if (data.type === 'register') {
+        const role = data.role === 'controller' ? 'controller' : 'viewer';
+        const info = clients.get(ws);
+        if (info) {
+          info.role = role;
+          info.registeredAt = new Date();
+          info.bleBackend = data.bleBackend || null;
+        }
+        ws.send(JSON.stringify({ type: 'registered', role }));
+        console.log(`Client registered as ${role}` + (data.bleBackend ? ` (bleBackend: ${data.bleBackend})` : ''));
+        return;
+      }
+
+      // --- Command from viewer → forward to controller ---
+      if (data.type === 'command') {
+        const info = clients.get(ws);
+
+        // list_workouts is handled directly by the server
+        if (data.command === 'list_workouts') {
+          try {
+            const workouts = db.prepare(`
+              SELECT w.*, COUNT(ws.id) as segment_count,
+                COALESCE(SUM(ws.duration_seconds), 0) as total_duration_seconds
+              FROM workouts w
+              LEFT JOIN workout_segments ws ON w.id = ws.workout_id
+              GROUP BY w.id ORDER BY w.created_at DESC
+            `).all();
+            ws.send(JSON.stringify({
+              type: 'command_response',
+              commandId: data.commandId || null,
+              command: 'list_workouts',
+              success: true,
+              data: workouts
+            }));
+          } catch (err) {
+            ws.send(JSON.stringify({
+              type: 'command_response',
+              commandId: data.commandId || null,
+              command: 'list_workouts',
+              success: false,
+              error: err.message
+            }));
+          }
+          return;
+        }
+
+        // All other commands → forward to the active controller
+        const controller = getActiveController();
+        if (!controller) {
+          ws.send(JSON.stringify({
+            type: 'command_response',
+            commandId: data.commandId || null,
+            command: data.command,
+            success: false,
+            error: 'No controller connected'
+          }));
+          return;
+        }
+
+        const commandId = data.commandId || crypto.randomUUID();
+
+        // Track pending command for response routing (10s timeout)
+        const timer = setTimeout(() => {
+          pendingCommands.delete(commandId);
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+              type: 'command_response',
+              commandId,
+              command: data.command,
+              success: false,
+              error: 'Command timed out (10s)'
+            }));
+          }
+        }, 10000);
+        pendingCommands.set(commandId, { viewer: ws, timer });
+
+        // Forward as remote_command to the controller
+        controller.send(JSON.stringify({
+          type: 'remote_command',
+          commandId,
+          command: data.command,
+          params: data.params || {}
+        }));
+        return;
+      }
+
+      // --- Command response from controller → route back to viewer ---
+      if (data.type === 'command_response' && data.commandId) {
+        const pending = pendingCommands.get(data.commandId);
+        if (pending) {
+          clearTimeout(pending.timer);
+          pendingCommands.delete(data.commandId);
+          if (pending.viewer.readyState === WebSocket.OPEN) {
+            pending.viewer.send(JSON.stringify(data));
+          }
+        }
+        return;
+      }
+
+      // --- Cache treadmill state for new-client hydration ---
       if (data.type === 'treadmill_state') {
         latestTreadmillState = data.sessionActive ? data : null;
       }
 
-      // Broadcast to all clients
-      wss.clients.forEach((client) => {
-        if (client.readyState === WebSocket.OPEN) {
-          client.send(JSON.stringify(data));
-        }
-      });
+      // --- Cache device status for new-client hydration ---
+      if (data.type === 'device_status') {
+        latestDeviceStatus = data;
+      }
+
+      // --- Default: broadcast to all connected clients ---
+      broadcast(data);
     } catch { return; }
   });
 
   ws.on('close', () => {
-    console.log('Client disconnected');
+    const info = clients.get(ws);
+    const roleLabel = info ? (info.role || 'unregistered') : 'unknown';
+    clients.delete(ws);
+
+    // Clean up any pending commands from this client
+    for (const [cmdId, pending] of pendingCommands) {
+      if (pending.viewer === ws) {
+        clearTimeout(pending.timer);
+        pendingCommands.delete(cmdId);
+      }
+    }
+
+    // If a controller disconnected, clear cached state
+    if (info && info.role === 'controller') {
+      latestTreadmillState = null;
+      latestDeviceStatus = null;
+      broadcast({ type: 'controller_disconnected' });
+    }
+
+    console.log(`Client disconnected (${roleLabel}, remaining: ${clients.size})`);
   });
+}
+
+// Wire up both WebSocket servers to the shared handler
+wssHTTP.on('connection', handleConnection);
+if (wssHTTPS) {
+  wssHTTPS.on('connection', handleConnection);
+}
+
+// ---------------------------------------------------------------------------
+// Start servers
+// ---------------------------------------------------------------------------
+httpServer.listen(HTTP_PORT, HOST, () => {
+  console.log(`HTTP  server running on http://${HOST}:${HTTP_PORT}`);
+  console.log(`WS    server running on ws://${HOST}:${HTTP_PORT}`);
 });
 
-const PORT = process.env.PORT || 3001;
-const HOST = process.env.HOST || '0.0.0.0';
-
-server.listen(PORT, HOST, () => {
-  const protocol = useHTTPS ? 'https' : 'http';
-  const wsProtocol = useHTTPS ? 'wss' : 'ws';
-  console.log(`Server running on ${protocol}://${HOST}:${PORT}`);
-  console.log(`WebSocket server running on ${wsProtocol}://${HOST}:${PORT}`);
-});
+if (httpsServer) {
+  httpsServer.listen(HTTPS_PORT, HOST, () => {
+    console.log(`HTTPS server running on https://${HOST}:${HTTPS_PORT}`);
+    console.log(`WSS   server running on wss://${HOST}:${HTTPS_PORT}`);
+  });
+} else {
+  console.log('HTTPS disabled (certificates not found in ./certs/)');
+}

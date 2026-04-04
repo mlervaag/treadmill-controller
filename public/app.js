@@ -46,6 +46,7 @@ let currentTargetIncline = null;
 let quickAccessInitialized = false;
 let stateBroadcastWs = null;
 let stateBroadcastTimer = null;
+let deviceStatusTimer = null;
 
 // Session graph (Chart.js)
 let sessionChart = null;
@@ -82,6 +83,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupEventListeners();
     setupQuickAccessModals();
     loadWorkouts();
+    initStateBroadcast();
     loadSessions();
     loadOverallStats();
     updateLoadedWorkoutUI(); // Initialize loaded workout UI
@@ -713,7 +715,24 @@ function initStateBroadcast() {
 
     stateBroadcastWs.onopen = () => {
         console.log('State broadcast WebSocket connected');
+        stateBroadcastWs.send(JSON.stringify({
+            type: 'register',
+            role: 'controller',
+            bleBackend: 'browser'
+        }));
+        broadcastDeviceStatus();
         startStateBroadcastTimer();
+    };
+
+    stateBroadcastWs.onmessage = (event) => {
+        try {
+            const data = JSON.parse(event.data);
+            if (data.type === 'remote_command') {
+                handleRemoteCommand(data);
+            }
+        } catch (e) {
+            console.error('Failed to parse WebSocket message:', e);
+        }
     };
 
     stateBroadcastWs.onclose = () => {
@@ -723,10 +742,12 @@ function initStateBroadcast() {
             clearInterval(stateBroadcastTimer);
             stateBroadcastTimer = null;
         }
-        // Auto-reconnect if session is still active
-        if (currentSession) {
-            setTimeout(initStateBroadcast, 3000);
+        if (deviceStatusTimer) {
+            clearInterval(deviceStatusTimer);
+            deviceStatusTimer = null;
         }
+        // Auto-reconnect always (connection must stay open for remote commands)
+        setTimeout(initStateBroadcast, 3000);
     };
 
     stateBroadcastWs.onerror = () => {
@@ -751,16 +772,111 @@ function stopStateBroadcast() {
         clearInterval(stateBroadcastTimer);
         stateBroadcastTimer = null;
     }
-    // Send final state with sessionActive=false
+    // Send final state with sessionActive=false but keep WebSocket open for remote commands
     if (stateBroadcastWs && stateBroadcastWs.readyState === WebSocket.OPEN) {
         stateBroadcastWs.send(JSON.stringify({
             type: 'treadmill_state',
             timestamp: Date.now(),
             sessionActive: false
         }));
-        stateBroadcastWs.close();
     }
-    stateBroadcastWs = null;
+}
+
+function broadcastDeviceStatus() {
+    if (deviceStatusTimer) {
+        clearInterval(deviceStatusTimer);
+        deviceStatusTimer = null;
+    }
+    const sendStatus = () => {
+        if (!stateBroadcastWs || stateBroadcastWs.readyState !== WebSocket.OPEN) return;
+        stateBroadcastWs.send(JSON.stringify({
+            type: 'device_status',
+            timestamp: Date.now(),
+            treadmillConnected: !!(treadmill && treadmill.isConnected()),
+            hrmConnected: !!(hrm && hrm.device && hrm.device.gatt.connected)
+        }));
+    };
+    sendStatus();
+    deviceStatusTimer = setInterval(sendStatus, 5000);
+}
+
+async function handleRemoteCommand(data) {
+    const { commandId, command, params } = data;
+    console.log('Received remote command:', command, params);
+
+    try {
+        switch (command) {
+            case 'load_workout': {
+                const response = await fetch(`/api/workouts/${params.workoutId}`);
+                if (!response.ok) throw new Error(`Failed to fetch workout: ${response.status}`);
+                const workout = await response.json();
+                loadedWorkout = workout;
+                updateLoadedWorkoutUI();
+                sendCommandResponse(commandId, command, true);
+                break;
+            }
+            case 'start_session': {
+                if (!loadedWorkout) {
+                    sendCommandResponse(commandId, command, false, 'No workout loaded');
+                    return;
+                }
+                if (!treadmill || !treadmill.isConnected()) {
+                    sendCommandResponse(commandId, command, false, 'Treadmill not connected');
+                    return;
+                }
+                try {
+                    currentWorkout = loadedWorkout;
+                    currentSegmentIndex = 0;
+
+                    document.getElementById('workoutProgress').classList.remove('hidden');
+                    document.getElementById('activeWorkoutName').textContent = currentWorkout.name;
+                    document.getElementById('totalSegments').textContent = currentWorkout.segments.length;
+
+                    buildWorkoutTimeline();
+
+                    await startSession(loadedWorkout.id);
+                    startLocalTimer();
+                    await executeSegment(0);
+
+                    loadedWorkout = null;
+                    updateLoadedWorkoutUI();
+                    sendCommandResponse(commandId, command, true);
+                } catch (error) {
+                    console.error('Failed to start workout via remote:', error);
+                    currentWorkout = null;
+                    currentSegmentIndex = 0;
+                    sendCommandResponse(commandId, command, false, error.message);
+                }
+                break;
+            }
+            case 'stop_session': {
+                await stopWorkout(false);
+                sendCommandResponse(commandId, command, true);
+                break;
+            }
+            case 'skip_segment': {
+                if (workoutTimer) {
+                    clearInterval(workoutTimer);
+                    workoutTimer = null;
+                }
+                await executeSegment(currentSegmentIndex + 1);
+                sendCommandResponse(commandId, command, true);
+                break;
+            }
+            default:
+                sendCommandResponse(commandId, command, false, `Unknown command: ${command}`);
+        }
+    } catch (error) {
+        console.error('Error handling remote command:', error);
+        sendCommandResponse(commandId, command, false, error.message);
+    }
+}
+
+function sendCommandResponse(commandId, command, success, error) {
+    if (!stateBroadcastWs || stateBroadcastWs.readyState !== WebSocket.OPEN) return;
+    const msg = { type: 'command_response', commandId, command, success };
+    if (error) msg.error = error;
+    stateBroadcastWs.send(JSON.stringify(msg));
 }
 
 async function stopWorkout(autoStop = false) {

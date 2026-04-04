@@ -1,0 +1,6 @@
+{
+  "treadmillAddress": null,
+  "hrmAddress": null,
+  "autoConnect": true,
+  "serverUrl": "ws://localhost:3000"
+}
