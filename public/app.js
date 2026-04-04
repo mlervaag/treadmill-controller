@@ -791,9 +791,9 @@ function broadcastDeviceStatus() {
         if (!stateBroadcastWs || stateBroadcastWs.readyState !== WebSocket.OPEN) return;
         stateBroadcastWs.send(JSON.stringify({
             type: 'device_status',
-            timestamp: Date.now(),
-            treadmillConnected: !!(treadmill && treadmill.isConnected()),
-            hrmConnected: !!(hrm && hrm.device && hrm.device.gatt.connected)
+            treadmill: (treadmill && treadmill.isConnected()) ? 'connected' : 'disconnected',
+            hrm: (hrm && hrm.isConnected()) ? 'connected' : 'disconnected',
+            bleBackend: 'browser'
         }));
     };
     sendStatus();
@@ -850,7 +850,7 @@ async function handleRemoteCommand(data) {
                 break;
             }
             case 'stop_session': {
-                await stopWorkout(false);
+                await stopWorkout(true);
                 sendCommandResponse(commandId, command, true);
                 break;
             }

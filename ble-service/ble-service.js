@@ -97,8 +97,9 @@ function connectWebSocket() {
       bleBackend: 'native'
     });
 
-    // Start broadcasting state
+    // Start broadcasting state and device status
     startStateBroadcast();
+    broadcastDeviceStatus();
   });
 
   ws.on('message', (raw) => {
@@ -209,6 +210,22 @@ function stopStateBroadcast() {
     clearInterval(stateBroadcastTimer);
     stateBroadcastTimer = null;
   }
+}
+
+let deviceStatusTimer = null;
+
+function broadcastDeviceStatus() {
+  if (deviceStatusTimer) clearInterval(deviceStatusTimer);
+  const send = () => {
+    wsSend({
+      type: 'device_status',
+      treadmill: ftms.isConnected() ? 'connected' : 'disconnected',
+      hrm: hrm.isConnected() ? 'connected' : 'disconnected',
+      bleBackend: 'native'
+    });
+  };
+  send();
+  deviceStatusTimer = setInterval(send, 5000);
 }
 
 // ── Server Message Handler ──────────────────────────────────────────────────
@@ -489,6 +506,7 @@ function setupFtmsListeners() {
 
   ftms.on('disconnect', () => {
     console.log('[Service] FTMS disconnected — scheduling reconnect');
+    broadcastDeviceStatus();
     scheduleReconnect('treadmill');
   });
 }
@@ -504,6 +522,7 @@ function setupHrmListeners() {
 
   hrm.on('disconnect', () => {
     console.log('[Service] HRM disconnected — scheduling reconnect');
+    broadcastDeviceStatus();
     scheduleReconnect('hrm');
   });
 }
@@ -549,6 +568,7 @@ async function reconnectFtms() {
   const peripheral = await findPeripheralByAddress(config.treadmillAddress);
   await ftms.connect(peripheral);
   setupFtmsListeners();
+  broadcastDeviceStatus();
   console.log('[BLE] Treadmill reconnected');
 }
 
@@ -558,6 +578,7 @@ async function reconnectHrm() {
   const peripheral = await findPeripheralByAddress(config.hrmAddress);
   await hrm.connect(peripheral);
   setupHrmListeners();
+  broadcastDeviceStatus();
   console.log('[BLE] HRM reconnected');
 }
 

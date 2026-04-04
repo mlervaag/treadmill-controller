@@ -140,6 +140,69 @@
             gap: 12px;
         }
 
+        .ble-controls {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .ble-controls.hidden { display: none !important; }
+        .ble-btn {
+            flex: 1;
+            padding: 10px 12px;
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+            background: var(--card-bg-light);
+            color: var(--text-secondary);
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+        }
+        .ble-btn:active { opacity: 0.7; }
+
+        .search-bar {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        .search-input {
+            width: 100%;
+            padding: 12px 16px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            background: var(--card-bg);
+            color: var(--text-primary);
+            font-size: 15px;
+            outline: none;
+        }
+        .search-input:focus {
+            border-color: var(--primary-color);
+        }
+        .search-input::placeholder {
+            color: var(--text-secondary);
+            opacity: 0.6;
+        }
+        .filter-row {
+            display: flex;
+            gap: 6px;
+            overflow-x: auto;
+        }
+        .filter-btn {
+            padding: 6px 14px;
+            border-radius: 20px;
+            border: 1px solid var(--border-color);
+            background: transparent;
+            color: var(--text-secondary);
+            font-size: 13px;
+            white-space: nowrap;
+            cursor: pointer;
+        }
+        .filter-btn.active {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+
         .no-controller-msg {
             text-align: center;
             padding: 16px;
@@ -646,6 +709,13 @@
             </div>
         </header>
 
+        <!-- BLE controls (native backend only) -->
+        <div id="bleControls" class="ble-controls hidden">
+            <button class="ble-btn" id="btnBleScan">Skann enheter</button>
+            <button class="ble-btn" id="btnBleConnectTreadmill">Koble mølle</button>
+            <button class="ble-btn" id="btnBleConnectHrm">Koble puls</button>
+        </div>
+
         <!-- ============================================================
              IDLE STATE — workout list + selector
         ============================================================= -->
@@ -654,6 +724,15 @@
                 Ingen kontroller tilkoblet
             </div>
             <div class="workout-list-header">Velg treningsokt</div>
+            <div class="search-bar">
+                <input type="text" id="workoutSearch" class="search-input" placeholder="Sok etter okt...">
+                <div class="filter-row">
+                    <button class="filter-btn active" data-filter="all">Alle</button>
+                    <button class="filter-btn" data-filter="beginner">Nybegynner</button>
+                    <button class="filter-btn" data-filter="intermediate">Middels</button>
+                    <button class="filter-btn" data-filter="advanced">Avansert</button>
+                </div>
+            </div>
             <div id="workoutListContainer" class="workout-list">
                 <div id="workoutListLoading" class="workout-list-loading">
                     Laster treningsprogrammer...
@@ -1055,6 +1134,7 @@
             if (data.bleBackend) deviceStatus.bleBackend = data.bleBackend;
             updateDeviceDots();
             hideNoControllerMsg();
+            updateBleControls();
         }
 
         function handleControllerInfo(data) {
@@ -1100,6 +1180,44 @@
             clearTimeout(noControllerTimer);
             $noControllerMsg.classList.add('hidden');
         }
+
+        // -------------------------------------------------------------------
+        // BLE controls (native backend only)
+        // -------------------------------------------------------------------
+        var $bleControls = document.getElementById('bleControls');
+
+        function updateBleControls() {
+            if (deviceStatus.bleBackend === 'native') {
+                $bleControls.classList.remove('hidden');
+            } else {
+                $bleControls.classList.add('hidden');
+            }
+        }
+
+        document.getElementById('btnBleScan').addEventListener('click', function () {
+            sendCommand('ble_scan').then(function (res) {
+                var devices = (res && res.devices) || [];
+                alert('Fant ' + devices.length + ' enhet(er):\n' + devices.map(function (d) { return (d.name || 'Ukjent') + ' — ' + d.address; }).join('\n'));
+            }).catch(function (err) { alert('Skanning feilet: ' + err.message); });
+        });
+
+        document.getElementById('btnBleConnectTreadmill').addEventListener('click', function () {
+            var addr = prompt('Treadmill BLE-adresse (eller la stå tom for å bruke lagret):');
+            var params = { deviceType: 'treadmill' };
+            if (addr) params.address = addr;
+            sendCommand('ble_connect', params).then(function () {
+                alert('Mølle tilkoblet!');
+            }).catch(function (err) { alert('Tilkobling feilet: ' + err.message); });
+        });
+
+        document.getElementById('btnBleConnectHrm').addEventListener('click', function () {
+            var addr = prompt('HRM BLE-adresse (eller la stå tom for å bruke lagret):');
+            var params = { deviceType: 'hrm' };
+            if (addr) params.address = addr;
+            sendCommand('ble_connect', params).then(function () {
+                alert('Pulsbelte tilkoblet!');
+            }).catch(function (err) { alert('Tilkobling feilet: ' + err.message); });
+        });
 
         // -------------------------------------------------------------------
         // Command response handler
@@ -1170,6 +1288,24 @@
                 });
         }
 
+        var activeFilter = 'all';
+        var searchQuery = '';
+
+        function getFilteredWorkouts() {
+            return workoutList.filter(function (w) {
+                // Filter by difficulty
+                if (activeFilter !== 'all' && w.difficulty !== activeFilter) return false;
+                // Filter by search query
+                if (searchQuery) {
+                    var q = searchQuery.toLowerCase();
+                    var name = (w.name || '').toLowerCase();
+                    var tags = Array.isArray(w.tags) ? w.tags.join(' ').toLowerCase() : '';
+                    if (name.indexOf(q) === -1 && tags.indexOf(q) === -1) return false;
+                }
+                return true;
+            });
+        }
+
         function renderWorkoutList() {
             // Remove any existing workout items (keep loading/empty placeholders)
             var existing = $workoutListContainer.querySelectorAll('.workout-item');
@@ -1177,15 +1313,20 @@
                 existing[i].remove();
             }
 
-            if (workoutList.length === 0) {
+            var filtered = getFilteredWorkouts();
+
+            if (filtered.length === 0) {
                 $workoutListEmpty.classList.remove('hidden');
+                $workoutListEmpty.innerHTML = workoutList.length === 0
+                    ? '<p>Ingen treningsprogrammer funnet</p>'
+                    : '<p>Ingen treff for sok/filter</p>';
                 return;
             }
             $workoutListEmpty.classList.add('hidden');
 
             // Insert items before the empty placeholder
-            for (var j = 0; j < workoutList.length; j++) {
-                var w = workoutList[j];
+            for (var j = 0; j < filtered.length; j++) {
+                var w = filtered[j];
                 var el = document.createElement('div');
                 el.className = 'workout-item';
                 el.dataset.workoutId = w.id;
@@ -1195,6 +1336,7 @@
 
                 var durationMin = formatMinutes(w.total_duration_seconds);
                 var segCount = w.segment_count || 0;
+                var diffLabel = w.difficulty === 'intermediate' ? 'Middels' : w.difficulty === 'advanced' ? 'Avansert' : '';
 
                 el.innerHTML =
                     '<div class="workout-item-top">' +
@@ -1204,6 +1346,7 @@
                     '<div class="workout-item-meta">' +
                         '<span>' + segCount + ' segment' + (segCount !== 1 ? 'er' : '') + '</span>' +
                         '<span>' + durationMin + ' min</span>' +
+                        (diffLabel ? '<span>' + diffLabel + '</span>' : '') +
                     '</div>';
 
                 el.addEventListener('click', onWorkoutItemClick);
@@ -1526,6 +1669,25 @@
         document.addEventListener('DOMContentLoaded', function () {
             switchState('idle');
             connect();
+
+            // Search
+            document.getElementById('workoutSearch').addEventListener('input', function (e) {
+                searchQuery = e.target.value.trim();
+                renderWorkoutList();
+            });
+
+            // Filter buttons
+            var filterBtns = document.querySelectorAll('.filter-btn');
+            for (var i = 0; i < filterBtns.length; i++) {
+                filterBtns[i].addEventListener('click', function (e) {
+                    for (var j = 0; j < filterBtns.length; j++) {
+                        filterBtns[j].classList.remove('active');
+                    }
+                    e.target.classList.add('active');
+                    activeFilter = e.target.dataset.filter;
+                    renderWorkoutList();
+                });
+            }
         });
 
     })();

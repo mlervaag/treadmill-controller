@@ -6,9 +6,9 @@ Wants=bluetooth.target
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/opt/treadmill-controller/ble-service
-ExecStartPre=/usr/sbin/rfkill unblock bluetooth
-ExecStartPre=/usr/bin/bluetoothctl power on
+WorkingDirectory=/home/pi/treadmill-controller/ble-service
+ExecStartPre=-/usr/sbin/rfkill unblock bluetooth
+ExecStartPre=-/usr/bin/bluetoothctl power on
 ExecStart=/usr/bin/node ble-service.js
 Restart=always
 RestartSec=5
