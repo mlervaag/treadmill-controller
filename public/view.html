@@ -1083,7 +1083,7 @@
                     return;
                 }
 
-                var commandId = crypto.randomUUID();
+                var commandId = (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2) + Date.now().toString(36));
                 var timeout = setTimeout(function () {
                     pendingCommands.delete(commandId);
                     reject(new Error('Kommando tidsavbrutt'));
