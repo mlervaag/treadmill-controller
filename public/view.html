@@ -159,6 +159,43 @@
             cursor: pointer;
         }
         .ble-btn:active { opacity: 0.7; }
+        .ble-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .scan-results {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 12px;
+            margin-bottom: 12px;
+        }
+        .scan-results-header {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+        .scan-result-item {
+            padding: 12px;
+            background: var(--card-bg-light);
+            border-radius: 8px;
+            margin-bottom: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .scan-result-item:active { opacity: 0.7; }
+        .toast-msg {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--card-bg-light);
+            color: var(--text-primary);
+            padding: 12px 24px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            font-size: 14px;
+            z-index: 1000;
+            animation: fadeInOut 3s ease;
+        }
+        @keyframes fadeInOut { 0%{opacity:0} 10%{opacity:1} 80%{opacity:1} 100%{opacity:0} }
 
         .search-bar {
             display: flex;
@@ -1195,29 +1232,99 @@
             }
         }
 
+        function showToast(msg) {
+            var t = document.createElement('div');
+            t.className = 'toast-msg';
+            t.textContent = msg;
+            document.body.appendChild(t);
+            setTimeout(function () { t.remove(); }, 3000);
+        }
+
+        var $scanResults = null;
+
         document.getElementById('btnBleScan').addEventListener('click', function () {
-            sendCommand('ble_scan').then(function (res) {
+            var btn = document.getElementById('btnBleScan');
+            btn.textContent = 'Skanner...';
+            btn.disabled = true;
+
+            sendCommand('ble_scan', { duration: 8000 }).then(function (res) {
                 var devices = (res && res.devices) || [];
-                alert('Fant ' + devices.length + ' enhet(er):\n' + devices.map(function (d) { return (d.name || 'Ukjent') + ' — ' + d.address; }).join('\n'));
-            }).catch(function (err) { alert('Skanning feilet: ' + err.message); });
+                btn.textContent = 'Skann enheter';
+                btn.disabled = false;
+
+                if (devices.length === 0) {
+                    showToast('Ingen enheter funnet. Er møllen/pulsbeltet på?');
+                    return;
+                }
+
+                showScanResults(devices);
+            }).catch(function (err) {
+                btn.textContent = 'Skann enheter';
+                btn.disabled = false;
+                showToast('Skanning feilet: ' + err.message);
+            });
         });
 
+        function showScanResults(devices) {
+            // Remove old results
+            if ($scanResults) $scanResults.remove();
+
+            $scanResults = document.createElement('div');
+            $scanResults.className = 'scan-results';
+            $scanResults.innerHTML = '<div class="scan-results-header">Funnet ' + devices.length + ' enhet(er) — trykk for å koble til</div>';
+
+            devices.forEach(function (d) {
+                var item = document.createElement('div');
+                item.className = 'scan-result-item';
+                var type = d.hasFTMS ? 'Tredemølle' : d.hasHRM ? 'Pulsmåler' : 'Ukjent';
+                var icon = d.hasFTMS ? '🏃' : d.hasHRM ? '❤️' : '📡';
+                item.innerHTML = '<span>' + icon + ' <strong>' + escapeHtml(d.name || 'Ukjent') + '</strong> — ' + type + '</span>';
+                item.addEventListener('click', function () {
+                    var deviceType = d.hasFTMS ? 'treadmill' : 'hrm';
+                    item.innerHTML += ' <em style="color:var(--warning-color)">Kobler til...</em>';
+                    sendCommand('ble_connect', { deviceType: deviceType, address: d.address }).then(function () {
+                        item.innerHTML = icon + ' <strong>' + escapeHtml(d.name) + '</strong> — <span style="color:var(--success-color)">Tilkoblet!</span>';
+                        setTimeout(function () { if ($scanResults) $scanResults.remove(); $scanResults = null; }, 2000);
+                    }).catch(function (err) {
+                        item.innerHTML = icon + ' <strong>' + escapeHtml(d.name) + '</strong> — <span style="color:var(--danger-color)">' + err.message + '</span>';
+                    });
+                });
+                $scanResults.appendChild(item);
+            });
+
+            // Insert after BLE controls
+            var bleCtrl = document.getElementById('bleControls');
+            bleCtrl.parentNode.insertBefore($scanResults, bleCtrl.nextSibling);
+        }
+
         document.getElementById('btnBleConnectTreadmill').addEventListener('click', function () {
-            var addr = prompt('Treadmill BLE-adresse (eller la stå tom for å bruke lagret):');
-            var params = { deviceType: 'treadmill' };
-            if (addr) params.address = addr;
-            sendCommand('ble_connect', params).then(function () {
-                alert('Mølle tilkoblet!');
-            }).catch(function (err) { alert('Tilkobling feilet: ' + err.message); });
+            var btn = document.getElementById('btnBleConnectTreadmill');
+            btn.textContent = 'Kobler til...';
+            btn.disabled = true;
+            sendCommand('ble_reconnect', { deviceType: 'treadmill' }).then(function () {
+                btn.textContent = 'Koble mølle';
+                btn.disabled = false;
+                showToast('Mølle tilkoblet!');
+            }).catch(function (err) {
+                btn.textContent = 'Koble mølle';
+                btn.disabled = false;
+                showToast('Feilet: ' + err.message + '. Prøv Skann først.');
+            });
         });
 
         document.getElementById('btnBleConnectHrm').addEventListener('click', function () {
-            var addr = prompt('HRM BLE-adresse (eller la stå tom for å bruke lagret):');
-            var params = { deviceType: 'hrm' };
-            if (addr) params.address = addr;
-            sendCommand('ble_connect', params).then(function () {
-                alert('Pulsbelte tilkoblet!');
-            }).catch(function (err) { alert('Tilkobling feilet: ' + err.message); });
+            var btn = document.getElementById('btnBleConnectHrm');
+            btn.textContent = 'Kobler til...';
+            btn.disabled = true;
+            sendCommand('ble_reconnect', { deviceType: 'hrm' }).then(function () {
+                btn.textContent = 'Koble puls';
+                btn.disabled = false;
+                showToast('Pulsbelte tilkoblet!');
+            }).catch(function (err) {
+                btn.textContent = 'Koble puls';
+                btn.disabled = false;
+                showToast('Feilet: ' + err.message + '. Prøv Skann først.');
+            });
         });
 
         // -------------------------------------------------------------------
