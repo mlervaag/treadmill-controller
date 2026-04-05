@@ -61,7 +61,7 @@ let currentTargetIncline = 0;
 
 // Data buffer — flushed periodically
 let dataBuffer = [];
-const DATA_FLUSH_INTERVAL = 5000; // ms
+const DATA_FLUSH_INTERVAL = 1000; // ms — ~1 data point per second, matching app.js
 let dataFlushTimer = null;
 
 // Drift detection
@@ -291,10 +291,10 @@ function handleServerMessage(msg) {
   }
 }
 
-function sendCommandResponse(commandId, command, success, error, extra) {
+function sendCommandResponse(commandId, command, success, error, data) {
   const msg = { type: 'command_response', commandId, command, success };
   if (error) msg.error = error;
-  if (extra) Object.assign(msg, extra);
+  if (data) msg.data = data;
   wsSend(msg);
 }
 
@@ -530,15 +530,20 @@ function setupFtmsListeners() {
       handleStartSession('physical-start', {});
     }
 
-    // On FTMS stopped (0x02) + active session → auto-stop
-    if (statusCode === 0x02 && sessionActive) {
-      console.log('[Service] Treadmill stopped — auto-stopping session');
+    // On FTMS stopped (0x02) or reset (0x01) + active session → auto-stop
+    if ((statusCode === 0x02 || statusCode === 0x01) && sessionActive) {
+      console.log('[Service] Treadmill stopped/reset — auto-stopping session');
       handleStopSession('physical-stop', {});
     }
   });
 
   ftms.on('disconnect', () => {
     console.log('[Service] FTMS disconnected — scheduling reconnect');
+    // Pause segment timer during disconnect to prevent blind advancement
+    if (sessionActive && segmentTimer) {
+      stopSegmentTimer();
+      console.log('[Service] Segment timer paused due to disconnect');
+    }
     broadcastDeviceStatus();
     scheduleReconnect('treadmill');
   });
@@ -645,6 +650,32 @@ async function reconnectFtms() {
   }
   broadcastDeviceStatus();
   console.log('[BLE] Treadmill reconnected');
+
+  // Resume workout if session was active during disconnect
+  if (sessionActive && currentTargetSpeed > 0 && currentWorkout) {
+    try {
+      await ftms.setSpeed(currentTargetSpeed);
+      await ftms.setIncline(currentTargetIncline);
+      // Resume segment timer for remaining time
+      const seg = currentWorkout.segments[currentSegmentIndex];
+      if (seg && segmentStartTime) {
+        const elapsed = (Date.now() - segmentStartTime) / 1000;
+        const remaining = seg.duration_seconds - elapsed;
+        if (remaining > 0) {
+          segmentTimer = setTimeout(() => {
+            currentSegmentIndex++;
+            executeSegment(currentSegmentIndex);
+          }, remaining * 1000);
+          console.log(`[BLE] Resumed segment ${currentSegmentIndex} with ${Math.round(remaining)}s remaining`);
+        } else {
+          currentSegmentIndex++;
+          executeSegment(currentSegmentIndex);
+        }
+      }
+    } catch (e) {
+      console.error('[BLE] Failed to re-send targets after reconnect:', e.message);
+    }
+  }
 }
 
 async function reconnectHrm() {
@@ -687,6 +718,10 @@ async function handleStartSession(commandId, params) {
     sendCommandResponse(commandId, 'start_session', false, 'Session already active');
     return;
   }
+  if (!ftms.isConnected() && commandId !== 'physical-start') {
+    sendCommandResponse(commandId, 'start_session', false, 'Treadmill not connected');
+    return;
+  }
 
   try {
     const body = {
@@ -716,7 +751,7 @@ async function handleStartSession(commandId, params) {
       executeSegment(currentSegmentIndex);
     }
 
-    sendCommandResponse(commandId, 'start_session', true);
+    sendCommandResponse(commandId, 'start_session', true, null, { workout_id: currentWorkout ? currentWorkout.id : null });
   } catch (err) {
     console.error('[Session] Failed to start session:', err.message);
     sendCommandResponse(commandId, 'start_session', false, err.message);
@@ -725,7 +760,9 @@ async function handleStartSession(commandId, params) {
 
 async function handleStopSession(commandId, params) {
   if (!sessionActive) {
-    sendCommandResponse(commandId, 'stop_session', false, 'No active session');
+    if (commandId && !['physical-stop', 'auto-complete', 'auto-skip-end'].includes(commandId)) {
+      sendCommandResponse(commandId, 'stop_session', false, 'No active session');
+    }
     return;
   }
 
@@ -733,21 +770,53 @@ async function handleStopSession(commandId, params) {
   stopDataFlush();
   stopDriftDetection();
 
+  // Stop the treadmill belt (unless it was a physical stop — belt already stopped)
+  if (commandId !== 'physical-stop' && ftms.isConnected()) {
+    try {
+      await ftms.stop();
+      console.log('[Session] Sent FTMS stop command');
+    } catch (e) {
+      console.error('[Session] FTMS stop failed:', e.message);
+    }
+  }
+
   await flushDataBuffer();
 
   const elapsed = sessionStartTime ? Math.floor((Date.now() - sessionStartTime) / 1000) : 0;
+
+  // Fetch computed stats from recorded data points
+  let distance = 0, avgHr = null, calories = 0;
+  try {
+    const statsRes = await fetch(`${httpBase()}/api/sessions/${sessionId}/details`);
+    if (statsRes.ok) {
+      const details = await statsRes.json();
+      if (details.data_points && details.data_points.length > 0) {
+        const points = details.data_points;
+        const lastPoint = points[points.length - 1];
+        distance = lastPoint.distance_km || 0;
+        calories = lastPoint.calories || 0;
+        const hrPoints = points.filter(p => p.heart_rate && p.heart_rate > 0);
+        if (hrPoints.length > 0) {
+          avgHr = Math.round(hrPoints.reduce((s, p) => s + p.heart_rate, 0) / hrPoints.length);
+        }
+      }
+    }
+  } catch (e) {
+    console.error('[Session] Failed to fetch stats:', e.message);
+  }
+
   try {
     await fetch(`${httpBase()}/api/sessions/${sessionId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        total_distance_km: 0,
+        total_distance_km: distance,
         total_time_seconds: elapsed,
-        avg_heart_rate: null,
-        calories_burned: 0
+        avg_heart_rate: avgHr,
+        calories_burned: calories
       })
     });
-    console.log(`[Session] Session ${sessionId} completed (${elapsed}s)`);
+    console.log(`[Session] Session ${sessionId} completed (${elapsed}s, ${distance.toFixed(2)}km, HR:${avgHr || 'n/a'})`);
   } catch (err) {
     console.error('[Session] Failed to complete session:', err.message);
   }
@@ -762,7 +831,9 @@ async function handleStopSession(commandId, params) {
   currentTargetSpeed = 0;
   currentTargetIncline = 0;
 
-  sendCommandResponse(commandId, 'stop_session', true);
+  if (commandId && !['physical-stop', 'auto-complete', 'auto-skip-end'].includes(commandId)) {
+    sendCommandResponse(commandId, 'stop_session', true);
+  }
 }
 
 function handleSkipSegment(commandId, params) {
