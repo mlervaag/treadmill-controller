@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Treadmill controller web app using Bluetooth (FTMS protocol) to control a treadmill and track workouts. Runs on a Raspberry Pi via Docker. Two BLE backends: browser-based (Web Bluetooth via desktop PC) or native (systemd service on RPi host using @abandonware/noble). All data is local — no cloud services (except optional Strava sync). UI is in Norwegian.
+Treadmill controller web app using Bluetooth (FTMS protocol) to control a treadmill and track workouts. Runs on a Raspberry Pi via Docker. Two BLE backends: browser-based (Web Bluetooth via desktop PC) or native (systemd service on RPi host using @abandonware/noble). Includes TTS coaching via OpenAI API with heart rate zone tracking, user profiles, and audio playback to client (iPhone/headset) or treadmill speakers (A2DP). All data is local — no cloud services (except optional Strava sync and OpenAI TTS). UI is in Norwegian.
 
 ## Commands
 
@@ -22,7 +22,7 @@ docker compose up -d
 docker compose down
 
 # Deploy to Pi from Windows
-scp server.js migrate.js docker-compose.yml .env pi@192.168.1.12:~/treadmill-controller/
+scp server.js coaching-engine.js tts-service.js migrate.js templates.json docker-compose.yml Dockerfile .env pi@192.168.1.12:~/treadmill-controller/
 scp public/* pi@192.168.1.12:~/treadmill-controller/public/
 ssh pi@192.168.1.12 "cd ~/treadmill-controller && docker compose build && docker rm -f treadmill-controller 2>/dev/null; docker compose up -d"
 
@@ -40,13 +40,17 @@ No test suite exists. No linter configured.
 
 ## Architecture
 
-**Backend**: Express 5 + better-sqlite3 (WAL mode) + WebSocket (ws). Single `server.js` (~1250 lines) handles REST API, WebSocket relay (for view dashboard), template syncing, Strava OAuth/upload, session exports (JSON/CSV/TCX), and HTTPS/HTTP auto-detection based on cert presence.
+**Backend**: Express 5 + better-sqlite3 (WAL mode) + WebSocket (ws). `server.js` (~1500 lines) handles REST API, WebSocket relay (for view dashboard), template syncing, Strava OAuth/upload, session exports (JSON/CSV/TCX), TTS coaching integration, user profiles, and HTTPS/HTTP auto-detection based on cert presence.
+
+**TTS Coaching** (server-side modules):
+- `coaching-engine.js` — Heart rate zone calculation, trigger evaluation (segment transitions, zone violations after 60s, milestones), Norwegian message generation, cooldown/priority queue.
+- `tts-service.js` — OpenAI TTS API (`tts-1` model) via `fetch()`, SHA256-based mp3 file caching in `tts-cache/`, A2DP speaker playback via `ffmpeg | paplay`.
 
 **Frontend**: Vanilla JS (no framework). Key files:
 - `public/ftms.js` — FTMS Bluetooth protocol: connect, parse treadmill data notifications, write control point commands (speed/incline/start/stop). Commands throttled with 400ms minimum gap. Confirmation mechanism waits for FTMS status codes 0x0A/0x0B.
 - `public/hrm.js` — Heart Rate Monitor Bluetooth protocol (UUID 0x180D). Optional; HRM takes priority over treadmill's built-in HR sensor.
 - `public/app.js` — Main application (~3000 lines). Manages UI tabs (Control/Workouts/History), workout execution with segment progression, session recording (1 data point/second), drift detection, Chart.js graphs, sound alerts, Strava integration, date filtering, export, auto BLE reconnect, segment feedback, WebSocket state broadcast.
-- `public/view.html` — Remote control + dashboard for iPad/iPhone. Three states: idle (workout selector), ready (workout loaded), active (live dashboard + controls). Sends commands via WebSocket, receives state broadcasts. Dark theme, responsive, auto-reconnect, HR zone coloring.
+- `public/view.html` — Remote control + dashboard for iPad/iPhone. Three states: idle (workout selector), ready (workout loaded with profile selector + TTS toggle), active (live dashboard + controls + TTS audio playback). Sends commands via WebSocket, receives state broadcasts and TTS audio. Dark theme, responsive, auto-reconnect, HR zone coloring. AudioContext unlocked on user gesture for iOS compatibility.
 - `public/sw.js` — Service worker for PWA offline support. Cache-first for static assets, network-first for API.
 - `public/manifest.json` — PWA manifest with Norwegian locale.
 
@@ -54,9 +58,9 @@ No test suite exists. No linter configured.
 
 **Dual HTTP/HTTPS**: server.js listens on HTTP (port 3000, env `HTTP_PORT`) and HTTPS (port 3001 if certs exist, env `HTTPS_PORT`). view.html uses HTTP (no cert warnings on iOS). index.html uses HTTPS for Web Bluetooth.
 
-**WebSocket Hub**: server.js routes commands between viewer clients (view.html) and the active controller (index.html browser or native BLE service). Controllers register with `{ type: "register", role: "controller" }`. Native BLE service takes priority over browser controllers. Protocol: `command` → `remote_command` → `command_response`.
+**WebSocket Hub**: server.js routes commands between viewer clients (view.html) and the active controller (index.html browser or native BLE service). Controllers register with `{ type: "register", role: "controller" }`. Native BLE service takes priority over browser controllers. Protocol: `command` → `remote_command` → `command_response`. Additional message types: `tts_config` (viewer → server, coaching preferences), `tts` (server → viewer, audio URL), `tts_text` (server → viewer, text-only fallback).
 
-**Database tables**: `workouts` → `workout_segments` (1:N), `workout_sessions` → `session_data` (1:N), `strava_auth`. 38 professional templates loaded from `templates.json` on startup.
+**Database tables**: `workouts` (with `target_max_zone`) → `workout_segments` (1:N, with `target_max_zone`), `workout_sessions` (with `profile_id`) → `session_data` (1:N), `user_profiles` (name, max_hr), `strava_auth`. 39 professional templates (including MaxHR Test) loaded from `templates.json` on startup, each with `target_max_zone` for coaching.
 
 **Data flow during workout**:
 ```
@@ -69,13 +73,20 @@ Template segments → executeSegment() → BLE write (speed/incline)
                                     buildCurrentState() → WebSocket broadcast (2s)
                                               ↓
                                     view.html renders on iPad/iPhone
+                                              ↓
+                                    server.js → CoachingEngine.update(state)
+                                              ↓
+                                    Trigger? → TTSService.speak(text) → cache/OpenAI
+                                              ↓
+                                    broadcastToViewers({ type: "tts", url }) + playOnSpeaker()
 ```
 
 ## Key API Routes
 
-- `GET/POST /api/workouts` — CRUD for workouts (with segments)
+- `GET/POST /api/workouts` — CRUD for workouts (with segments and target_max_zone)
 - `PUT /api/workouts/:id` — Update existing workout
-- `GET/POST/PUT/DELETE /api/sessions` — Session lifecycle (create → record data → complete)
+- `GET/POST/PUT/DELETE /api/profiles` — User profiles (name, max_hr) for TTS coaching
+- `GET/POST/PUT/DELETE /api/sessions` — Session lifecycle (create with profile_id → record data → complete)
 - `POST /api/sessions/:id/data` — Record data point each second (with optional `segment_index`)
 - `GET /api/sessions/:id/details` — Full session with all data points
 - `GET /api/sessions/:id/segments` — Per-segment aggregated feedback
@@ -103,14 +114,22 @@ When treadmill sends status `0x02` (stopped), app auto-ends session and workout 
 
 ## Environment Variables
 
-Strava integration requires `.env` file (or environment variables):
+`.env` file (or environment variables):
 ```
+# Strava (optional)
 STRAVA_CLIENT_ID=<from strava.com/settings/api>
 STRAVA_CLIENT_SECRET=<from strava.com/settings/api>
 APP_URL=https://192.168.1.12:3001
+
+# TTS coaching (optional — falls back to text-only without API key)
+OPENAI_API_KEY=<from platform.openai.com/api-keys>
+TTS_VOICE=nova          # OpenAI TTS voice (default: nova)
+A2DP_SINK=              # PulseAudio sink for treadmill speakers (optional)
 ```
 
 Note: Strava API does not support setting activity privacy. Users must set "Default Activity Privacy" to "Only You" in Strava settings.
+
+Note: TTS coaching works without OPENAI_API_KEY — coaching engine still runs and sends text messages to view.html as toast notifications. With the API key, it generates spoken Norwegian audio via OpenAI `tts-1` with disk caching (~10-50KB per message, ~2s latency on first generation, 1ms on cache hit).
 
 ## Known Issues
 

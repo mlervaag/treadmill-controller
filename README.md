@@ -17,15 +17,29 @@ En moderne, fullstendig webapplikasjon for å kontrollere tredemøllen din via B
 - **Drift-deteksjon**: Sender BLE-kommandoer på nytt hvis faktisk != mål
 
 ### 💪 Treningsøkter
-- **38 profesjonelle treningsøkter** fordelt på 3 nivåer:
+- **39 profesjonelle treningsøkter** fordelt på 3 nivåer:
   - **Beginner (23)**: Couch to 5K (9 uker), Steady State, Standard intervaller, Motbakke intro
   - **Intermediate (9)**: VO2max 5x3, Threshold 2x10, Tempo 20 min, Hill Repeats, Pyramide
-  - **Advanced (8)**: VO2max 6x4, Speed 400m x12, Threshold 3x12, Hill Sprints, Long Runs
+  - **Advanced (9)**: VO2max 6x4, Speed 400m x12, Threshold 3x12, Hill Sprints, Long Runs, MaxHR Test
+- **Målsoner**: Alle templates har anbefalte HR-soner per segment for coaching
 - **Egendefinerte økter**: Lag og rediger dine egne treningsøkter med flere segmenter
 - **Automatisk kjøring**: Appen styrer hastighet og stigning automatisk gjennom segmentene
 - **Lydvarsler**: Pip ved segmentbytte, stigende tone ved fullført økt (Web Audio API)
 - **Smart filtrering**: Søk på difficulty, tags (c25k, vo2max, threshold, etc.) og varighet
 - **Auto-stopp**: Når tredemøllen stoppes fysisk, avsluttes økten automatisk uten bekreftelse
+
+### 🎙️ TTS-coaching
+- **Talecoach**: Norsk stemme (OpenAI TTS) som gir informativ og adaptiv feedback under trening
+- **Triggere**:
+  - **Segment-overganger**: "Nytt segment: Intervall. 10 kilometer i timen, 3 prosent stigning, 5 minutter. Målsone er 4."
+  - **Sone-avvik**: "Pulsen din har vært i sone 4 i 2 minutter. Målsonen er 3, vurder å senke farten." (etter 60 sekunder utenfor målsone)
+  - **Milepæler**: "Halvveis! 10 minutter igjen.", "Du har løpt 2 kilometer.", "Ett minutt igjen."
+- **Brukerprofiler**: Lettvekts profilliste med navn og maks hjertefrekvens, inline-redigering
+- **Standard 5-soner**: Basert på prosent av maxHR (sone 1: <60%, sone 2: 60-70%, sone 3: 70-80%, sone 4: 80-90%, sone 5: 90-100%)
+- **Avspilling**: Valgbart i view.html — "Denne enheten" (iPhone/headset), "Tredemølle" (A2DP-høyttalere), eller "Begge"
+- **Aggressiv caching**: SHA256-hash av tekst → mp3 på disk (~10-50 KB). Cache hit på 1ms, API-kall ~2s
+- **Graceful degradation**: Fungerer uten OpenAI API-nøkkel — viser tekst-toast i stedet for lyd
+- **MaxHR-test**: Egen progressiv template for å finne maks hjertefrekvens (4→14 km/t + stigning)
 
 ### 📊 Historikk & Statistikk
 - **Tre visninger**: Oversikt, Økter, og Trender
@@ -48,18 +62,22 @@ En moderne, fullstendig webapplikasjon for å kontrollere tredemøllen din via B
 
 > **Merk**: Strava API støtter ikke å sette aktivitetsprivacy. Sett "Default Activity Privacy" til "Only You" i Strava-innstillingene for private økter.
 
-### ❤️ Pulsmåling
+### ❤️ Pulsmåling & HR-soner
 - **FTMS puls-støtte**: Mottar pulsdata fra FTMS-protokollen
 - **Separat pulsbelte**: Koble til Bluetooth-pulsbelte (f.eks. Polar H10) for bedre nøyaktighet
 - **Smart visning**: Skjuler pulsvisning automatisk når ingen gyldig puls er tilgjengelig
 - **Gjennomsnittspuls**: Beregner gjennomsnitt kun fra gyldige målinger
+- **5 HR-soner**: Automatisk soneberegning basert på brukerprofils maks hjertefrekvens
+- **Flerbruker**: Lettvekts profiler med navn + maxHR, velges ved økt-start
 
 ### 📱 Mobil, Tablet & iPad
 - **Fullt responsiv**: Optimalisert for mobil, tablet (iPad) og desktop
-- **View-only dashboard** (`/view.html`): Sanntidsvisning for iPad/iPhone som ikke støtter Web Bluetooth
+- **Fjernkontroll + dashboard** (`/view.html`): Sanntidsvisning og kontroll for iPad/iPhone
   - Mottar data via WebSocket fra kontrollpanelet
   - Viser hastighet, stigning, puls, distanse, tid, kalorier
-  - HR-sone-farger basert på maks puls
+  - HR-sone-farger basert på brukerprofils maks puls
+  - **TTS-coaching**: Profilvelger, coach-toggle, lyd-mål (enhet/tredemølle/begge)
+  - Last inn og start økter direkte fra telefonen
   - Tilkoblingsstatus med feilmelding
 - **PWA-støtte**: Installerbar som app med offline-støtte (Service Worker)
 - **Apple Web App**: Fungerer som standalone app på iOS/iPadOS
@@ -221,9 +239,11 @@ For enheter uten Web Bluetooth-støtte:
 
 ```
 treadmill-controller/
-├── server.js                  # Express server (~1250 linjer): API, WebSocket, Strava, eksport
+├── server.js                  # Express server (~1500 linjer): API, WebSocket, Strava, TTS coaching
+├── coaching-engine.js         # HR-soner, trigger-evaluering, norske meldinger
+├── tts-service.js             # OpenAI TTS API, SHA256-caching, A2DP-avspilling
 ├── package.json               # npm konfigurasjon
-├── templates.json             # 38 standard treningsøkter
+├── templates.json             # 39 treningsøkter med target_max_zone
 ├── migrate.js                 # Database migrations (ALTER TABLE)
 ├── deploy-to-pi.sh            # Bash deploy-skript for Raspberry Pi
 ├── Dockerfile                 # Docker container build
@@ -239,6 +259,7 @@ treadmill-controller/
 ├── ROADMAP.md                 # Planlagte funksjoner og veikart
 ├── data/                      # Database (git-ignored)
 │   └── treadmill.db           # SQLite database
+├── tts-cache/                 # Cachede TTS-lydfiler (git-ignored)
 ├── certs/                     # SSL-sertifikater (git-ignored)
 │   ├── server.key
 │   └── server.crt
@@ -268,23 +289,28 @@ treadmill-controller/
 
 ### `workouts`
 ```sql
-id, name, description, difficulty, is_template, tags, created_at
+id, name, description, difficulty, is_template, tags, target_max_zone, created_at
 ```
 
 ### `workout_segments`
 ```sql
-id, workout_id, segment_order, duration_seconds, speed_kmh, incline_percent, segment_name
+id, workout_id, segment_order, duration_seconds, speed_kmh, incline_percent, segment_name, target_max_zone
 ```
 
 ### `workout_sessions`
 ```sql
 id, workout_id, started_at, completed_at, total_distance_km, total_time_seconds,
-avg_heart_rate, calories_burned, heart_rate_source, strava_activity_id, strava_upload_status
+avg_heart_rate, calories_burned, heart_rate_source, strava_activity_id, strava_upload_status, profile_id
 ```
 
 ### `session_data`
 ```sql
 id, session_id, timestamp, speed_kmh, incline_percent, distance_km, heart_rate, segment_index
+```
+
+### `user_profiles`
+```sql
+id, name (UNIQUE), max_hr, created_at
 ```
 
 ### `strava_auth`
@@ -303,6 +329,15 @@ id, athlete_id (UNIQUE), access_token, refresh_token, expires_at, scope, athlete
 | POST | `/api/workouts` | Opprett ny treningsøkt |
 | PUT | `/api/workouts/:id` | Oppdater treningsøkt |
 | DELETE | `/api/workouts/:id` | Slett treningsøkt |
+
+### Profiles
+| Metode | Endepunkt | Beskrivelse |
+|--------|-----------|-------------|
+| GET | `/api/profiles` | Hent alle brukerprofiler |
+| GET | `/api/profiles/:id` | Hent spesifikk profil |
+| POST | `/api/profiles` | Opprett ny profil `{ name, max_hr }` |
+| PUT | `/api/profiles/:id` | Oppdater profil |
+| DELETE | `/api/profiles/:id` | Slett profil |
 
 ### Sessions
 | Metode | Endepunkt | Beskrivelse |
@@ -375,11 +410,12 @@ Heart Rate Service:   0000180d-0000-1000-8000-00805f9b34fb
 
 - **Backend**: Node.js, Express 5, WebSocket (ws), better-sqlite3
 - **Frontend**: Vanilla JavaScript (ES6+), HTML5, CSS3, Chart.js 4
-- **Bluetooth**: Web Bluetooth API, FTMS Protocol, Heart Rate Service
+- **Bluetooth**: Web Bluetooth API (BLE), Bluetooth Classic (A2DP), FTMS Protocol, Heart Rate Service
+- **TTS Coaching**: OpenAI TTS API (`tts-1`), norsk stemme, SHA256-filcaching, AudioContext (iOS)
 - **Integrasjoner**: Strava API v3 (OAuth 2.0, TCX upload)
-- **Infrastruktur**: Docker, Raspberry Pi, HTTPS (self-signed)
+- **Infrastruktur**: Docker, Raspberry Pi, PulseAudio (A2DP), HTTPS (self-signed)
 - **PWA**: Service Worker, Web App Manifest
-- **Lyd**: Web Audio API (oscillator-baserte varsler)
+- **Lyd**: Web Audio API (varsler), AudioContext (TTS), A2DP (tredemølle-høyttalere)
 - **Design**: Responsive, Mobile-first, Dark theme
 
 ## 📚 Dokumentasjon
@@ -421,14 +457,20 @@ Se [ROADMAP.md](ROADMAP.md) for komplett veikart. Oppsummering:
 - Auto BLE-reconnect
 - Per-segment feedback
 - PWA med offline-støtte
-- View-only dashboard for iPad/iPhone
+- Fjernkontroll + dashboard for iPad/iPhone
+- TTS-coaching med OpenAI (norsk stemme, segment/sone/milepæl-triggere)
+- HR-soner med brukerprofiler (5-soner basert på maxHR)
+- Flerbruker-støtte (lettvekts profiler med navn + maxHR)
+- Målsoner på alle 39 templates
+- MaxHR-test-økt
+- A2DP-lydavspilling til tredemølle-høyttalere
 
 ### 🔜 Planlagt
-- **Heart Rate Zone Training** — Pulsbasert adaptiv trening med brukerprofil (høy prioritet)
 - **Workout Builder** — Visuell drag-and-drop segment-creator
 - **Avansert Analyse** — Treningsbelastning (TSS/TRIMP), fitness-trender
-- **Flerbruker-støtte** — Flere brukerprofiler med individuell statistikk
-- **Stemme-feedback** — Talevarsler under trening
+- **Sone-statistikk** — Tid i hver sone per økt, sone-progresjon over tid
+- **Periodiske oppsummeringer** — TTS hvert 5. minutt med snitt-puls, distanse, tempo
+- **Økt-oppsummering** — Talt oppsummering ved økt-slutt
 
 ## 📄 Lisens
 
