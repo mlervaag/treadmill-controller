@@ -852,9 +852,9 @@
             <div id="noControllerMsg" class="no-controller-msg hidden">
                 Ingen kontroller tilkoblet
             </div>
-            <div class="workout-list-header">Velg treningsokt</div>
+            <div class="workout-list-header">Velg treningsøkt</div>
             <div class="search-bar">
-                <input type="text" id="workoutSearch" class="search-input" placeholder="Sok etter okt...">
+                <input type="text" id="workoutSearch" class="search-input" placeholder="Søk etter økt...">
                 <div class="filter-row">
                     <button class="filter-btn active" data-filter="all">Alle</button>
                     <button class="filter-btn" data-filter="beginner">Nybegynner</button>
@@ -871,7 +871,7 @@
                 </div>
             </div>
             <div class="idle-actions">
-                <button class="btn btn-primary" id="btnLoadWorkout" disabled>Last inn okt</button>
+                <button class="btn btn-primary" id="btnLoadWorkout" disabled>Last inn økt</button>
             </div>
         </div>
 
@@ -911,11 +911,11 @@
                 </select>
             </div>
 
-            <div class="ready-hint">Eller trykk Start pa mollen</div>
+            <div class="ready-hint">Eller trykk Start på møllen</div>
 
             <div class="ready-actions">
                 <button class="btn btn-secondary" id="btnBackToIdle">Bytt</button>
-                <button class="btn btn-success" id="btnStartSession">Start okt</button>
+                <button class="btn btn-success" id="btnStartSession">Start økt</button>
             </div>
         </div>
 
@@ -974,7 +974,7 @@
 
                 <div class="overall-progress-section">
                     <div class="progress-label-row">
-                        <span>Total fremgang</span>
+                        <span>Total fremdrift</span>
                         <span id="vOverallPercent">0%</span>
                     </div>
                     <div class="progress-section">
@@ -989,7 +989,7 @@
             <!-- Active control buttons -->
             <div class="active-controls">
                 <button class="btn btn-secondary" id="btnSkipSegment">Hopp segment &#x23ED;</button>
-                <button class="btn btn-danger" id="btnStopSession">Stopp okt &#x25A0;</button>
+                <button class="btn btn-danger" id="btnStopSession">Stopp økt &#x25A0;</button>
             </div>
 
             <div class="secondary-row">
@@ -1805,7 +1805,7 @@
             $btnLoadWorkout.textContent = 'Laster...';
 
             sendCommand('load_workout', { workoutId: selectedWorkoutId }).then(function (resp) {
-                $btnLoadWorkout.textContent = 'Last inn okt';
+                $btnLoadWorkout.textContent = 'Last inn økt';
                 $btnLoadWorkout.disabled = false;
 
                 // Store loaded workout info
@@ -1821,11 +1821,11 @@
                 showReadyState();
             }).catch(function (err) {
                 console.error('Load workout failed:', err);
-                $btnLoadWorkout.textContent = 'Last inn okt';
+                $btnLoadWorkout.textContent = 'Last inn økt';
                 $btnLoadWorkout.disabled = false;
                 // Show error briefly on the button
                 $btnLoadWorkout.textContent = 'Feilet: ' + err.message;
-                setTimeout(function () { $btnLoadWorkout.textContent = 'Last inn okt'; }, 3000);
+                setTimeout(function () { $btnLoadWorkout.textContent = 'Last inn økt'; }, 3000);
             });
         });
 
@@ -1907,14 +1907,14 @@
 
             sendCommand('start_session').then(function () {
                 // Active state will be triggered by treadmill_state broadcast
-                $btnStartSession.textContent = 'Start okt';
+                $btnStartSession.textContent = 'Start økt';
                 $btnStartSession.disabled = false;
             }).catch(function (err) {
                 console.error('Start session failed:', err);
-                $btnStartSession.textContent = 'Start okt';
+                $btnStartSession.textContent = 'Start økt';
                 $btnStartSession.disabled = false;
                 $btnStartSession.textContent = 'Feilet: ' + err.message;
-                setTimeout(function () { $btnStartSession.textContent = 'Start okt'; }, 3000);
+                setTimeout(function () { $btnStartSession.textContent = 'Start økt'; }, 3000);
             });
         });
 
@@ -1935,7 +1935,7 @@
         // ACTIVE: Stop session
         // -------------------------------------------------------------------
         $btnStopSession.addEventListener('click', function () {
-            if (!confirm('Stopp treningsokten?')) return;
+            if (!confirm('Stopp treningsøkten?')) return;
             $btnStopSession.disabled = true;
             sendCommand('stop_session').then(function () {
                 $btnStopSession.disabled = false;
