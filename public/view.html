@@ -322,6 +322,78 @@
             color: var(--text-secondary);
         }
 
+        .workout-item-details {
+            display: none;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .workout-item.selected .workout-item-details { display: block; }
+
+        .workout-item-desc {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            line-height: 1.4;
+        }
+
+        .workout-item-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin-bottom: 8px;
+        }
+
+        .workout-item-tag {
+            font-size: 11px;
+            background: var(--card-bg-light);
+            color: var(--text-secondary);
+            padding: 2px 8px;
+            border-radius: 6px;
+        }
+
+        .workout-item-segments {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .workout-seg-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 12px;
+            padding: 4px 8px;
+            background: var(--card-bg-light);
+            border-radius: 6px;
+        }
+
+        .workout-seg-name {
+            font-weight: 500;
+            flex: 1;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .workout-seg-info {
+            display: flex;
+            gap: 10px;
+            color: var(--text-secondary);
+            flex-shrink: 0;
+        }
+
+        .workout-seg-zone {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 6px;
+            flex-shrink: 0;
+        }
+
         .idle-actions {
             position: fixed;
             bottom: 0;
@@ -1751,7 +1823,8 @@
                         '<span>' + segCount + ' segment' + (segCount !== 1 ? 'er' : '') + '</span>' +
                         '<span>' + durationMin + ' min</span>' +
                         (diffLabel ? '<span>' + diffLabel + '</span>' : '') +
-                    '</div>';
+                    '</div>' +
+                    '<div class="workout-item-details" id="details-' + w.id + '"></div>';
 
                 el.addEventListener('click', onWorkoutItemClick);
                 $workoutListContainer.insertBefore(el, $workoutListEmpty);
@@ -1765,7 +1838,6 @@
             var id = parseInt(target.dataset.workoutId, 10);
 
             if (selectedWorkoutId === id) {
-                // Deselect
                 selectedWorkoutId = null;
             } else {
                 selectedWorkoutId = id;
@@ -1777,7 +1849,6 @@
                 var itemId = parseInt(items[i].dataset.workoutId, 10);
                 items[i].classList.toggle('selected', itemId === selectedWorkoutId);
 
-                // Update badge
                 var badge = items[i].querySelector('.workout-item-badge');
                 if (itemId === selectedWorkoutId && !badge) {
                     var b = document.createElement('span');
@@ -1789,7 +1860,63 @@
                 }
             }
 
+            // Fetch and render details for selected workout
+            if (selectedWorkoutId) {
+                loadWorkoutDetails(selectedWorkoutId);
+            }
+
             updateLoadButton();
+        }
+
+        function loadWorkoutDetails(workoutId) {
+            var detailsEl = document.getElementById('details-' + workoutId);
+            if (!detailsEl || detailsEl.dataset.loaded) return;
+
+            fetch('/api/workouts/' + workoutId).then(function (r) { return r.json(); }).then(function (w) {
+                if (!w || !w.segments) return;
+                detailsEl.dataset.loaded = '1';
+
+                var zoneColors = ['', 'var(--zone1)', 'var(--zone2)', 'var(--zone3)', 'var(--zone4)', 'var(--zone5)'];
+                var html = '';
+
+                if (w.description) {
+                    html += '<div class="workout-item-desc">' + escapeHtml(w.description) + '</div>';
+                }
+
+                var tags = [];
+                try { tags = typeof w.tags === 'string' ? JSON.parse(w.tags) : (w.tags || []); } catch (e) {}
+                if (tags.length > 0) {
+                    html += '<div class="workout-item-tags">';
+                    for (var t = 0; t < tags.length; t++) {
+                        html += '<span class="workout-item-tag">' + escapeHtml(tags[t]) + '</span>';
+                    }
+                    html += '</div>';
+                }
+
+                html += '<div class="workout-item-segments">';
+                for (var i = 0; i < w.segments.length; i++) {
+                    var s = w.segments[i];
+                    var name = s.segment_name || 'Segment ' + (i + 1);
+                    var dur = Math.ceil((s.duration_seconds || 0) / 60);
+                    var zone = s.target_max_zone || w.target_max_zone || 0;
+                    var zoneColor = zone > 0 && zone <= 5 ? zoneColors[zone] : 'transparent';
+
+                    html += '<div class="workout-seg-row">' +
+                        '<span class="workout-seg-zone" style="background:' + zoneColor + '"></span>' +
+                        '<span class="workout-seg-name">' + escapeHtml(name) + '</span>' +
+                        '<span class="workout-seg-info">' +
+                            '<span>' + (s.speed_kmh || 0) + ' km/t</span>' +
+                            (s.incline_percent > 0 ? '<span>' + s.incline_percent + '%</span>' : '') +
+                            '<span>' + dur + ' min</span>' +
+                        '</span>' +
+                    '</div>';
+                }
+                html += '</div>';
+
+                detailsEl.innerHTML = html;
+            }).catch(function (err) {
+                console.error('Failed to load workout details:', err);
+            });
         }
 
         function updateLoadButton() {
