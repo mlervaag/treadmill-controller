@@ -4,8 +4,8 @@ FROM node:20-alpine
 # Set working directory
 WORKDIR /app
 
-# Install build dependencies for better-sqlite3
-RUN apk add --no-cache python3 make g++
+# Install build dependencies for better-sqlite3 and audio tools for A2DP
+RUN apk add --no-cache python3 make g++ ffmpeg pulseaudio-utils
 
 # Copy package files
 COPY package*.json ./

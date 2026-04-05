@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
-const { execFile } = require('child_process');
+const { execFile, exec } = require('child_process');
 
 const CACHE_DIR = path.join(__dirname, 'tts-cache');
 
@@ -82,12 +82,10 @@ class TTSService {
     const filepath = path.join(CACHE_DIR, filename);
     if (!fs.existsSync(filepath)) return;
 
-    execFile('mpv', ['--no-video', '--really-quiet', `--audio-device=pulse/${this.a2dpSink}`, filepath], (err) => {
-      if (err) {
-        execFile('paplay', [`--device=${this.a2dpSink}`, filepath], (err2) => {
-          if (err2) console.error('A2DP playback failed:', err2.message);
-        });
-      }
+    // ffmpeg decodes mp3 to wav and pipes to paplay for A2DP playback
+    const cmd = `ffmpeg -y -i "${filepath}" -f wav - 2>/dev/null | paplay --device=${this.a2dpSink}`;
+    exec(cmd, (err) => {
+      if (err) console.error('A2DP playback failed:', err.message);
     });
   }
 }

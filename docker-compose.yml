@@ -17,9 +17,12 @@ services:
       - ./certs:/app/certs:ro
       # TTS audio cache
       - ./tts-cache:/app/tts-cache
+      # PulseAudio socket for A2DP speaker playback
+      - /run/user/1000/pulse:/run/user/1000/pulse
     environment:
       - NODE_ENV=production
       - DATABASE_PATH=/app/data/treadmill.db
+      - PULSE_SERVER=unix:/run/user/1000/pulse/native
     # Change to "no" if you want manual control (save power)
     # Use "unless-stopped" for 24/7 operation
     restart: unless-stopped
