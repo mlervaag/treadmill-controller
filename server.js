@@ -8,6 +8,8 @@ const cors = require('cors');
 const Database = require('better-sqlite3');
 
 const crypto = require('crypto');
+const TTSService = require('./tts-service');
+const CoachingEngine = require('./coaching-engine');
 
 const app = express();
 
@@ -64,6 +66,7 @@ app.use((req, res, next) => {
 });
 
 app.use(express.static('public'));
+app.use('/audio', express.static(path.join(__dirname, 'tts-cache')));
 
 // Database setup
 const dbPath = process.env.DATABASE_PATH || './data/treadmill.db';
@@ -142,6 +145,31 @@ try { db.exec('ALTER TABLE workout_sessions ADD COLUMN strava_upload_status TEXT
 
 // Add segment_index column to session_data if missing
 try { db.exec('ALTER TABLE session_data ADD COLUMN segment_index INTEGER'); } catch(e) {}
+
+// User profiles for TTS coaching
+db.exec(`
+  CREATE TABLE IF NOT EXISTS user_profiles (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT UNIQUE NOT NULL,
+    max_hr INTEGER NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )
+`);
+
+// Add target_max_zone and profile_id columns
+try { db.exec('ALTER TABLE workouts ADD COLUMN target_max_zone INTEGER'); } catch(e) {}
+try { db.exec('ALTER TABLE workout_segments ADD COLUMN target_max_zone INTEGER'); } catch(e) {}
+try { db.exec('ALTER TABLE workout_sessions ADD COLUMN profile_id INTEGER'); } catch(e) {}
+
+// --- TTS and Coaching setup ---
+const ttsService = new TTSService({
+  apiKey: process.env.OPENAI_API_KEY || null,
+  voice: process.env.TTS_VOICE || 'nova',
+  a2dpSink: process.env.A2DP_SINK || null
+});
+
+let activeCoachingEngine = null;
+const ttsConfigs = new Map(); // Map<ws, { enabled, target, profileId }>
 
 // API Routes
 app.get('/api/workouts', (req, res) => {
@@ -366,6 +394,66 @@ app.delete('/api/workouts/:id', (req, res) => {
   }
 });
 
+// --- Profile API routes ---
+
+app.get('/api/profiles', (req, res) => {
+  const profiles = db.prepare('SELECT * FROM user_profiles ORDER BY name ASC').all();
+  res.json(profiles);
+});
+
+app.get('/api/profiles/:id', (req, res) => {
+  const id = parseInt(req.params.id);
+  if (isNaN(id) || id <= 0) return res.status(400).json({ error: 'Ugyldig ID' });
+  const profile = db.prepare('SELECT * FROM user_profiles WHERE id = ?').get(id);
+  if (!profile) return res.status(404).json({ error: 'Profil ikke funnet' });
+  res.json(profile);
+});
+
+app.post('/api/profiles', (req, res) => {
+  try {
+    const { name, max_hr } = req.body;
+    if (!name || !name.trim()) return res.status(400).json({ error: 'Navn er påkrevd' });
+    const hr = parseInt(max_hr);
+    if (isNaN(hr) || hr < 100 || hr > 250) return res.status(400).json({ error: 'MaxHR må være mellom 100 og 250' });
+    const result = db.prepare('INSERT INTO user_profiles (name, max_hr) VALUES (?, ?)').run(name.trim(), hr);
+    res.json({ id: result.lastInsertRowid, name: name.trim(), max_hr: hr });
+  } catch (error) {
+    if (error.message && error.message.includes('UNIQUE')) {
+      return res.status(409).json({ error: 'En profil med dette navnet finnes allerede' });
+    }
+    console.error('Error creating profile:', error);
+    res.status(500).json({ error: 'Kunne ikke opprette profil' });
+  }
+});
+
+app.put('/api/profiles/:id', (req, res) => {
+  const id = parseInt(req.params.id);
+  if (isNaN(id) || id <= 0) return res.status(400).json({ error: 'Ugyldig ID' });
+  const { name, max_hr } = req.body;
+  if (!name || !name.trim()) return res.status(400).json({ error: 'Navn er påkrevd' });
+  const hr = parseInt(max_hr);
+  if (isNaN(hr) || hr < 100 || hr > 250) return res.status(400).json({ error: 'MaxHR må være mellom 100 og 250' });
+  try {
+    const result = db.prepare('UPDATE user_profiles SET name = ?, max_hr = ? WHERE id = ?').run(name.trim(), hr, id);
+    if (result.changes === 0) return res.status(404).json({ error: 'Profil ikke funnet' });
+    res.json({ id, name: name.trim(), max_hr: hr });
+  } catch (error) {
+    if (error.message && error.message.includes('UNIQUE')) {
+      return res.status(409).json({ error: 'En profil med dette navnet finnes allerede' });
+    }
+    console.error('Error updating profile:', error);
+    res.status(500).json({ error: 'Kunne ikke oppdatere profil' });
+  }
+});
+
+app.delete('/api/profiles/:id', (req, res) => {
+  const id = parseInt(req.params.id);
+  if (isNaN(id) || id <= 0) return res.status(400).json({ error: 'Ugyldig ID' });
+  const result = db.prepare('DELETE FROM user_profiles WHERE id = ?').run(id);
+  if (result.changes === 0) return res.status(404).json({ error: 'Profil ikke funnet' });
+  res.json({ success: true });
+});
+
 app.delete('/api/sessions/:id', (req, res) => {
   try {
     const id = parseInt(req.params.id);
@@ -420,13 +508,14 @@ app.get('/api/sessions', (req, res) => {
 
 app.post('/api/sessions', (req, res) => {
   try {
-    const { workout_id, heart_rate_source } = req.body;
+    const { workout_id, heart_rate_source, profile_id } = req.body;
     const validWorkoutId = workout_id && !isNaN(parseInt(workout_id)) ? parseInt(workout_id) : null;
     const validHRSource = heart_rate_source || 'none';
+    const validProfileId = profile_id && !isNaN(parseInt(profile_id)) ? parseInt(profile_id) : null;
 
-    const insert = db.prepare('INSERT INTO workout_sessions (workout_id, heart_rate_source) VALUES (?, ?)');
-    const result = insert.run(validWorkoutId, validHRSource);
-    console.log(`Session ${result.lastInsertRowid} created (workout: ${validWorkoutId || 'manual'}, HR source: ${validHRSource})`);
+    const insert = db.prepare('INSERT INTO workout_sessions (workout_id, heart_rate_source, profile_id) VALUES (?, ?, ?)');
+    const result = insert.run(validWorkoutId, validHRSource, validProfileId);
+    console.log(`Session ${result.lastInsertRowid} created (workout: ${validWorkoutId || 'manual'}, HR source: ${validHRSource}, profile: ${validProfileId || 'none'})`);
     res.json({ id: result.lastInsertRowid });
   } catch (error) {
     console.error('Error creating session:', error);
@@ -1060,21 +1149,21 @@ function initializeTemplates() {
     let updatedCount = 0;
 
     const insertWorkout = db.prepare(`
-      INSERT INTO workouts (name, description, difficulty, is_template, tags)
-      VALUES (?, ?, ?, 1, ?)
+      INSERT INTO workouts (name, description, difficulty, is_template, tags, target_max_zone)
+      VALUES (?, ?, ?, 1, ?, ?)
     `);
 
     const updateWorkout = db.prepare(`
-        UPDATE workouts 
-        SET description = ?, difficulty = ?, tags = ?
+        UPDATE workouts
+        SET description = ?, difficulty = ?, tags = ?, target_max_zone = ?
         WHERE id = ?
     `);
 
     const deleteSegments = db.prepare('DELETE FROM workout_segments WHERE workout_id = ?');
 
     const insertSegment = db.prepare(`
-      INSERT INTO workout_segments (workout_id, segment_order, duration_seconds, speed_kmh, incline_percent, segment_name)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO workout_segments (workout_id, segment_order, duration_seconds, speed_kmh, incline_percent, segment_name, target_max_zone)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `);
 
     db.transaction(() => {
@@ -1089,7 +1178,8 @@ function initializeTemplates() {
             template.name,
             template.description || '',
             template.difficulty || 'beginner',
-            tagsJson
+            tagsJson,
+            template.target_max_zone || null
           );
           const workoutId = result.lastInsertRowid;
 
@@ -1101,17 +1191,19 @@ function initializeTemplates() {
                 segment.duration || 60,
                 segment.speed || 0,
                 segment.incline || 0,
-                segment.name || null
+                segment.name || null,
+                segment.target_max_zone || null
               );
             });
           }
           addedCount++;
         } else {
-          // Update existing template to ensure tags and description are fresh
+          // Update existing template to ensure tags, description and zones are fresh
           updateWorkout.run(
             template.description || '',
             template.difficulty || 'beginner',
             tagsJson,
+            template.target_max_zone || null,
             existing.id
           );
 
@@ -1125,7 +1217,8 @@ function initializeTemplates() {
                 segment.duration || 60,
                 segment.speed || 0,
                 segment.incline || 0,
-                segment.name || null
+                segment.name || null,
+                segment.target_max_zone || null
               );
             });
           }
@@ -1240,6 +1333,79 @@ function generateTCX(session, dataPoints) {
 }
 
 // ---------------------------------------------------------------------------
+// Coaching helpers
+// ---------------------------------------------------------------------------
+
+function startCoaching(profileId, workoutId) {
+  const profile = profileId ? db.prepare('SELECT * FROM user_profiles WHERE id = ?').get(profileId) : null;
+  if (!profile) return null;
+
+  const segments = db.prepare(
+    'SELECT segment_order, duration_seconds, speed_kmh, incline_percent, segment_name, target_max_zone FROM workout_segments WHERE workout_id = ? ORDER BY segment_order'
+  ).all(workoutId);
+
+  const workout = db.prepare('SELECT target_max_zone FROM workouts WHERE id = ?').get(workoutId);
+
+  // Fill in workout-level target zone where segment doesn't have one
+  const enrichedSegments = segments.map(s => ({
+    ...s,
+    target_max_zone: s.target_max_zone || (workout ? workout.target_max_zone : null)
+  }));
+
+  // Stop any existing engine first
+  if (activeCoachingEngine) {
+    activeCoachingEngine.stop();
+    activeCoachingEngine = null;
+  }
+
+  const engine = new CoachingEngine({
+    maxHR: profile.max_hr,
+    segments: enrichedSegments,
+    ttsService,
+    onMessage: (text, filename) => {
+      deliverTTS(text, filename);
+    }
+  });
+
+  engine.start();
+  return engine;
+}
+
+function deliverTTS(text, filename) {
+  let deliveredToViewer = false;
+
+  for (const [ws, config] of ttsConfigs) {
+    if (!config.enabled) continue;
+    if (ws.readyState !== WebSocket.OPEN) continue;
+
+    if (config.target === 'client' || config.target === 'both') {
+      if (filename) {
+        ws.send(JSON.stringify({ type: 'tts', url: '/audio/' + filename }));
+      } else {
+        ws.send(JSON.stringify({ type: 'tts_text', text }));
+      }
+      deliveredToViewer = true;
+    }
+
+    if (config.target === 'speaker' || config.target === 'both') {
+      if (filename) ttsService.playOnSpeaker(filename);
+    }
+  }
+
+  // Fallback: if no viewer has TTS enabled but A2DP speaker is configured
+  if (!deliveredToViewer && filename) {
+    ttsService.playOnSpeaker(filename);
+  }
+}
+
+function stopCoaching() {
+  if (activeCoachingEngine) {
+    activeCoachingEngine.stop();
+    activeCoachingEngine = null;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // WebSocket hub — shared across HTTP and HTTPS servers
 // ---------------------------------------------------------------------------
 
@@ -1315,6 +1481,27 @@ function handleConnection(ws, req) {
         return;
       }
 
+      // --- TTS config from viewer ---
+      if (data.type === 'tts_config') {
+        ttsConfigs.set(ws, {
+          enabled: !!data.enabled,
+          target: data.target || 'client',
+          profileId: data.profileId || null
+        });
+
+        // Late coaching start: if session is already active and coaching not running
+        if (data.enabled && data.profileId && !activeCoachingEngine && latestTreadmillState && latestTreadmillState.sessionActive) {
+          const workoutId = latestTreadmillState.workout ? latestTreadmillState.workout.workoutId : null;
+          if (workoutId) {
+            activeCoachingEngine = startCoaching(data.profileId, workoutId);
+            if (activeCoachingEngine) {
+              console.log(`🎙️  Late coaching start (profile: ${data.profileId}, workout: ${workoutId})`);
+            }
+          }
+        }
+        return;
+      }
+
       // --- Command from viewer → forward to controller ---
       if (data.type === 'command') {
         const info = clients.get(ws);
@@ -1378,7 +1565,7 @@ function handleConnection(ws, req) {
             }));
           }
         }, timeoutMs);
-        pendingCommands.set(commandId, { viewer: ws, timer });
+        pendingCommands.set(commandId, { viewer: ws, timer, command: data.command });
 
         // Forward as remote_command to the controller
         controller.send(JSON.stringify({
@@ -1399,6 +1586,22 @@ function handleConnection(ws, req) {
           if (pending.viewer.readyState === WebSocket.OPEN) {
             pending.viewer.send(JSON.stringify(data));
           }
+
+          // Start coaching on successful start_session
+          if (pending.command === 'start_session' && data.success && !activeCoachingEngine) {
+            const workoutId = (data.data && data.data.workout_id) ? data.data.workout_id : null;
+            if (workoutId) {
+              for (const [, config] of ttsConfigs) {
+                if (config.enabled && config.profileId) {
+                  activeCoachingEngine = startCoaching(config.profileId, workoutId);
+                  if (activeCoachingEngine) {
+                    console.log(`🎙️  Coaching started (profile: ${config.profileId}, workout: ${workoutId})`);
+                  }
+                  break;
+                }
+              }
+            }
+          }
         }
         return;
       }
@@ -1406,6 +1609,16 @@ function handleConnection(ws, req) {
       // --- Cache treadmill state for new-client hydration ---
       if (data.type === 'treadmill_state') {
         latestTreadmillState = data.sessionActive ? data : null;
+
+        // Feed to active coaching engine
+        if (activeCoachingEngine) {
+          activeCoachingEngine.update(data);
+        }
+
+        // Detect session end → stop coaching
+        if (!data.sessionActive && activeCoachingEngine) {
+          stopCoaching();
+        }
       }
 
       // --- Cache device status for new-client hydration ---
@@ -1422,6 +1635,7 @@ function handleConnection(ws, req) {
     const info = clients.get(ws);
     const roleLabel = info ? (info.role || 'unregistered') : 'unknown';
     clients.delete(ws);
+    ttsConfigs.delete(ws);
 
     // Clean up any pending commands from this client
     for (const [cmdId, pending] of pendingCommands) {

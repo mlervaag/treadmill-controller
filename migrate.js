@@ -91,6 +91,38 @@ try {
       console.log('Added strava_upload_status column');
     }
 
+    // Create user_profiles table
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS user_profiles (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT UNIQUE NOT NULL,
+        max_hr INTEGER NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    console.log('Ensured user_profiles table exists');
+
+    // Add target_max_zone to workouts
+    const workoutsInfo3 = db.prepare("PRAGMA table_info(workouts)").all();
+    if (!workoutsInfo3.some(col => col.name === 'target_max_zone')) {
+      db.exec('ALTER TABLE workouts ADD COLUMN target_max_zone INTEGER');
+      console.log('Added target_max_zone column to workouts');
+    }
+
+    // Add target_max_zone to workout_segments
+    const segmentsInfo2 = db.prepare("PRAGMA table_info(workout_segments)").all();
+    if (!segmentsInfo2.some(col => col.name === 'target_max_zone')) {
+      db.exec('ALTER TABLE workout_segments ADD COLUMN target_max_zone INTEGER');
+      console.log('Added target_max_zone column to workout_segments');
+    }
+
+    // Add profile_id to workout_sessions
+    const sessionsInfo3 = db.prepare("PRAGMA table_info(workout_sessions)").all();
+    if (!sessionsInfo3.some(col => col.name === 'profile_id')) {
+      db.exec('ALTER TABLE workout_sessions ADD COLUMN profile_id INTEGER');
+      console.log('Added profile_id column to workout_sessions');
+    }
+
     // Create strava_auth table if it doesn't exist
     db.exec(`
       CREATE TABLE IF NOT EXISTS strava_auth (

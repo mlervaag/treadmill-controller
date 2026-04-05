@@ -661,6 +661,7 @@ function buildCurrentState() {
         const elapsedInWorkout = elapsedSegments + elapsedInCurrent;
 
         workoutInfo = {
+            workoutId: currentWorkout.id,
             name: currentWorkout.name,
             totalSegments: segments.length,
             currentSegmentIndex: currentSegmentIndex,
@@ -669,7 +670,8 @@ function buildCurrentState() {
                 targetSpeed: currentSeg.speed_kmh,
                 targetIncline: currentSeg.incline_percent,
                 durationSeconds: currentSeg.duration_seconds,
-                timeRemaining: segmentTimeRemaining
+                timeRemaining: segmentTimeRemaining,
+                targetZone: currentSeg.target_max_zone || null
             } : null,
             nextSegment: segments[currentSegmentIndex + 1] ? {
                 name: segments[currentSegmentIndex + 1].segment_name || `Segment ${currentSegmentIndex + 2}`,
@@ -840,7 +842,7 @@ async function handleRemoteCommand(data) {
 
                     loadedWorkout = null;
                     updateLoadedWorkoutUI();
-                    sendCommandResponse(commandId, command, true);
+                    sendCommandResponse(commandId, command, true, null, { workout_id: currentWorkout ? currentWorkout.id : null });
                 } catch (error) {
                     console.error('Failed to start workout via remote:', error);
                     currentWorkout = null;
@@ -872,10 +874,11 @@ async function handleRemoteCommand(data) {
     }
 }
 
-function sendCommandResponse(commandId, command, success, error) {
+function sendCommandResponse(commandId, command, success, error, data) {
     if (!stateBroadcastWs || stateBroadcastWs.readyState !== WebSocket.OPEN) return;
     const msg = { type: 'command_response', commandId, command, success };
     if (error) msg.error = error;
+    if (data) msg.data = data;
     stateBroadcastWs.send(JSON.stringify(msg));
 }
 

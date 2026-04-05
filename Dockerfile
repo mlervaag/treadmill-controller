@@ -17,10 +17,13 @@ RUN npm ci --only=production
 COPY server.js .
 COPY migrate.js .
 COPY templates.json .
+COPY coaching-engine.js .
+COPY tts-service.js .
 COPY public ./public
 
 # Create directory for database with proper permissions
 RUN mkdir -p /app/data && \
+    mkdir -p /app/tts-cache && \
     chown -R node:node /app && \
     chmod 700 /app/data
 

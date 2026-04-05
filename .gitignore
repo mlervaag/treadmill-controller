@@ -9,6 +9,9 @@ node_modules/
 # Backups (contains personal workout data)
 backups/
 
+# TTS audio cache
+tts-cache/
+
 # SSL certificates
 certs/
 

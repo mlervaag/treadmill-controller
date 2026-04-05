@@ -722,6 +722,97 @@
                 transition-duration: 0.01ms !important;
             }
         }
+
+        /* --- TTS & Profile controls --- */
+        .tts-controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+            margin-bottom: 12px;
+            padding: 10px;
+            background: var(--card-bg);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+        }
+
+        .tts-controls label {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .tts-controls select {
+            background: var(--card-bg-light);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 6px 10px;
+            font-size: 14px;
+            font-family: inherit;
+        }
+
+        .tts-controls .btn-icon {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 18px;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 6px;
+        }
+
+        .tts-controls .btn-icon:hover {
+            background: var(--card-bg-light);
+            color: var(--text-primary);
+        }
+
+        .tts-toggle {
+            position: relative;
+            width: 44px;
+            height: 24px;
+            background: var(--border-color);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: background 0.2s;
+            border: none;
+            flex-shrink: 0;
+        }
+
+        .tts-toggle.active { background: var(--success-color); }
+
+        .tts-toggle::after {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: white;
+            top: 2px;
+            left: 2px;
+            transition: transform 0.2s;
+        }
+
+        .tts-toggle.active::after { transform: translateX(20px); }
+
+        .tts-toast {
+            position: fixed;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--card-bg-light);
+            color: var(--text-primary);
+            padding: 10px 20px;
+            border-radius: 10px;
+            font-size: 14px;
+            z-index: 999;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            max-width: 90%;
+            text-align: center;
+        }
+
+        .tts-toast.show { opacity: 1; }
     </style>
 </head>
 <body>
@@ -800,6 +891,24 @@
             <div class="intensity-chart">
                 <div class="intensity-chart-label">Intensitetsprofil</div>
                 <div class="intensity-bars" id="readyIntensityBars"></div>
+            </div>
+
+            <!-- TTS coaching controls -->
+            <div class="tts-controls" id="ttsControls">
+                <label>Coach</label>
+                <button class="tts-toggle" id="ttsToggle" type="button"></button>
+
+                <label>Profil</label>
+                <select id="profileSelect"></select>
+                <button class="btn-icon" id="btnEditProfile" title="Rediger">&#9998;</button>
+                <button class="btn-icon" id="btnAddProfile" title="Ny profil">&#43;</button>
+
+                <label>Lyd</label>
+                <select id="ttsTargetSelect">
+                    <option value="client">Denne enheten</option>
+                    <option value="speaker">Tredemølle</option>
+                    <option value="both">Begge</option>
+                </select>
             </div>
 
             <div class="ready-hint">Eller trykk Start pa mollen</div>
@@ -902,6 +1011,8 @@
         </div>
     </div>
 
+    <div class="tts-toast" id="ttsToast"></div>
+
     <script>
     (function () {
         'use strict';
@@ -910,8 +1021,15 @@
         // Configuration
         // -------------------------------------------------------------------
         const params = new URLSearchParams(window.location.search);
-        const MAX_HR = parseInt(params.get('maxHR'), 10) || 190;
+        let MAX_HR = parseInt(params.get('maxHR'), 10) || 190;
         const MAX_RECONNECT_DELAY = 30000;
+
+        // TTS state
+        let ttsEnabled = localStorage.getItem('ttsEnabled') === 'true';
+        let ttsTarget = localStorage.getItem('ttsTarget') || 'client';
+        let selectedProfileId = parseInt(localStorage.getItem('selectedProfileId'), 10) || null;
+        let audioCtx = null;
+        let profiles = [];
 
         // -------------------------------------------------------------------
         // XSS helper
@@ -977,6 +1095,13 @@
         const $btnSkipSegment = document.getElementById('btnSkipSegment');
         const $btnStopSession = document.getElementById('btnStopSession');
 
+        const $ttsToggle = document.getElementById('ttsToggle');
+        const $profileSelect = document.getElementById('profileSelect');
+        const $btnEditProfile = document.getElementById('btnEditProfile');
+        const $btnAddProfile = document.getElementById('btnAddProfile');
+        const $ttsTargetSelect = document.getElementById('ttsTargetSelect');
+        const $ttsToast = document.getElementById('ttsToast');
+
         // -------------------------------------------------------------------
         // Helpers
         // -------------------------------------------------------------------
@@ -1035,6 +1160,7 @@
 
                 // Register as viewer
                 ws.send(JSON.stringify({ type: 'register', role: 'viewer' }));
+                sendTTSConfig();
 
                 // Request workout list
                 fetchWorkoutList();
@@ -1136,6 +1262,16 @@
 
                 case 'command_response':
                     handleCommandResponse(data);
+                    break;
+
+                case 'tts':
+                    if (ttsEnabled && (ttsTarget === 'client' || ttsTarget === 'both')) {
+                        playTTSAudio(data.url);
+                    }
+                    break;
+
+                case 'tts_text':
+                    showTTSToast(data.text);
                     break;
             }
         }
@@ -1241,6 +1377,164 @@
             document.body.appendChild(t);
             setTimeout(function () { t.remove(); }, 3000);
         }
+
+        // -------------------------------------------------------------------
+        // TTS / Profile management
+        // -------------------------------------------------------------------
+
+        function initAudioContext() {
+            if (audioCtx) return;
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        }
+
+        async function playTTSAudio(url) {
+            if (!audioCtx) return;
+            try {
+                if (audioCtx.state === 'suspended') await audioCtx.resume();
+                var resp = await fetch(url);
+                var arrayBuffer = await resp.arrayBuffer();
+                var audioBuffer = await new Promise(function (resolve, reject) {
+                    audioCtx.decodeAudioData(arrayBuffer, resolve, reject);
+                });
+                var source = audioCtx.createBufferSource();
+                source.buffer = audioBuffer;
+                source.connect(audioCtx.destination);
+                source.start(0);
+            } catch (e) {
+                console.warn('TTS playback failed:', e);
+            }
+        }
+
+        function showTTSToast(text) {
+            $ttsToast.textContent = text;
+            $ttsToast.classList.add('show');
+            setTimeout(function () { $ttsToast.classList.remove('show'); }, 4000);
+        }
+
+        async function loadProfiles() {
+            try {
+                var resp = await fetch('/api/profiles');
+                profiles = await resp.json();
+                renderProfileSelect();
+            } catch (e) {
+                console.error('Failed to load profiles:', e);
+            }
+        }
+
+        function renderProfileSelect() {
+            $profileSelect.innerHTML = '<option value="">Ingen profil</option>';
+            profiles.forEach(function (p) {
+                var opt = document.createElement('option');
+                opt.value = p.id;
+                opt.textContent = escapeHtml(p.name) + ' (' + p.max_hr + ')';
+                $profileSelect.appendChild(opt);
+            });
+            if (selectedProfileId) {
+                $profileSelect.value = selectedProfileId;
+                var profile = profiles.find(function (p) { return p.id === selectedProfileId; });
+                if (profile) {
+                    MAX_HR = profile.max_hr;
+                }
+            }
+        }
+
+        function sendTTSConfig() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'tts_config',
+                    enabled: ttsEnabled,
+                    target: ttsTarget,
+                    profileId: selectedProfileId
+                }));
+            }
+        }
+
+        // Profile select change
+        $profileSelect.addEventListener('change', function () {
+            selectedProfileId = parseInt($profileSelect.value, 10) || null;
+            localStorage.setItem('selectedProfileId', selectedProfileId || '');
+            var profile = profiles.find(function (p) { return p.id === selectedProfileId; });
+            if (profile) {
+                MAX_HR = profile.max_hr;
+                localStorage.setItem('profileMaxHR', profile.max_hr);
+            }
+            sendTTSConfig();
+        });
+
+        // Add profile
+        $btnAddProfile.addEventListener('click', async function () {
+            var name = prompt('Navn:');
+            if (!name) return;
+            var hr = prompt('Maks hjertefrekvens:', '190');
+            if (!hr) return;
+            try {
+                var resp = await fetch('/api/profiles', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: name, max_hr: parseInt(hr, 10) })
+                });
+                if (!resp.ok) {
+                    var err = await resp.json();
+                    alert(err.error || 'Feil');
+                    return;
+                }
+                var newProfile = await resp.json();
+                selectedProfileId = newProfile.id;
+                localStorage.setItem('selectedProfileId', newProfile.id);
+                await loadProfiles();
+                sendTTSConfig();
+            } catch (e) {
+                alert('Kunne ikke opprette profil');
+            }
+        });
+
+        // Edit profile
+        $btnEditProfile.addEventListener('click', async function () {
+            if (!selectedProfileId) { alert('Velg en profil først'); return; }
+            var profile = profiles.find(function (p) { return p.id === selectedProfileId; });
+            if (!profile) return;
+            var name = prompt('Navn:', profile.name);
+            if (!name) return;
+            var hr = prompt('Maks hjertefrekvens:', profile.max_hr);
+            if (!hr) return;
+            try {
+                var resp = await fetch('/api/profiles/' + selectedProfileId, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: name, max_hr: parseInt(hr, 10) })
+                });
+                if (!resp.ok) {
+                    var err = await resp.json();
+                    alert(err.error || 'Feil');
+                    return;
+                }
+                var updated = await resp.json();
+                MAX_HR = updated.max_hr;
+                localStorage.setItem('profileMaxHR', updated.max_hr);
+                await loadProfiles();
+            } catch (e) {
+                alert('Kunne ikke oppdatere profil');
+            }
+        });
+
+        // TTS toggle
+        if (ttsEnabled) $ttsToggle.classList.add('active');
+        $ttsTargetSelect.value = ttsTarget;
+
+        $ttsToggle.addEventListener('click', function () {
+            ttsEnabled = !ttsEnabled;
+            initAudioContext();
+            $ttsToggle.classList.toggle('active', ttsEnabled);
+            localStorage.setItem('ttsEnabled', ttsEnabled);
+            sendTTSConfig();
+        });
+
+        $ttsTargetSelect.addEventListener('change', function () {
+            ttsTarget = $ttsTargetSelect.value;
+            localStorage.setItem('ttsTarget', ttsTarget);
+            sendTTSConfig();
+        });
 
         var $scanResults = null;
 
@@ -1605,6 +1899,9 @@
         // READY → ACTIVE: Start session
         // -------------------------------------------------------------------
         $btnStartSession.addEventListener('click', function () {
+            // Unlock AudioContext on user gesture (required for iOS)
+            initAudioContext();
+
             $btnStartSession.disabled = true;
             $btnStartSession.textContent = 'Starter...';
 
@@ -1799,6 +2096,9 @@
                 });
             }
         });
+
+        // Load profiles on page load
+        loadProfiles();
 
     })();
     </script>

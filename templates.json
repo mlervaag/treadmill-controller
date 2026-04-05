@@ -110,10 +110,12 @@
             {
                 "name": "Nedkjøling",
                 "duration": 300,
-                "speed": 5.0,
-                "incline": 0
+                "speed": 5,
+                "incline": 0,
+                "target_max_zone": 1
             }
-        ]
+        ],
+        "target_max_zone": 2
     },
     {
         "name": "Couch to 5K - Uke 2",
@@ -202,10 +204,12 @@
             {
                 "name": "Nedkjøling",
                 "duration": 300,
-                "speed": 5.0,
-                "incline": 0
+                "speed": 5,
+                "incline": 0,
+                "target_max_zone": 1
             }
-        ]
+        ],
+        "target_max_zone": 2
     },
     {
         "name": "Couch to 5K - Uke 3",
@@ -270,10 +274,12 @@
             {
                 "name": "Nedkjøling",
                 "duration": 300,
-                "speed": 5.0,
-                "incline": 0
+                "speed": 5,
+                "incline": 0,
+                "target_max_zone": 1
             }
-        ]
+        ],
+        "target_max_zone": 2
     },
     {
         "name": "Couch to 5K - Uke 4",
@@ -338,10 +344,12 @@
             {
                 "name": "Nedkjøling",
                 "duration": 300,
-                "speed": 5.0,
-                "incline": 0
+                "speed": 5,
+                "incline": 0,
+                "target_max_zone": 1
             }
-        ]
+        ],
+        "target_max_zone": 2
     },
     {
         "name": "Couch to 5K - Uke 5",
@@ -394,10 +402,12 @@
             {
                 "name": "Nedkjøling",
                 "duration": 300,
-                "speed": 5.0,
-                "incline": 0
+                "speed": 5,
+                "incline": 0,
+                "target_max_zone": 1
             }
-        ]
+        ],
+        "target_max_zone": 2
     },
     {
         "name": "Couch to 5K - Uke 6",
@@ -438,10 +448,12 @@
             {
                 "name": "Nedkjøling",
                 "duration": 300,
-                "speed": 5.0,
-                "incline": 0
+                "speed": 5,
+                "incline": 0,
+                "target_max_zone": 1
             }
-        ]
+        ],
+        "target_max_zone": 2
     },
     {
         "name": "Couch to 5K - Uke 7",
@@ -470,10 +482,12 @@
             {
                 "name": "Nedkjøling",
                 "duration": 300,
-                "speed": 5.0,
-                "incline": 0
+                "speed": 5,
+                "incline": 0,
+                "target_max_zone": 1
             }
-        ]
+        ],
+        "target_max_zone": 2
     },
     {
         "name": "Couch to 5K - Uke 8",
@@ -502,10 +516,12 @@
             {
                 "name": "Nedkjøling",
                 "duration": 300,
-                "speed": 5.0,
-                "incline": 0
+                "speed": 5,
+                "incline": 0,
+                "target_max_zone": 1
             }
-        ]
+        ],
+        "target_max_zone": 2
     },
     {
         "name": "Couch to 5K - Uke 9 GRADUERING",
@@ -534,10 +550,12 @@
             {
                 "name": "Nedkjøling",
                 "duration": 300,
-                "speed": 5.0,
-                "incline": 0
+                "speed": 5,
+                "incline": 0,
+                "target_max_zone": 1
             }
-        ]
+        ],
+        "target_max_zone": 2
     },
     {
         "name": "Steady State - Rolig Langkjøring 25",
@@ -554,7 +572,8 @@
                 "name": "Oppvarming",
                 "duration": 300,
                 "speed": 5.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Rolig jogg",
@@ -565,10 +584,12 @@
             {
                 "name": "Nedkjøling",
                 "duration": 300,
-                "speed": 5.0,
-                "incline": 0
+                "speed": 5,
+                "incline": 0,
+                "target_max_zone": 1
             }
-        ]
+        ],
+        "target_max_zone": 3
     },
     {
         "name": "Steady State - Rolig Langkjøring 40",
@@ -584,7 +605,8 @@
                 "name": "Oppvarming",
                 "duration": 300,
                 "speed": 5.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Rolig jogg",
@@ -595,10 +617,12 @@
             {
                 "name": "Nedkjøling",
                 "duration": 300,
-                "speed": 5.0,
-                "incline": 0
+                "speed": 5,
+                "incline": 0,
+                "target_max_zone": 1
             }
-        ]
+        ],
+        "target_max_zone": 3
     },
     {
         "name": "Steady State - Langkjøring 50 min",
@@ -613,22 +637,26 @@
             {
                 "name": "Oppvarming",
                 "duration": 300,
-                "speed": 6.0,
-                "incline": 0
+                "speed": 6,
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Rolig jogg 50 min",
                 "duration": 3000,
-                "speed": 10.0,
-                "incline": 0
+                "speed": 10,
+                "incline": 0,
+                "target_max_zone": 4
             },
             {
                 "name": "Nedkjøling",
                 "duration": 300,
                 "speed": 5.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 1
             }
-        ]
+        ],
+        "target_max_zone": 3
     },
     {
         "name": "Steady State - Langkjøring 60 min",
@@ -644,21 +672,25 @@
                 "name": "Oppvarming",
                 "duration": 300,
                 "speed": 6.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Sammenhengende 60 min",
                 "duration": 3600,
                 "speed": 10.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 4
             },
             {
                 "name": "Nedkjøling",
                 "duration": 300,
-                "speed": 6.0,
-                "incline": 0
+                "speed": 6,
+                "incline": 0,
+                "target_max_zone": 1
             }
-        ]
+        ],
+        "target_max_zone": 3
     },
     {
         "name": "Restitusjon - Gange med Lett Stigning",
@@ -678,7 +710,8 @@
                 "speed": 5.9,
                 "incline": 3
             }
-        ]
+        ],
+        "target_max_zone": 2
     },
     {
         "name": "Hill Intro - Motbakke for Nybegynner",
@@ -696,45 +729,50 @@
                 "name": "Oppvarming",
                 "duration": 300,
                 "speed": 5.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Motbakke 1",
                 "duration": 180,
-                "speed": 6.0,
+                "speed": 6,
                 "incline": 4
             },
             {
                 "name": "Flat rolig",
                 "duration": 120,
                 "speed": 5.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Motbakke 2",
                 "duration": 180,
-                "speed": 6.0,
+                "speed": 6,
                 "incline": 6
             },
             {
                 "name": "Flat rolig",
                 "duration": 120,
                 "speed": 5.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Motbakke 3",
                 "duration": 180,
-                "speed": 6.0,
+                "speed": 6,
                 "incline": 8
             },
             {
                 "name": "Nedkjøling",
                 "duration": 300,
-                "speed": 5.0,
-                "incline": 0
+                "speed": 5,
+                "incline": 0,
+                "target_max_zone": 1
             }
-        ]
+        ],
+        "target_max_zone": 3
     },
     {
         "name": "Motbakke Stige 3-6-9-12",
@@ -752,31 +790,34 @@
                 "name": "Oppvarming",
                 "duration": 300,
                 "speed": 5.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "3 %",
                 "duration": 180,
-                "speed": 6.0,
+                "speed": 6,
                 "incline": 3
             },
             {
                 "name": "Flat hvile",
                 "duration": 120,
                 "speed": 5.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "6 %",
                 "duration": 180,
-                "speed": 6.0,
+                "speed": 6,
                 "incline": 6
             },
             {
                 "name": "Flat hvile",
                 "duration": 120,
                 "speed": 5.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "9 %",
@@ -788,7 +829,8 @@
                 "name": "Flat hvile",
                 "duration": 120,
                 "speed": 5.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "12 %",
@@ -799,10 +841,12 @@
             {
                 "name": "Nedkjøling",
                 "duration": 300,
-                "speed": 5.0,
-                "incline": 0
+                "speed": 5,
+                "incline": 0,
+                "target_max_zone": 1
             }
-        ]
+        ],
+        "target_max_zone": 3
     },
     {
         "name": "Hill Repeats 8x90s",
@@ -819,106 +863,124 @@
             {
                 "name": "Oppvarming",
                 "duration": 360,
-                "speed": 6.0,
-                "incline": 0
+                "speed": 6,
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Bakke 1",
                 "duration": 90,
-                "speed": 10.0,
-                "incline": 5
+                "speed": 10,
+                "incline": 5,
+                "target_max_zone": 4
             },
             {
                 "name": "Hvile 1",
                 "duration": 90,
-                "speed": 6.0,
-                "incline": 0
+                "speed": 6,
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Bakke 2",
                 "duration": 90,
-                "speed": 10.0,
-                "incline": 5
+                "speed": 10,
+                "incline": 5,
+                "target_max_zone": 4
             },
             {
                 "name": "Hvile 2",
                 "duration": 90,
-                "speed": 6.0,
-                "incline": 0
+                "speed": 6,
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Bakke 3",
                 "duration": 90,
-                "speed": 10.0,
-                "incline": 5
+                "speed": 10,
+                "incline": 5,
+                "target_max_zone": 4
             },
             {
                 "name": "Hvile 3",
                 "duration": 90,
-                "speed": 6.0,
-                "incline": 0
+                "speed": 6,
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Bakke 4",
                 "duration": 90,
-                "speed": 10.0,
-                "incline": 5
+                "speed": 10,
+                "incline": 5,
+                "target_max_zone": 4
             },
             {
                 "name": "Hvile 4",
                 "duration": 90,
-                "speed": 6.0,
-                "incline": 0
+                "speed": 6,
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Bakke 5",
                 "duration": 90,
-                "speed": 10.0,
-                "incline": 5
+                "speed": 10,
+                "incline": 5,
+                "target_max_zone": 4
             },
             {
                 "name": "Hvile 5",
                 "duration": 90,
-                "speed": 6.0,
-                "incline": 0
+                "speed": 6,
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Bakke 6",
                 "duration": 90,
-                "speed": 10.0,
-                "incline": 5
+                "speed": 10,
+                "incline": 5,
+                "target_max_zone": 4
             },
             {
                 "name": "Hvile 6",
                 "duration": 90,
-                "speed": 6.0,
-                "incline": 0
+                "speed": 6,
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Bakke 7",
                 "duration": 90,
-                "speed": 10.0,
-                "incline": 5
+                "speed": 10,
+                "incline": 5,
+                "target_max_zone": 4
             },
             {
                 "name": "Hvile 7",
                 "duration": 90,
-                "speed": 6.0,
-                "incline": 0
+                "speed": 6,
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Bakke 8",
                 "duration": 90,
-                "speed": 10.0,
-                "incline": 5
+                "speed": 10,
+                "incline": 5,
+                "target_max_zone": 4
             },
             {
                 "name": "Nedkjøling",
                 "duration": 300,
                 "speed": 5.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 1
             }
-        ]
+        ],
+        "target_max_zone": 3
     },
     {
         "name": "Hill Sprints 10x60s TØFT",
@@ -936,130 +998,152 @@
             {
                 "name": "Oppvarming",
                 "duration": 360,
-                "speed": 7.0,
-                "incline": 0
+                "speed": 7,
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Sprint 1",
                 "duration": 60,
-                "speed": 12.0,
-                "incline": 8
+                "speed": 12,
+                "incline": 8,
+                "target_max_zone": 5
             },
             {
                 "name": "Hvile 1",
                 "duration": 120,
-                "speed": 6.0,
-                "incline": 0
+                "speed": 6,
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Sprint 2",
                 "duration": 60,
-                "speed": 12.0,
-                "incline": 8
+                "speed": 12,
+                "incline": 8,
+                "target_max_zone": 5
             },
             {
                 "name": "Hvile 2",
                 "duration": 120,
-                "speed": 6.0,
-                "incline": 0
+                "speed": 6,
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Sprint 3",
                 "duration": 60,
-                "speed": 12.0,
-                "incline": 9
+                "speed": 12,
+                "incline": 9,
+                "target_max_zone": 5
             },
             {
                 "name": "Hvile 3",
                 "duration": 120,
-                "speed": 6.0,
-                "incline": 0
+                "speed": 6,
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Sprint 4",
                 "duration": 60,
-                "speed": 12.0,
-                "incline": 9
+                "speed": 12,
+                "incline": 9,
+                "target_max_zone": 5
             },
             {
                 "name": "Hvile 4",
                 "duration": 120,
-                "speed": 6.0,
-                "incline": 0
+                "speed": 6,
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Sprint 5",
                 "duration": 60,
-                "speed": 12.0,
-                "incline": 10
+                "speed": 12,
+                "incline": 10,
+                "target_max_zone": 5
             },
             {
                 "name": "Aktiv hvile midtveis",
                 "duration": 180,
                 "speed": 6.5,
-                "incline": 1
+                "incline": 1,
+                "target_max_zone": 2
             },
             {
                 "name": "Sprint 6",
                 "duration": 60,
-                "speed": 12.0,
-                "incline": 10
+                "speed": 12,
+                "incline": 10,
+                "target_max_zone": 5
             },
             {
                 "name": "Hvile 6",
                 "duration": 120,
-                "speed": 6.0,
-                "incline": 0
+                "speed": 6,
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Sprint 7",
                 "duration": 60,
-                "speed": 12.0,
-                "incline": 9
+                "speed": 12,
+                "incline": 9,
+                "target_max_zone": 5
             },
             {
                 "name": "Hvile 7",
                 "duration": 120,
-                "speed": 6.0,
-                "incline": 0
+                "speed": 6,
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Sprint 8",
                 "duration": 60,
-                "speed": 12.0,
-                "incline": 9
+                "speed": 12,
+                "incline": 9,
+                "target_max_zone": 5
             },
             {
                 "name": "Hvile 8",
                 "duration": 120,
-                "speed": 6.0,
-                "incline": 0
+                "speed": 6,
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Sprint 9",
                 "duration": 60,
-                "speed": 12.0,
-                "incline": 8
+                "speed": 12,
+                "incline": 8,
+                "target_max_zone": 5
             },
             {
                 "name": "Hvile 9",
                 "duration": 120,
-                "speed": 6.0,
-                "incline": 0
+                "speed": 6,
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Sprint 10",
                 "duration": 60,
-                "speed": 12.0,
-                "incline": 8
+                "speed": 12,
+                "incline": 8,
+                "target_max_zone": 5
             },
             {
                 "name": "Nedkjøling",
                 "duration": 360,
-                "speed": 6.0,
-                "incline": 0
+                "speed": 6,
+                "incline": 0,
+                "target_max_zone": 1
             }
-        ]
+        ],
+        "target_max_zone": 4
     },
     {
         "name": "Standard Intervall 6x2",
@@ -1081,8 +1165,9 @@
             {
                 "name": "Løp 1",
                 "duration": 120,
-                "speed": 10.0,
-                "incline": 0
+                "speed": 10,
+                "incline": 0,
+                "target_max_zone": 4
             },
             {
                 "name": "Pause 1",
@@ -1093,8 +1178,9 @@
             {
                 "name": "Løp 2",
                 "duration": 120,
-                "speed": 10.0,
-                "incline": 0
+                "speed": 10,
+                "incline": 0,
+                "target_max_zone": 4
             },
             {
                 "name": "Pause 2",
@@ -1105,8 +1191,9 @@
             {
                 "name": "Løp 3",
                 "duration": 120,
-                "speed": 10.0,
-                "incline": 0
+                "speed": 10,
+                "incline": 0,
+                "target_max_zone": 4
             },
             {
                 "name": "Pause 3",
@@ -1117,8 +1204,9 @@
             {
                 "name": "Løp 4",
                 "duration": 120,
-                "speed": 10.0,
-                "incline": 0
+                "speed": 10,
+                "incline": 0,
+                "target_max_zone": 4
             },
             {
                 "name": "Pause 4",
@@ -1129,8 +1217,9 @@
             {
                 "name": "Løp 5",
                 "duration": 120,
-                "speed": 10.0,
-                "incline": 0
+                "speed": 10,
+                "incline": 0,
+                "target_max_zone": 4
             },
             {
                 "name": "Pause 5",
@@ -1141,8 +1230,9 @@
             {
                 "name": "Løp 6",
                 "duration": 120,
-                "speed": 10.0,
-                "incline": 0
+                "speed": 10,
+                "incline": 0,
+                "target_max_zone": 4
             },
             {
                 "name": "Pause 6",
@@ -1153,10 +1243,12 @@
             {
                 "name": "Nedkjøling",
                 "duration": 300,
-                "speed": 5.0,
-                "incline": 0
+                "speed": 5,
+                "incline": 0,
+                "target_max_zone": 1
             }
-        ]
+        ],
+        "target_max_zone": 2
     },
     {
         "name": "Standard Intervall 10x2",
@@ -1172,130 +1264,152 @@
             {
                 "name": "Oppvarming",
                 "duration": 360,
-                "speed": 6.0,
-                "incline": 0
+                "speed": 6,
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Løp 1",
                 "duration": 120,
-                "speed": 11.0,
-                "incline": 0
+                "speed": 11,
+                "incline": 0,
+                "target_max_zone": 4
             },
             {
                 "name": "Pause 1",
                 "duration": 60,
-                "speed": 7.0,
-                "incline": 0
+                "speed": 7,
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Løp 2",
                 "duration": 120,
-                "speed": 11.0,
-                "incline": 0
+                "speed": 11,
+                "incline": 0,
+                "target_max_zone": 4
             },
             {
                 "name": "Pause 2",
                 "duration": 60,
-                "speed": 7.0,
-                "incline": 0
+                "speed": 7,
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Løp 3",
                 "duration": 120,
-                "speed": 11.0,
-                "incline": 0
+                "speed": 11,
+                "incline": 0,
+                "target_max_zone": 4
             },
             {
                 "name": "Pause 3",
                 "duration": 60,
-                "speed": 7.0,
-                "incline": 0
+                "speed": 7,
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Løp 4",
                 "duration": 120,
-                "speed": 11.0,
-                "incline": 0
+                "speed": 11,
+                "incline": 0,
+                "target_max_zone": 4
             },
             {
                 "name": "Pause 4",
                 "duration": 60,
-                "speed": 7.0,
-                "incline": 0
+                "speed": 7,
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Løp 5",
                 "duration": 120,
-                "speed": 11.0,
-                "incline": 0
+                "speed": 11,
+                "incline": 0,
+                "target_max_zone": 4
             },
             {
                 "name": "Pause 5",
                 "duration": 60,
-                "speed": 7.0,
-                "incline": 0
+                "speed": 7,
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Løp 6",
                 "duration": 120,
-                "speed": 11.0,
-                "incline": 0
+                "speed": 11,
+                "incline": 0,
+                "target_max_zone": 4
             },
             {
                 "name": "Pause 6",
                 "duration": 60,
-                "speed": 7.0,
-                "incline": 0
+                "speed": 7,
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Løp 7",
                 "duration": 120,
-                "speed": 11.0,
-                "incline": 0
+                "speed": 11,
+                "incline": 0,
+                "target_max_zone": 4
             },
             {
                 "name": "Pause 7",
                 "duration": 60,
-                "speed": 7.0,
-                "incline": 0
+                "speed": 7,
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Løp 8",
                 "duration": 120,
-                "speed": 11.0,
-                "incline": 0
+                "speed": 11,
+                "incline": 0,
+                "target_max_zone": 4
             },
             {
                 "name": "Pause 8",
                 "duration": 60,
-                "speed": 7.0,
-                "incline": 0
+                "speed": 7,
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Løp 9",
                 "duration": 120,
-                "speed": 11.0,
-                "incline": 0
+                "speed": 11,
+                "incline": 0,
+                "target_max_zone": 4
             },
             {
                 "name": "Pause 9",
                 "duration": 60,
-                "speed": 7.0,
-                "incline": 0
+                "speed": 7,
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Løp 10",
                 "duration": 120,
-                "speed": 11.0,
-                "incline": 0
+                "speed": 11,
+                "incline": 0,
+                "target_max_zone": 4
             },
             {
                 "name": "Nedjogg",
                 "duration": 300,
-                "speed": 6.0,
-                "incline": 0
+                "speed": 6,
+                "incline": 0,
+                "target_max_zone": 1
             }
-        ]
+        ],
+        "target_max_zone": 3
     },
     {
         "name": "Standard Intervall 4x4",
@@ -1360,9 +1474,11 @@
                 "name": "Nedjogg",
                 "duration": 300,
                 "speed": 5.2,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 1
             }
-        ]
+        ],
+        "target_max_zone": 2
     },
     {
         "name": "Pyramide 1-2-3-4-4-3-2-1",
@@ -1379,106 +1495,124 @@
             {
                 "name": "Oppvarming",
                 "duration": 300,
-                "speed": 6.0,
-                "incline": 0
+                "speed": 6,
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Løp 1 min",
                 "duration": 60,
-                "speed": 11.0,
-                "incline": 0
+                "speed": 11,
+                "incline": 0,
+                "target_max_zone": 4
             },
             {
                 "name": "Pause",
                 "duration": 30,
                 "speed": 6.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Løp 2 min",
                 "duration": 120,
-                "speed": 11.0,
-                "incline": 0
+                "speed": 11,
+                "incline": 0,
+                "target_max_zone": 4
             },
             {
                 "name": "Pause",
                 "duration": 60,
                 "speed": 6.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Løp 3 min",
                 "duration": 180,
-                "speed": 11.0,
-                "incline": 0
+                "speed": 11,
+                "incline": 0,
+                "target_max_zone": 4
             },
             {
                 "name": "Pause",
                 "duration": 90,
                 "speed": 6.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Løp 4 min",
                 "duration": 240,
-                "speed": 11.0,
-                "incline": 0
+                "speed": 11,
+                "incline": 0,
+                "target_max_zone": 4
             },
             {
                 "name": "Pause",
                 "duration": 120,
                 "speed": 6.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Løp 4 min",
                 "duration": 240,
-                "speed": 11.0,
-                "incline": 0
+                "speed": 11,
+                "incline": 0,
+                "target_max_zone": 4
             },
             {
                 "name": "Pause",
                 "duration": 120,
                 "speed": 6.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Løp 3 min",
                 "duration": 180,
-                "speed": 11.0,
-                "incline": 0
+                "speed": 11,
+                "incline": 0,
+                "target_max_zone": 4
             },
             {
                 "name": "Pause",
                 "duration": 90,
                 "speed": 6.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Løp 2 min",
                 "duration": 120,
-                "speed": 11.0,
-                "incline": 0
+                "speed": 11,
+                "incline": 0,
+                "target_max_zone": 4
             },
             {
                 "name": "Pause",
                 "duration": 60,
                 "speed": 6.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Løp 1 min",
                 "duration": 60,
-                "speed": 11.0,
-                "incline": 0
+                "speed": 11,
+                "incline": 0,
+                "target_max_zone": 4
             },
             {
                 "name": "Nedjogg",
                 "duration": 300,
-                "speed": 6.0,
-                "incline": 0
+                "speed": 6,
+                "incline": 0,
+                "target_max_zone": 1
             }
-        ]
+        ],
+        "target_max_zone": 3
     },
     {
         "name": "Tempo Intro 3x5",
@@ -1496,45 +1630,53 @@
                 "name": "Oppvarming",
                 "duration": 300,
                 "speed": 5.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Tempo 1",
                 "duration": 300,
-                "speed": 10.0,
-                "incline": 0
+                "speed": 10,
+                "incline": 0,
+                "target_max_zone": 4
             },
             {
                 "name": "Rolig jogg",
                 "duration": 120,
                 "speed": 8.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Tempo 2",
                 "duration": 300,
-                "speed": 10.0,
-                "incline": 0
+                "speed": 10,
+                "incline": 0,
+                "target_max_zone": 4
             },
             {
                 "name": "Rolig jogg",
                 "duration": 120,
                 "speed": 8.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Tempo 3",
                 "duration": 300,
-                "speed": 10.0,
-                "incline": 0
+                "speed": 10,
+                "incline": 0,
+                "target_max_zone": 4
             },
             {
                 "name": "Nedkjøling",
                 "duration": 300,
-                "speed": 5.0,
-                "incline": 0
+                "speed": 5,
+                "incline": 0,
+                "target_max_zone": 1
             }
-        ]
+        ],
+        "target_max_zone": 3
     },
     {
         "name": "Tempo 20 min Sammenhengende",
@@ -1552,21 +1694,24 @@
                 "name": "Oppvarming",
                 "duration": 360,
                 "speed": 6.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Tempo 20 min",
                 "duration": 1200,
-                "speed": 11.0,
+                "speed": 11,
                 "incline": 0
             },
             {
                 "name": "Nedkjøling",
                 "duration": 360,
-                "speed": 6.0,
-                "incline": 0
+                "speed": 6,
+                "incline": 0,
+                "target_max_zone": 1
             }
-        ]
+        ],
+        "target_max_zone": 4
     },
     {
         "name": "Tempo 30 min TØFT",
@@ -1583,8 +1728,9 @@
             {
                 "name": "Oppvarming",
                 "duration": 420,
-                "speed": 7.0,
-                "incline": 0
+                "speed": 7,
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Tempo 30 min",
@@ -1596,9 +1742,11 @@
                 "name": "Nedkjøling",
                 "duration": 360,
                 "speed": 6.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 1
             }
-        ]
+        ],
+        "target_max_zone": 4
     },
     {
         "name": "VO2max 5x3 min",
@@ -1616,69 +1764,81 @@
                 "name": "Oppvarming",
                 "duration": 420,
                 "speed": 6.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "VO2max 1",
                 "duration": 180,
-                "speed": 12.0,
-                "incline": 0
+                "speed": 12,
+                "incline": 0,
+                "target_max_zone": 5
             },
             {
                 "name": "Hvile 1",
                 "duration": 180,
                 "speed": 6.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "VO2max 2",
                 "duration": 180,
-                "speed": 12.0,
-                "incline": 0
+                "speed": 12,
+                "incline": 0,
+                "target_max_zone": 5
             },
             {
                 "name": "Hvile 2",
                 "duration": 180,
                 "speed": 6.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "VO2max 3",
                 "duration": 180,
-                "speed": 12.0,
-                "incline": 0
+                "speed": 12,
+                "incline": 0,
+                "target_max_zone": 5
             },
             {
                 "name": "Hvile 3",
                 "duration": 180,
                 "speed": 6.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "VO2max 4",
                 "duration": 180,
-                "speed": 12.0,
-                "incline": 0
+                "speed": 12,
+                "incline": 0,
+                "target_max_zone": 5
             },
             {
                 "name": "Hvile 4",
                 "duration": 180,
                 "speed": 6.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "VO2max 5",
                 "duration": 180,
-                "speed": 12.0,
-                "incline": 0
+                "speed": 12,
+                "incline": 0,
+                "target_max_zone": 5
             },
             {
                 "name": "Nedkjøling",
                 "duration": 360,
-                "speed": 6.0,
-                "incline": 0
+                "speed": 6,
+                "incline": 0,
+                "target_max_zone": 1
             }
-        ]
+        ],
+        "target_max_zone": 4
     },
     {
         "name": "VO2max 6x4 min BRUTALT",
@@ -1695,82 +1855,96 @@
             {
                 "name": "Oppvarming",
                 "duration": 480,
-                "speed": 7.0,
-                "incline": 0
+                "speed": 7,
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "VO2max 1",
                 "duration": 240,
                 "speed": 12.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 5
             },
             {
                 "name": "Hvile 1",
                 "duration": 180,
-                "speed": 7.0,
-                "incline": 0
+                "speed": 7,
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "VO2max 2",
                 "duration": 240,
                 "speed": 12.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 5
             },
             {
                 "name": "Hvile 2",
                 "duration": 180,
-                "speed": 7.0,
-                "incline": 0
+                "speed": 7,
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "VO2max 3",
                 "duration": 240,
                 "speed": 12.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 5
             },
             {
                 "name": "Aktiv hvile midtveis",
                 "duration": 240,
                 "speed": 7.5,
-                "incline": 1
+                "incline": 1,
+                "target_max_zone": 2
             },
             {
                 "name": "VO2max 4",
                 "duration": 240,
-                "speed": 13.0,
-                "incline": 0
+                "speed": 13,
+                "incline": 0,
+                "target_max_zone": 5
             },
             {
                 "name": "Hvile 4",
                 "duration": 180,
-                "speed": 7.0,
-                "incline": 0
+                "speed": 7,
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "VO2max 5",
                 "duration": 240,
-                "speed": 13.0,
-                "incline": 0
+                "speed": 13,
+                "incline": 0,
+                "target_max_zone": 5
             },
             {
                 "name": "Hvile 5",
                 "duration": 180,
-                "speed": 7.0,
-                "incline": 0
+                "speed": 7,
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "VO2max 6",
                 "duration": 240,
-                "speed": 13.0,
-                "incline": 0
+                "speed": 13,
+                "incline": 0,
+                "target_max_zone": 5
             },
             {
                 "name": "Nedkjøling",
                 "duration": 420,
                 "speed": 6.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 1
             }
-        ]
+        ],
+        "target_max_zone": 4
     },
     {
         "name": "Threshold 2x10 min",
@@ -1787,33 +1961,37 @@
                 "name": "Oppvarming",
                 "duration": 420,
                 "speed": 6.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Threshold 10 min - 1",
                 "duration": 600,
-                "speed": 11.0,
+                "speed": 11,
                 "incline": 0
             },
             {
                 "name": "Aktiv hvile",
                 "duration": 240,
-                "speed": 7.0,
-                "incline": 0
+                "speed": 7,
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Threshold 10 min - 2",
                 "duration": 600,
-                "speed": 11.0,
+                "speed": 11,
                 "incline": 0
             },
             {
                 "name": "Nedkjøling",
                 "duration": 360,
-                "speed": 6.0,
-                "incline": 0
+                "speed": 6,
+                "incline": 0,
+                "target_max_zone": 1
             }
-        ]
+        ],
+        "target_max_zone": 4
     },
     {
         "name": "Threshold 3x12 min HARD",
@@ -1829,32 +2007,35 @@
             {
                 "name": "Oppvarming",
                 "duration": 480,
-                "speed": 7.0,
-                "incline": 0
+                "speed": 7,
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Threshold 12 min - 1",
                 "duration": 720,
-                "speed": 11.0,
+                "speed": 11,
                 "incline": 0
             },
             {
                 "name": "Hvile 1",
                 "duration": 240,
                 "speed": 7.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Threshold 12 min - 2",
                 "duration": 720,
-                "speed": 11.0,
+                "speed": 11,
                 "incline": 0
             },
             {
                 "name": "Hvile 2",
                 "duration": 240,
                 "speed": 7.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Threshold 12 min - 3",
@@ -1866,9 +2047,11 @@
                 "name": "Nedkjøling",
                 "duration": 420,
                 "speed": 6.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 1
             }
-        ]
+        ],
+        "target_max_zone": 4
     },
     {
         "name": "Speed 400m x12 EKSPLOSIVT",
@@ -1884,154 +2067,180 @@
             {
                 "name": "Oppvarming",
                 "duration": 420,
-                "speed": 7.0,
-                "incline": 0
+                "speed": 7,
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "400m - 1",
                 "duration": 90,
                 "speed": 13.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 5
             },
             {
                 "name": "Hvile 1",
                 "duration": 75,
-                "speed": 6.0,
-                "incline": 0
+                "speed": 6,
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "400m - 2",
                 "duration": 90,
                 "speed": 13.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 5
             },
             {
                 "name": "Hvile 2",
                 "duration": 75,
-                "speed": 6.0,
-                "incline": 0
+                "speed": 6,
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "400m - 3",
                 "duration": 90,
                 "speed": 13.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 5
             },
             {
                 "name": "Hvile 3",
                 "duration": 75,
-                "speed": 6.0,
-                "incline": 0
+                "speed": 6,
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "400m - 4",
                 "duration": 90,
                 "speed": 13.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 5
             },
             {
                 "name": "Hvile 4",
                 "duration": 75,
-                "speed": 6.0,
-                "incline": 0
+                "speed": 6,
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "400m - 5",
                 "duration": 90,
-                "speed": 14.0,
-                "incline": 0
+                "speed": 14,
+                "incline": 0,
+                "target_max_zone": 5
             },
             {
                 "name": "Hvile 5",
                 "duration": 75,
-                "speed": 6.0,
-                "incline": 0
+                "speed": 6,
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "400m - 6",
                 "duration": 90,
-                "speed": 14.0,
-                "incline": 0
+                "speed": 14,
+                "incline": 0,
+                "target_max_zone": 5
             },
             {
                 "name": "Aktiv hvile midtveis",
                 "duration": 180,
-                "speed": 7.0,
-                "incline": 1
+                "speed": 7,
+                "incline": 1,
+                "target_max_zone": 2
             },
             {
                 "name": "400m - 7",
                 "duration": 90,
-                "speed": 14.0,
-                "incline": 0
+                "speed": 14,
+                "incline": 0,
+                "target_max_zone": 5
             },
             {
                 "name": "Hvile 7",
                 "duration": 75,
-                "speed": 6.0,
-                "incline": 0
+                "speed": 6,
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "400m - 8",
                 "duration": 90,
-                "speed": 14.0,
-                "incline": 0
+                "speed": 14,
+                "incline": 0,
+                "target_max_zone": 5
             },
             {
                 "name": "Hvile 8",
                 "duration": 75,
-                "speed": 6.0,
-                "incline": 0
+                "speed": 6,
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "400m - 9",
                 "duration": 90,
                 "speed": 13.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 5
             },
             {
                 "name": "Hvile 9",
                 "duration": 75,
-                "speed": 6.0,
-                "incline": 0
+                "speed": 6,
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "400m - 10",
                 "duration": 90,
                 "speed": 13.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 5
             },
             {
                 "name": "Hvile 10",
                 "duration": 75,
-                "speed": 6.0,
-                "incline": 0
+                "speed": 6,
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "400m - 11",
                 "duration": 90,
                 "speed": 13.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 5
             },
             {
                 "name": "Hvile 11",
                 "duration": 75,
-                "speed": 6.0,
-                "incline": 0
+                "speed": 6,
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "400m - 12",
                 "duration": 90,
                 "speed": 13.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 5
             },
             {
                 "name": "Nedkjøling",
                 "duration": 420,
                 "speed": 6.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 1
             }
-        ]
+        ],
+        "target_max_zone": 4
     },
     {
         "name": "Long Run Progressive 60 min",
@@ -2048,39 +2257,45 @@
                 "name": "Oppvarming",
                 "duration": 360,
                 "speed": 6.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "20 min @ 9 km/t",
                 "duration": 1200,
-                "speed": 9.0,
+                "speed": 9,
                 "incline": 0
             },
             {
                 "name": "15 min @ 10 km/t",
                 "duration": 900,
-                "speed": 10.0,
-                "incline": 0
+                "speed": 10,
+                "incline": 0,
+                "target_max_zone": 4
             },
             {
                 "name": "15 min @ 11 km/t",
                 "duration": 900,
-                "speed": 11.0,
-                "incline": 0
+                "speed": 11,
+                "incline": 0,
+                "target_max_zone": 4
             },
             {
                 "name": "10 min @ 11.5 km/t",
                 "duration": 600,
                 "speed": 11.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 4
             },
             {
                 "name": "Nedkjøling",
                 "duration": 360,
                 "speed": 6.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 1
             }
-        ]
+        ],
+        "target_max_zone": 3
     },
     {
         "name": "5K Race Pace Simulator",
@@ -2098,7 +2313,8 @@
                 "name": "Oppvarming",
                 "duration": 420,
                 "speed": 6.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "1000m - 1",
@@ -2110,7 +2326,8 @@
                 "name": "Hvile 1",
                 "duration": 90,
                 "speed": 6.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "1000m - 2",
@@ -2122,7 +2339,8 @@
                 "name": "Hvile 2",
                 "duration": 90,
                 "speed": 6.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "1000m - 3",
@@ -2134,33 +2352,39 @@
                 "name": "Hvile 3",
                 "duration": 90,
                 "speed": 6.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "1000m - 4",
                 "duration": 240,
-                "speed": 12.0,
-                "incline": 0
+                "speed": 12,
+                "incline": 0,
+                "target_max_zone": 5
             },
             {
                 "name": "Hvile 4",
                 "duration": 90,
                 "speed": 6.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "1000m - 5",
                 "duration": 240,
-                "speed": 12.0,
-                "incline": 0
+                "speed": 12,
+                "incline": 0,
+                "target_max_zone": 5
             },
             {
                 "name": "Nedkjøling",
                 "duration": 360,
-                "speed": 6.0,
-                "incline": 0
+                "speed": 6,
+                "incline": 0,
+                "target_max_zone": 1
             }
-        ]
+        ],
+        "target_max_zone": 4
     },
     {
         "name": "Mixed Terrain Simulation",
@@ -2178,94 +2402,107 @@
             {
                 "name": "Oppvarming",
                 "duration": 360,
-                "speed": 7.0,
-                "incline": 0
+                "speed": 7,
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Flat rolig",
                 "duration": 300,
-                "speed": 10.0,
-                "incline": 0
+                "speed": 10,
+                "incline": 0,
+                "target_max_zone": 4
             },
             {
                 "name": "Motbakke moderat",
                 "duration": 180,
-                "speed": 10.0,
-                "incline": 4
+                "speed": 10,
+                "incline": 4,
+                "target_max_zone": 4
             },
             {
                 "name": "Flat tempo",
                 "duration": 240,
                 "speed": 11.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 4
             },
             {
                 "name": "Bratt bakke",
                 "duration": 120,
-                "speed": 9.0,
+                "speed": 9,
                 "incline": 8
             },
             {
                 "name": "Flat recovery",
                 "duration": 180,
-                "speed": 9.0,
+                "speed": 9,
                 "incline": 0
             },
             {
                 "name": "Speed segment",
                 "duration": 120,
-                "speed": 13.0,
-                "incline": 0
+                "speed": 13,
+                "incline": 0,
+                "target_max_zone": 5
             },
             {
                 "name": "Lett stigning",
                 "duration": 240,
                 "speed": 10.5,
-                "incline": 3
+                "incline": 3,
+                "target_max_zone": 4
             },
             {
                 "name": "Flat tempo",
                 "duration": 300,
                 "speed": 11.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 4
             },
             {
                 "name": "Bratt sprint",
                 "duration": 90,
-                "speed": 11.0,
-                "incline": 10
+                "speed": 11,
+                "incline": 10,
+                "target_max_zone": 4
             },
             {
                 "name": "Flat recovery",
                 "duration": 180,
-                "speed": 9.0,
+                "speed": 9,
                 "incline": 0
             },
             {
                 "name": "Speed burst",
                 "duration": 60,
-                "speed": 14.0,
-                "incline": 0
+                "speed": 14,
+                "incline": 0,
+                "target_max_zone": 5
             },
             {
                 "name": "Moderat bakke",
                 "duration": 180,
-                "speed": 10.0,
-                "incline": 5
+                "speed": 10,
+                "incline": 5,
+                "target_max_zone": 4
             },
             {
                 "name": "Flat finish",
                 "duration": 240,
-                "speed": 12.0,
-                "incline": 0
+                "speed": 12,
+                "incline": 0,
+                "target_max_zone": 5
             },
             {
                 "name": "Nedkjøling",
                 "duration": 420,
                 "speed": 6.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 1
             }
-        ]
+        ],
+        "target_max_zone": 3
     },
     {
         "name": "Lactate Tolerance 4x5",
@@ -2282,58 +2519,68 @@
             {
                 "name": "Oppvarming",
                 "duration": 480,
-                "speed": 7.0,
-                "incline": 0
+                "speed": 7,
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Lactate 5 min - 1",
                 "duration": 300,
-                "speed": 12.0,
-                "incline": 0
+                "speed": 12,
+                "incline": 0,
+                "target_max_zone": 5
             },
             {
                 "name": "Hvile 1",
                 "duration": 120,
-                "speed": 7.0,
-                "incline": 0
+                "speed": 7,
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Lactate 5 min - 2",
                 "duration": 300,
-                "speed": 12.0,
-                "incline": 0
+                "speed": 12,
+                "incline": 0,
+                "target_max_zone": 5
             },
             {
                 "name": "Hvile 2",
                 "duration": 120,
-                "speed": 7.0,
-                "incline": 0
+                "speed": 7,
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Lactate 5 min - 3",
                 "duration": 300,
-                "speed": 12.0,
-                "incline": 0
+                "speed": 12,
+                "incline": 0,
+                "target_max_zone": 5
             },
             {
                 "name": "Hvile 3",
                 "duration": 120,
-                "speed": 7.0,
-                "incline": 0
+                "speed": 7,
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Lactate 5 min - 4",
                 "duration": 300,
-                "speed": 12.0,
-                "incline": 0
+                "speed": 12,
+                "incline": 0,
+                "target_max_zone": 5
             },
             {
                 "name": "Nedkjøling",
                 "duration": 420,
                 "speed": 6.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 1
             }
-        ]
+        ],
+        "target_max_zone": 4
     },
     {
         "name": "Fettforbrenning - Gange 45 med Stigning",
@@ -2352,7 +2599,8 @@
                 "speed": 5.9,
                 "incline": 4
             }
-        ]
+        ],
+        "target_max_zone": 2
     },
     {
         "name": "Fartlek Lett 20",
@@ -2369,57 +2617,67 @@
                 "name": "Oppvarming",
                 "duration": 300,
                 "speed": 5.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Rolig jogg",
                 "duration": 240,
-                "speed": 9.0,
-                "incline": 0
+                "speed": 9,
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Fartlek 1",
                 "duration": 60,
                 "speed": 10.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 4
             },
             {
                 "name": "Rolig",
                 "duration": 120,
-                "speed": 9.0,
-                "incline": 0
+                "speed": 9,
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Fartlek 2",
                 "duration": 90,
                 "speed": 10.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 4
             },
             {
                 "name": "Rolig",
                 "duration": 150,
-                "speed": 9.0,
-                "incline": 0
+                "speed": 9,
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Fartlek 3",
                 "duration": 60,
-                "speed": 11.0,
-                "incline": 0
+                "speed": 11,
+                "incline": 0,
+                "target_max_zone": 4
             },
             {
                 "name": "Rolig",
                 "duration": 180,
-                "speed": 9.0,
-                "incline": 0
+                "speed": 9,
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Nedkjøling",
                 "duration": 300,
-                "speed": 5.0,
-                "incline": 0
+                "speed": 5,
+                "incline": 0,
+                "target_max_zone": 1
             }
-        ]
+        ],
+        "target_max_zone": 3
     },
     {
         "name": "Teknikk Økt - Lett Kadens",
@@ -2437,27 +2695,31 @@
                 "name": "Oppvarming",
                 "duration": 300,
                 "speed": 5.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Jogg kontrollert",
                 "duration": 900,
-                "speed": 9.0,
+                "speed": 9,
                 "incline": 0
             },
             {
                 "name": "Strides 6x20 sek",
                 "duration": 120,
                 "speed": 10.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 4
             },
             {
                 "name": "Nedkjøling",
                 "duration": 300,
-                "speed": 5.0,
-                "incline": 0
+                "speed": 5,
+                "incline": 0,
+                "target_max_zone": 1
             }
-        ]
+        ],
+        "target_max_zone": 3
     },
     {
         "name": "Måløkt - Sammenhengende 30",
@@ -2475,7 +2737,8 @@
                 "name": "Oppvarming",
                 "duration": 300,
                 "speed": 5.5,
-                "incline": 0
+                "incline": 0,
+                "target_max_zone": 2
             },
             {
                 "name": "Sammenhengende jogg",
@@ -2486,7 +2749,62 @@
             {
                 "name": "Nedkjøling",
                 "duration": 300,
-                "speed": 5.0,
+                "speed": 5,
+                "incline": 0,
+                "target_max_zone": 1
+            }
+        ],
+        "target_max_zone": 3
+    },
+    {
+        "name": "MaxHR Test",
+        "description": "Progressiv test for å finne din maksimale hjertefrekvens. Gradvis økning i hastighet og stigning.",
+        "difficulty": "advanced",
+        "tags": [
+            "threshold",
+            "vo2max"
+        ],
+        "segments": [
+            {
+                "name": "Oppvarming",
+                "duration": 300,
+                "speed": 4,
+                "incline": 0
+            },
+            {
+                "name": "Lett jogg",
+                "duration": 180,
+                "speed": 6,
+                "incline": 0
+            },
+            {
+                "name": "Moderat",
+                "duration": 180,
+                "speed": 8,
+                "incline": 2
+            },
+            {
+                "name": "Hardt",
+                "duration": 180,
+                "speed": 10,
+                "incline": 4
+            },
+            {
+                "name": "Veldig hardt",
+                "duration": 120,
+                "speed": 12,
+                "incline": 6
+            },
+            {
+                "name": "Maksimalt",
+                "duration": 120,
+                "speed": 14,
+                "incline": 8
+            },
+            {
+                "name": "Nedkjøling",
+                "duration": 180,
+                "speed": 4,
                 "incline": 0
             }
         ]
