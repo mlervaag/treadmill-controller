@@ -152,17 +152,21 @@ function buildCurrentState() {
       elapsedInWorkout += (Date.now() - segmentStartTime) / 1000;
     }
 
+    const currentSeg = segments[currentSegmentIndex];
+    const segElapsed = segmentStartTime ? (Date.now() - segmentStartTime) / 1000 : 0;
+
     workoutInfo = {
-      id: currentWorkout.id,
+      workoutId: currentWorkout.id,
       name: currentWorkout.name,
       currentSegmentIndex,
       totalSegments: segments.length,
-      currentSegment: segments[currentSegmentIndex] ? {
-        name: segments[currentSegmentIndex].segment_name,
-        targetSpeed: segments[currentSegmentIndex].speed_kmh,
-        targetIncline: segments[currentSegmentIndex].incline_percent,
-        durationSeconds: segments[currentSegmentIndex].duration_seconds,
-        elapsed: segmentStartTime ? (Date.now() - segmentStartTime) / 1000 : 0
+      currentSegment: currentSeg ? {
+        name: currentSeg.segment_name,
+        targetSpeed: currentSeg.speed_kmh,
+        targetIncline: currentSeg.incline_percent,
+        durationSeconds: currentSeg.duration_seconds,
+        timeRemaining: Math.max(0, currentSeg.duration_seconds - segElapsed),
+        targetZone: currentSeg.target_max_zone || null
       } : null,
       nextSegment: segments[currentSegmentIndex + 1] ? {
         name: segments[currentSegmentIndex + 1].segment_name,
