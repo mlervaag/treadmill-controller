@@ -1456,10 +1456,29 @@
         // -------------------------------------------------------------------
 
         function initAudioContext() {
-            if (audioCtx) return;
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            if (audioCtx.state === 'suspended') audioCtx.resume();
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
         }
+
+        // Unlock audio on ANY user tap (iOS requires gesture to resume AudioContext)
+        document.addEventListener('touchstart', function unlockAudio() {
+            initAudioContext();
+            if (audioCtx && audioCtx.state === 'running') {
+                document.removeEventListener('touchstart', unlockAudio);
+                console.log('AudioContext unlocked via touch');
+            }
+        }, { passive: true });
+        document.addEventListener('click', function unlockAudioClick() {
+            initAudioContext();
+            if (audioCtx && audioCtx.state === 'running') {
+                document.removeEventListener('click', unlockAudioClick);
+                console.log('AudioContext unlocked via click');
+            }
+        });
 
         async function playTTSAudio(url) {
             // Try AudioContext first (works if unlocked by user gesture)
