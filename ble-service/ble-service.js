@@ -804,6 +804,11 @@ async function executeSegment(index) {
   // Send commands to treadmill
   if (ftms.isConnected()) {
     try {
+      if (index === 0) {
+        // First segment: send FTMS Start command (0x07) to start the belt
+        await ftms.start();
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
       await ftms.setSpeed(currentTargetSpeed);
       await ftms.setIncline(currentTargetIncline);
     } catch (err) {
