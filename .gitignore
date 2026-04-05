@@ -20,6 +20,12 @@ certs/
 # Claude Code editor config
 .claude/
 
+# Internal design docs (contain local IPs and deployment details)
+docs/superpowers/
+
+# Brainstorm visual companion
+.superpowers/
+
 # Editor directories and files
 .vscode/
 .idea/
