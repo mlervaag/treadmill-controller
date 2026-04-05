@@ -67,6 +67,7 @@ class CoachingEngine {
 
     // --- Trigger 1: Segment transition (priority 2) ---
     if (segmentIndex !== null && segmentIndex !== this.lastSegmentIndex) {
+      console.log(`[Coach] Segment change: ${this.lastSegmentIndex} → ${segmentIndex}, segments loaded: ${this.segments.length}`);
       if (this.lastSegmentIndex >= 0) {
         // Reset zone tracking on segment change
         this.overZoneStart = null;
@@ -154,6 +155,9 @@ class CoachingEngine {
     }
 
     // --- Dispatch highest-priority message if cooldown allows ---
+    if (this.pendingMessages.length > 0) {
+      console.log(`[Coach] ${this.pendingMessages.length} pending msg(s), cooldown: ${now - this.lastMessageTime}ms / ${cooldown}ms`);
+    }
     if (this.pendingMessages.length > 0 && (now - this.lastMessageTime) >= cooldown) {
       this.processing = true;
       try {

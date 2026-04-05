@@ -1338,6 +1338,7 @@
 
                 case 'tts':
                     if (ttsEnabled && (ttsTarget === 'client' || ttsTarget === 'both')) {
+                        initAudioContext();
                         playTTSAudio(data.url);
                     }
                     break;
@@ -1461,20 +1462,33 @@
         }
 
         async function playTTSAudio(url) {
-            if (!audioCtx) return;
+            // Try AudioContext first (works if unlocked by user gesture)
+            if (audioCtx) {
+                try {
+                    if (audioCtx.state === 'suspended') await audioCtx.resume();
+                    var resp = await fetch(url);
+                    var arrayBuffer = await resp.arrayBuffer();
+                    var audioBuffer = await new Promise(function (resolve, reject) {
+                        audioCtx.decodeAudioData(arrayBuffer, resolve, reject);
+                    });
+                    var source = audioCtx.createBufferSource();
+                    source.buffer = audioBuffer;
+                    source.connect(audioCtx.destination);
+                    source.start(0);
+                    return;
+                } catch (e) {
+                    console.warn('AudioContext playback failed, trying Audio element:', e);
+                }
+            }
+            // Fallback: HTML5 Audio element (works on most browsers, may fail on iOS without gesture)
             try {
-                if (audioCtx.state === 'suspended') await audioCtx.resume();
-                var resp = await fetch(url);
-                var arrayBuffer = await resp.arrayBuffer();
-                var audioBuffer = await new Promise(function (resolve, reject) {
-                    audioCtx.decodeAudioData(arrayBuffer, resolve, reject);
+                var audio = new Audio(url);
+                audio.play().catch(function (e) {
+                    console.warn('Audio element playback also failed:', e);
+                    showTTSToast('Coach: ' + url.split('/').pop().substring(0, 8) + '...');
                 });
-                var source = audioCtx.createBufferSource();
-                source.buffer = audioBuffer;
-                source.connect(audioCtx.destination);
-                source.start(0);
             } catch (e) {
-                console.warn('TTS playback failed:', e);
+                console.warn('TTS playback failed entirely:', e);
             }
         }
 

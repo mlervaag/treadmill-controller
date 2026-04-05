@@ -1373,8 +1373,10 @@ function startCoaching(profileId, workoutId) {
 
 function deliverTTS(text, filename) {
   let deliveredToViewer = false;
+  console.log(`🔊 Delivering TTS: "${text.substring(0, 40)}..." to ${ttsConfigs.size} viewer(s), file=${filename ? 'yes' : 'no'}`);
 
   for (const [ws, config] of ttsConfigs) {
+    console.log(`   Viewer config: enabled=${config.enabled}, target=${config.target}, profileId=${config.profileId}, wsOpen=${ws.readyState === WebSocket.OPEN}`);
     if (!config.enabled) continue;
     if (ws.readyState !== WebSocket.OPEN) continue;
 
@@ -1483,6 +1485,7 @@ function handleConnection(ws, req) {
 
       // --- TTS config from viewer ---
       if (data.type === 'tts_config') {
+        console.log(`🎙️  TTS config received: enabled=${data.enabled}, target=${data.target}, profileId=${data.profileId}`);
         ttsConfigs.set(ws, {
           enabled: !!data.enabled,
           target: data.target || 'client',
