@@ -21,7 +21,7 @@ docker compose build
 docker compose up -d
 docker compose down
 
-# Deploy to Pi from Windows
+# Deploy to Pi from Windows (always rebuild — public/ is baked into Docker image)
 scp server.js coaching-engine.js tts-service.js migrate.js templates.json docker-compose.yml Dockerfile .env pi@192.168.1.12:~/treadmill-controller/
 scp public/* pi@192.168.1.12:~/treadmill-controller/public/
 ssh pi@192.168.1.12 "cd ~/treadmill-controller && docker compose build && docker rm -f treadmill-controller 2>/dev/null; docker compose up -d"
