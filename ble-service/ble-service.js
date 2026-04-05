@@ -868,7 +868,6 @@ async function executeSegment(index) {
   const segment = currentWorkout.segments[index];
   currentTargetSpeed = segment.speed_kmh;
   currentTargetIncline = segment.incline_percent || 0;
-  segmentStartTime = Date.now();
 
   console.log(`[Session] Segment ${index}: "${segment.segment_name || 'unnamed'}" — ${currentTargetSpeed} km/h, ${currentTargetIncline}% for ${segment.duration_seconds}s`);
 
@@ -887,8 +886,9 @@ async function executeSegment(index) {
     }
   }
 
-  // Set timer for segment duration
+  // Set timer for segment duration (stopSegmentTimer clears segmentStartTime, so set it AFTER)
   stopSegmentTimer();
+  segmentStartTime = Date.now();
   segmentTimer = setTimeout(() => {
     currentSegmentIndex++;
     executeSegment(currentSegmentIndex);
