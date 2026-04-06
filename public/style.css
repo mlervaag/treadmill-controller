@@ -1541,6 +1541,13 @@ textarea:focus-visible {
    Strava Styles
    ======================================== */
 .strava-section { margin-bottom: 16px; }
+.strava-section-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 16px;
+    margin-bottom: 12px;
+}
 .strava-card {
     background: var(--card-bg);
     border-radius: 12px;
@@ -1552,6 +1559,45 @@ textarea:focus-visible {
 .strava-card p { color: var(--text-secondary); font-size: 14px; margin-bottom: 12px; }
 .strava-logo { margin-bottom: 8px; }
 .strava-logo svg { vertical-align: middle; }
+.strava-profile-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.strava-profile-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    background: var(--card-bg);
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+}
+.strava-profile-item.strava-connected {
+    border-color: #FC4C02;
+    border-left: 3px solid #FC4C02;
+}
+.strava-profile-name {
+    font-weight: 600;
+    color: var(--text-primary);
+    min-width: 80px;
+}
+.strava-athlete-name {
+    color: #FC4C02;
+    font-size: 13px;
+    flex: 1;
+}
+.strava-not-connected {
+    color: var(--text-secondary);
+    font-size: 13px;
+    flex: 1;
+}
+.strava-hint {
+    color: var(--text-secondary);
+    font-size: 13px;
+    text-align: center;
+    padding: 12px;
+}
 .strava-btn {
     background: #FC4C02 !important;
     color: white !important;
@@ -1643,6 +1689,52 @@ textarea:focus-visible {
     font-size: 13px;
 }
 .date-input::-webkit-calendar-picker-indicator { filter: invert(1); }
+
+/* Profile Filter & Inline Selector */
+.profile-filter-section {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.profile-filter-section label {
+    color: var(--text-secondary);
+    font-size: 13px;
+    white-space: nowrap;
+}
+.profile-filter-section select,
+.profile-select-inline {
+    background: var(--bg-color);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 4px 8px;
+    border-radius: 8px;
+    font-size: 13px;
+    cursor: pointer;
+}
+.profile-select-inline {
+    font-size: 12px;
+    padding: 2px 6px;
+    max-width: 100px;
+}
+.loaded-workout-profile {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 8px 0;
+}
+.loaded-workout-profile label {
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+.loaded-workout-profile select {
+    background: var(--bg-color);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 6px 10px;
+    border-radius: 8px;
+    font-size: 14px;
+    flex: 1;
+}
 
 /* ========================================
    Export Buttons

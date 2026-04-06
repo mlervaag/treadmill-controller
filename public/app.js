@@ -77,6 +77,10 @@ function showToast(message, type = 'info', duration = 3000) {
     }, duration);
 }
 
+// Profile state
+let allProfiles = [];
+let activeProfileFilterId = null;
+
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
     setupTabs();
@@ -84,7 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupQuickAccessModals();
     loadWorkouts();
     initStateBroadcast();
-    loadSessions();
+    loadProfilesForUI().then(() => loadSessions());
     loadOverallStats();
     updateLoadedWorkoutUI(); // Initialize loaded workout UI
 
@@ -836,7 +840,7 @@ async function handleRemoteCommand(data) {
 
                     buildWorkoutTimeline();
 
-                    await startSession(loadedWorkout.id);
+                    await startSession(loadedWorkout.id, params.profileId || null);
                     startLocalTimer();
                     await executeSegment(0);
 
@@ -1012,6 +1016,9 @@ async function loadWorkouts() {
     }
 }
 
+// HR Zone filter state
+let hrZoneFilterActive = false;
+
 // Filtering Logic
 let activeFilters = {
     difficulty: [],
@@ -1108,7 +1115,7 @@ function applyFilters() {
         // Tag Match (AND logic - must contain ALL selected tags? OR logic - must contain ANY?
         // Usually Attribute filtering is AND across categories, OR within category.
         // Since we have a flat tag list for now, let's go with OR logic for simplicity (matches ANY selected tag).
-        // If the user wants specific "Interval" AND "Hills", they might expect AND. 
+        // If the user wants specific "Interval" AND "Hills", they might expect AND.
         // Let's stick to: If tags selected, workout must have AT LEAST ONE of them.
         if (selectedTags.length > 0) {
             if (!workout.tags || !workout.tags.some(tag => selectedTags.includes(tag))) {
@@ -1116,10 +1123,21 @@ function applyFilters() {
             }
         }
 
+        // HR zone eligible filter
+        if (hrZoneFilterActive && workout.hr_zone_eligible !== 1) {
+            return false;
+        }
+
         return true;
     });
 
     displayWorkouts(filteredWorkouts);
+}
+
+function toggleHRZoneFilter() {
+    const checkbox = document.getElementById('hrZoneFilterBtn');
+    hrZoneFilterActive = checkbox ? checkbox.checked : !hrZoneFilterActive;
+    applyFilters();
 }
 
 function resetFilters() {
@@ -1129,6 +1147,11 @@ function resetFilters() {
     // Reset slider
     document.getElementById('filterDuration').value = 120;
     document.getElementById('durationValue').textContent = 'Alt';
+
+    // Reset HR zone filter
+    hrZoneFilterActive = false;
+    const hrBtn = document.getElementById('hrZoneFilterBtn');
+    if (hrBtn) hrBtn.checked = false;
 
     applyFilters();
 }
@@ -1790,13 +1813,15 @@ async function executeSegment(index) {
     }, 1000);
 }
 
-async function startSession(workoutId = null) {
+async function startSession(workoutId = null, profileId = null) {
     try {
+        const effectiveProfileId = profileId || getSelectedProfileId();
         const response = await fetch('/api/sessions', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 workout_id: workoutId,
+                profile_id: effectiveProfileId,
                 heart_rate_source: activeHeartRateSource
             })
         });
@@ -1862,11 +1887,16 @@ async function endSession() {
             })
         });
 
-        // Auto-sync to Strava if connected and enabled
+        // Auto-sync to Strava if connected and enabled (only if session's profile has Strava)
         const autoSyncCheckbox = document.getElementById('autoSyncStrava');
         if (autoSyncCheckbox && autoSyncCheckbox.checked) {
             try {
-                await uploadToStrava(currentSession);
+                const stravaStatus = await fetch('/api/strava/status').then(r => r.json());
+                const sessionProfileId = getSelectedProfileId();
+                const hasConnection = (stravaStatus.connections || []).some(c => c.profile_id === sessionProfileId);
+                if (hasConnection) {
+                    await uploadToStrava(currentSession);
+                }
             } catch (e) {
                 console.error('Auto Strava upload failed:', e);
             }
@@ -1959,6 +1989,7 @@ async function loadSessions(startDate = null, endDate = null) {
         let url = '/api/sessions?limit=50';
         if (startDate) url += `&startDate=${startDate}`;
         if (endDate) url += `&endDate=${endDate}`;
+        if (activeProfileFilterId) url += `&profileId=${activeProfileFilterId}`;
         const response = await fetch(url);
         const data = await response.json();
         const sessions = Array.isArray(data) ? data : data.sessions || [];
@@ -1991,12 +2022,21 @@ function displaySessions(sessions) {
             paceStr = `<span>⚡ ${pace.toFixed(2)} min/km</span>`;
         }
 
+        const profileOptions = allProfiles.map(p =>
+            `<option value="${p.id}"${session.profile_id === p.id ? ' selected' : ''}>${escapeHtml(p.name)}</option>`
+        ).join('');
+
         const card = document.createElement('div');
         card.className = 'session-card';
+        const hrZoneBadge = session.hr_zone_control_enabled ? ' <span title="Sonestyrt økt" style="font-size: 14px;">🎯</span>' : '';
         card.innerHTML = `
             <div class="session-header">
-                <h3>${escapeHtml(session.workout_name || 'Fri trening')}</h3>
-                <div style="display: flex; gap: 8px;">
+                <h3>${escapeHtml(session.workout_name || 'Fri trening')}${hrZoneBadge}</h3>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <select class="profile-select-inline" onchange="changeSessionProfile(${session.id}, this.value)" aria-label="Endre løper">
+                        <option value="">—</option>
+                        ${profileOptions}
+                    </select>
                     <button class="btn-expand" onclick="toggleSessionDetails(${session.id})">▼</button>
                     <button class="btn btn-danger btn-small" onclick="deleteSession(${session.id})">Slett</button>
                 </div>
@@ -2025,6 +2065,76 @@ function displaySessions(sessions) {
         `;
         list.appendChild(card);
     });
+}
+
+// --- Profile management for sessions ---
+
+async function loadProfilesForUI() {
+    try {
+        const response = await fetch('/api/profiles');
+        allProfiles = await response.json();
+        populateProfileFilter();
+        populateSessionProfileSelect();
+    } catch (error) {
+        console.error('Failed to load profiles:', error);
+    }
+}
+
+function populateProfileFilter() {
+    const filter = document.getElementById('profileFilter');
+    if (!filter) return;
+    filter.innerHTML = '<option value="">Alle</option>';
+    allProfiles.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = p.name;
+        filter.appendChild(opt);
+    });
+}
+
+function populateSessionProfileSelect() {
+    const select = document.getElementById('sessionProfileSelect');
+    if (!select) return;
+    const savedId = localStorage.getItem('selectedProfileId');
+    select.innerHTML = '<option value="">Ingen profil</option>';
+    allProfiles.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = `${p.name} (${p.max_hr})`;
+        if (savedId && parseInt(savedId) === p.id) opt.selected = true;
+        select.appendChild(opt);
+    });
+    // Use onchange to avoid stacking event listeners on re-calls
+    select.onchange = () => {
+        localStorage.setItem('selectedProfileId', select.value);
+    };
+}
+
+function applyProfileFilter() {
+    const filter = document.getElementById('profileFilter');
+    activeProfileFilterId = filter && filter.value ? parseInt(filter.value) : null;
+    loadSessions();
+}
+
+async function changeSessionProfile(sessionId, profileId) {
+    try {
+        const response = await fetch(`/api/sessions/${sessionId}/profile`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ profile_id: profileId ? parseInt(profileId) : null })
+        });
+        if (!response.ok) throw new Error('Failed to update profile');
+        const data = await response.json();
+        showToast(`Profil oppdatert: ${data.profile_name || 'Ingen'}`, 'success');
+    } catch (error) {
+        console.error('Failed to change session profile:', error);
+        showToast('Kunne ikke oppdatere profil', 'error');
+    }
+}
+
+function getSelectedProfileId() {
+    const select = document.getElementById('sessionProfileSelect');
+    return select && select.value ? parseInt(select.value) : null;
 }
 
 async function toggleSessionDetails(sessionId) {
@@ -3141,9 +3251,11 @@ async function attemptReconnect() {
 // 7. Strava UI
 // ========================================
 
-async function disconnectStrava() {
+async function disconnectStrava(profileId) {
     try {
-        const response = await fetch('/api/strava/disconnect', { method: 'DELETE' });
+        let url = '/api/strava/disconnect';
+        if (profileId) url += `?profileId=${profileId}`;
+        const response = await fetch(url, { method: 'DELETE' });
         if (response.ok) {
             showToast('Koblet fra Strava', 'info');
             checkStravaConnection();
@@ -3157,28 +3269,37 @@ async function disconnectStrava() {
 async function checkStravaConnection() {
     try {
         const response = await fetch('/api/strava/status');
-        if (!response.ok) return; // Endpoint may not exist yet
+        if (!response.ok) return;
 
         const data = await response.json();
+        const listEl = document.getElementById('stravaProfileList');
+        if (!listEl) return;
 
-        const connectedSection = document.getElementById('stravaConnected');
-        const disconnectedSection = document.getElementById('stravaDisconnected');
-
-        if (connectedSection && disconnectedSection) {
-            if (data.connected) {
-                connectedSection.classList.remove('hidden');
-                disconnectedSection.classList.add('hidden');
-                const athleteNameEl = document.getElementById('stravaAthleteName');
-                if (athleteNameEl && data.athlete_name) {
-                    athleteNameEl.textContent = data.athlete_name;
-                }
-            } else {
-                connectedSection.classList.add('hidden');
-                disconnectedSection.classList.remove('hidden');
-            }
+        // Build per-profile Strava connection list
+        const profiles = allProfiles.length > 0 ? allProfiles : [];
+        if (profiles.length === 0) {
+            listEl.innerHTML = '<p class="strava-hint">Opprett profiler først for å koble til Strava</p>';
+            return;
         }
+
+        const connections = data.connections || [];
+        listEl.innerHTML = profiles.map(profile => {
+            const conn = connections.find(c => c.profile_id === profile.id);
+            if (conn) {
+                return `<div class="strava-profile-item strava-connected">
+                    <span class="strava-profile-name">${escapeHtml(profile.name)}</span>
+                    <span class="strava-athlete-name">${escapeHtml(conn.athlete_name)}</span>
+                    <button class="btn btn-danger btn-small" onclick="disconnectStrava(${profile.id})">Koble fra</button>
+                </div>`;
+            } else {
+                return `<div class="strava-profile-item">
+                    <span class="strava-profile-name">${escapeHtml(profile.name)}</span>
+                    <span class="strava-not-connected">Ikke koblet</span>
+                    <button class="btn strava-btn btn-small" onclick="window.location.href='/auth/strava?profileId=${profile.id}'">Koble til</button>
+                </div>`;
+            }
+        }).join('');
     } catch (error) {
-        // Strava endpoint not available yet, silently ignore
         console.log('Strava status check skipped (endpoint not available)');
     }
 }

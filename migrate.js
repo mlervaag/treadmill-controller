@@ -123,6 +123,29 @@ try {
       console.log('Added profile_id column to workout_sessions');
     }
 
+    // HR zone control columns
+    const segmentsInfo3 = db.prepare("PRAGMA table_info(workout_segments)").all();
+    if (!segmentsInfo3.some(col => col.name === 'hr_zone_control')) {
+      db.exec('ALTER TABLE workout_segments ADD COLUMN hr_zone_control INTEGER DEFAULT 0');
+      console.log('Added hr_zone_control column to workout_segments');
+    }
+    if (!segmentsInfo3.some(col => col.name === 'hr_zone_control_mode')) {
+      db.exec("ALTER TABLE workout_segments ADD COLUMN hr_zone_control_mode TEXT DEFAULT 'speed'");
+      console.log('Added hr_zone_control_mode column to workout_segments');
+    }
+
+    const workoutsInfo4 = db.prepare("PRAGMA table_info(workouts)").all();
+    if (!workoutsInfo4.some(col => col.name === 'hr_zone_eligible')) {
+      db.exec('ALTER TABLE workouts ADD COLUMN hr_zone_eligible INTEGER DEFAULT 0');
+      console.log('Added hr_zone_eligible column to workouts');
+    }
+
+    const sessionsInfo4 = db.prepare("PRAGMA table_info(workout_sessions)").all();
+    if (!sessionsInfo4.some(col => col.name === 'hr_zone_control_enabled')) {
+      db.exec('ALTER TABLE workout_sessions ADD COLUMN hr_zone_control_enabled INTEGER DEFAULT 0');
+      console.log('Added hr_zone_control_enabled column to workout_sessions');
+    }
+
     // Create strava_auth table if it doesn't exist
     db.exec(`
       CREATE TABLE IF NOT EXISTS strava_auth (
@@ -137,6 +160,13 @@ try {
       )
     `);
     console.log('Ensured strava_auth table exists');
+
+    // Add profile_id to strava_auth for per-profile Strava connections
+    const stravaInfo = db.prepare("PRAGMA table_info(strava_auth)").all();
+    if (!stravaInfo.some(col => col.name === 'profile_id')) {
+      db.exec('ALTER TABLE strava_auth ADD COLUMN profile_id INTEGER');
+      console.log('Added profile_id column to strava_auth');
+    }
   });
 
   migrate();

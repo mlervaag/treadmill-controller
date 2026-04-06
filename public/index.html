@@ -225,6 +225,12 @@
                         <strong id="loadedWorkoutName"></strong>
                         <p id="loadedWorkoutInfo"></p>
                     </div>
+                    <div class="loaded-workout-profile">
+                        <label>Løper:</label>
+                        <select id="sessionProfileSelect" aria-label="Velg løper">
+                            <option value="">Ingen profil</option>
+                        </select>
+                    </div>
                     <button id="startLoadedWorkoutBtn" class="btn btn-success" onclick="startLoadedWorkout()">▶ Start Lastet Økt</button>
                     <p class="loaded-workout-tip">💡 Eller trykk Start på tredemøllen</p>
                 </div>
@@ -353,6 +359,10 @@
                             <h4>Maks Varighet: <span id="durationValue">Alt</span> min</h4>
                             <input type="range" id="filterDuration" min="10" max="120" step="5" value="120"
                                 oninput="updateDurationLabel(); applyFilters()">
+                        </div>
+
+                        <div class="filter-group">
+                            <label><input type="checkbox" id="hrZoneFilterBtn" onchange="toggleHRZoneFilter()"> <span>🎯 Vis bare sonestyrt-egnede økter</span></label>
                         </div>
 
                         <div class="filter-actions">
@@ -543,25 +553,17 @@
                     </div>
                 </div>
 
-                <!-- Strava Integration -->
+                <!-- Strava Integration (per profile) -->
                 <div class="strava-section">
-                    <div id="stravaDisconnected" class="strava-card">
-                        <div class="strava-logo">
-                            <svg viewBox="0 0 24 24" width="24" height="24" fill="#FC4C02"><path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169"/></svg>
-                        </div>
-                        <h3>Koble til Strava</h3>
-                        <p>Synkroniser treningsøktene dine til Strava</p>
-                        <button id="connectStravaBtn" class="btn strava-btn" onclick="window.location.href='/auth/strava'" aria-label="Koble til Strava">
-                            Koble til Strava
-                        </button>
+                    <h3 class="strava-section-title">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="#FC4C02"><path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169"/></svg>
+                        Strava
+                    </h3>
+                    <div class="strava-options">
+                        <label><input type="checkbox" id="autoSyncStrava" checked> Automatisk opplasting</label>
                     </div>
-                    <div id="stravaConnected" class="strava-card hidden">
-                        <h3>✅ Koblet til Strava</h3>
-                        <p><strong id="stravaAthleteName"></strong></p>
-                        <div class="strava-options">
-                            <label><input type="checkbox" id="autoSyncStrava" checked> Automatisk opplasting</label>
-                        </div>
-                        <button class="btn btn-danger btn-small" onclick="disconnectStrava()" aria-label="Koble fra Strava">Koble fra</button>
+                    <div id="stravaProfileList" class="strava-profile-list">
+                        <!-- Per-profile Strava connections rendered by JS -->
                     </div>
                 </div>
 
@@ -580,6 +582,12 @@
                             <span>til</span>
                             <input type="date" id="dateFilterEnd" class="date-input" aria-label="Sluttdato">
                             <button class="btn btn-small" onclick="applyCustomDateFilter()" aria-label="Bruk datofilter">Filtrer</button>
+                        </div>
+                        <div class="profile-filter-section">
+                            <label>Løper:</label>
+                            <select id="profileFilter" onchange="applyProfileFilter()" aria-label="Filtrer etter løper">
+                                <option value="">Alle</option>
+                            </select>
                         </div>
                     </div>
 

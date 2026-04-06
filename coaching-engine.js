@@ -82,7 +82,12 @@ class CoachingEngine {
     }
 
     // --- Trigger 2: Zone violation (priority 1) ---
-    if (targetZone && zone) {
+    // Skip if HR zone controller is actively managing the zone
+    if (state.hrZoneControl && state.hrZoneControl.active && !state.hrZoneControl.paused) {
+      this.overZoneStart = null;
+      this.underZoneStart = null;
+      this.zoneWarningActive = false;
+    } else if (targetZone && zone) {
       if (zone > targetZone) {
         // Over target zone
         this.underZoneStart = null; // reset under-timer

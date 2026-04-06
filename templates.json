@@ -2808,5 +2808,71 @@
                 "incline": 0
             }
         ]
+    },
+    {
+        "name": "Sonestyrt: Sone 2 Utholdenhet 45",
+        "description": "Automatisk fartsjustering holder deg i sone 2. Perfekt for basebygging og fettforbrenning.",
+        "difficulty": "beginner",
+        "tags": ["hr-zone", "endurance", "long"],
+        "target_max_zone": 2,
+        "segments": [
+            { "name": "Oppvarming", "duration": 300, "speed": 5.5, "incline": 0, "target_max_zone": 2 },
+            { "name": "Sone 2 Sonestyrt", "duration": 2100, "speed": 7.0, "incline": 0, "target_max_zone": 2, "hr_zone_control": 1, "hr_zone_control_mode": "speed" },
+            { "name": "Nedkjøling", "duration": 300, "speed": 5.0, "incline": 0, "target_max_zone": 1 }
+        ]
+    },
+    {
+        "name": "Sonestyrt: Sone 3 Tempo 30",
+        "description": "Automatisk fartsjustering holder deg i temposone. Bygger aerob kapasitet.",
+        "difficulty": "intermediate",
+        "tags": ["hr-zone", "tempo", "medium"],
+        "target_max_zone": 3,
+        "segments": [
+            { "name": "Oppvarming", "duration": 300, "speed": 6.0, "incline": 0, "target_max_zone": 2 },
+            { "name": "Sone 3 Sonestyrt", "duration": 1200, "speed": 9.5, "incline": 0, "target_max_zone": 3, "hr_zone_control": 1, "hr_zone_control_mode": "speed" },
+            { "name": "Nedkjøling", "duration": 300, "speed": 5.0, "incline": 0, "target_max_zone": 1 }
+        ]
+    },
+    {
+        "name": "Sonestyrt: Sone 4 Terskel 3x8",
+        "description": "Tre arbeidsperioder i terskelsonen med aktiv hvile. Sonestyrt fartsjustering.",
+        "difficulty": "advanced",
+        "tags": ["hr-zone", "threshold", "interval"],
+        "target_max_zone": 4,
+        "segments": [
+            { "name": "Oppvarming", "duration": 300, "speed": 6.0, "incline": 0, "target_max_zone": 2 },
+            { "name": "Arbeid 1", "duration": 480, "speed": 10.5, "incline": 0, "target_max_zone": 4, "hr_zone_control": 1, "hr_zone_control_mode": "speed" },
+            { "name": "Aktiv hvile 1", "duration": 180, "speed": 6.5, "incline": 0, "target_max_zone": 2 },
+            { "name": "Arbeid 2", "duration": 480, "speed": 10.5, "incline": 0, "target_max_zone": 4, "hr_zone_control": 1, "hr_zone_control_mode": "speed" },
+            { "name": "Aktiv hvile 2", "duration": 180, "speed": 6.5, "incline": 0, "target_max_zone": 2 },
+            { "name": "Arbeid 3", "duration": 480, "speed": 10.5, "incline": 0, "target_max_zone": 4, "hr_zone_control": 1, "hr_zone_control_mode": "speed" },
+            { "name": "Nedkjøling", "duration": 300, "speed": 5.0, "incline": 0, "target_max_zone": 1 }
+        ]
+    },
+    {
+        "name": "Sonestyrt: Progressiv Sonetrening 40",
+        "description": "Gradvis økning gjennom sone 2, 3 og 4. Automatisk fartsjustering per sone.",
+        "difficulty": "intermediate",
+        "tags": ["hr-zone", "progressive", "endurance"],
+        "target_max_zone": 4,
+        "segments": [
+            { "name": "Oppvarming", "duration": 300, "speed": 5.5, "incline": 0, "target_max_zone": 1 },
+            { "name": "Sone 2", "duration": 600, "speed": 7.0, "incline": 0, "target_max_zone": 2, "hr_zone_control": 1, "hr_zone_control_mode": "speed" },
+            { "name": "Sone 3", "duration": 600, "speed": 9.5, "incline": 0, "target_max_zone": 3, "hr_zone_control": 1, "hr_zone_control_mode": "speed" },
+            { "name": "Sone 4", "duration": 600, "speed": 10.5, "incline": 0, "target_max_zone": 4, "hr_zone_control": 1, "hr_zone_control_mode": "speed" },
+            { "name": "Nedkjøling", "duration": 300, "speed": 5.0, "incline": 0, "target_max_zone": 1 }
+        ]
+    },
+    {
+        "name": "Sonestyrt: Sone 2 Bakketrening 35",
+        "description": "Automatisk stigningsjustering holder deg i sone 2. Styrker bein og bygger utholdenhet.",
+        "difficulty": "beginner",
+        "tags": ["hr-zone", "hill", "incline", "endurance"],
+        "target_max_zone": 2,
+        "segments": [
+            { "name": "Oppvarming", "duration": 300, "speed": 6.0, "incline": 0, "target_max_zone": 1 },
+            { "name": "Sone 2 Sonestyrt Stigning", "duration": 1500, "speed": 6.0, "incline": 4, "target_max_zone": 2, "hr_zone_control": 1, "hr_zone_control_mode": "incline" },
+            { "name": "Nedkjøling", "duration": 300, "speed": 5.0, "incline": 0, "target_max_zone": 1 }
+        ]
     }
 ]

@@ -62,14 +62,46 @@ Følgende funksjoner er ferdig implementert:
 - HR-sone-farger, tilkoblingsstatus
 - Responsiv, dark theme
 
+### TTS Voice Coaching
+**Status**: ✅ Implementert (2026-04)
+- Norsk stemme via OpenAI TTS API med aggressiv disk-caching
+- Triggere: segment-overganger, sone-avvik (etter 60s), milepæler
+- Brukerprofiler med maxHR for 5-sone-beregning
+- Avspilling til iPhone/headset (AudioContext) eller tredemølle-høyttalere (A2DP)
+- Graceful degradation: tekst-toast uten API-nøkkel
+
+### Multi-user / Profile Tagging
+**Status**: ✅ Implementert (2026-04)
+- Lettvekts brukerprofiler (navn + maxHR)
+- Profilvelger ved øktstart (index.html + view.html)
+- Historikkfiltrering per profil
+- Inline profil-tagging i etterkant (PATCH endpoint)
+- Per-profil Strava-tilkoblinger (OAuth state-param)
+- Auto-upload kun for profiler med Strava-kobling
+
+### HR-sonestyrt trening (automatisk fartsjustering)
+**Status**: ✅ Implementert (2026-04-06)
+- Automatisk fart/stigning-justering for å holde løperen i målsone
+- HR Zone Controller i `ble-service/hr-zone-controller.js` med hysterese, akkumulering og retningsskifte-cooldown
+- Justering hvert 20. sekund, manuell overstyring pauser kontrolleren i 45s
+- Støtter kontrollmodus: speed, incline, eller begge
+- Sonestyrt-segmenter i vanlige workout templates (`hr_zone_control` felt på segmenter)
+- TTS-meldinger via `hr_zone_status` WebSocket — coaching engine undertrykker sine egne sonevarsler
+- Fullstendig designspesifikasjon: `docs/superpowers/specs/2026-04-06-hr-zone-controlled-training-design.md`
+
 ---
 
 ## 🎯 Planlagte funksjoner
 
-### 1. Heart Rate Zone Training & User Profile
-**Status**: Planlagt
-**Prioritet**: Høy
-**Estimert kompleksitet**: Medium-høy
+### ~~HR-sonestyrt trening~~
+**Status**: ✅ Implementert (2026-04-06)
+- Se "HR-sonestyrt trening" i Implementerte funksjoner over
+
+### Historisk plan (nå implementert)
+
+### 1 (historisk). Heart Rate Zone Training & User Profile
+**Status**: ✅ Implementert (2026-04-06)
+**Hva ble implementert**: Brukerprofiler, HR-soner, coaching-varsler, MaxHR-test, alle 39 templates med målsoner, automatisk fartsjustering (HRZoneController)
 
 #### Beskrivelse
 Implementere pulsbasert adaptiv trening hvor tredemøllen automatisk justerer tempo/stigning for å holde brukeren i ønsket puls-sone. Krever brukerprofil med fysiologiske data.
@@ -310,22 +342,15 @@ class HRZoneController {
 - Fitness & Fatigue trends
 - Weekly/monthly volume charts
 - PR tracking (distance, speed, elevation)
+- Sone-statistikk: tid i hver sone per økt, sone-progresjon over tid
 
-### Multi-user Support
-**Status**: Planlagt
-**Prioritet**: Lav
-- Multiple user profiles
-- User switching
-- Individual stats and history
+### ~~Multi-user Support~~
+**Status**: ✅ Implementert (2026-04)
+- Se "Multi-user / Profile Tagging" over
 
-### Voice Feedback
-**Status**: Planlagt
-**Prioritet**: Lav
-- Stemme-feedback under trening (text-to-speech)
-- Sonevarsler med tale
-- Motivasjonsfraser
-
-> **Merk**: Grunnleggende lydvarsler (pip/toner) er allerede implementert. Denne funksjonen handler om tale/stemme.
+### ~~Voice Feedback~~
+**Status**: ✅ Implementert (2026-04)
+- Se "TTS Voice Coaching" over
 
 ### Push Notifications
 **Status**: Planlagt
@@ -333,6 +358,12 @@ class HRZoneController {
 - Varslinger ved treningsplanlagte økter
 - Påminnelser om treningsfrekvens
 - Krever PWA (allerede implementert)
+
+### Periodiske TTS-oppsummeringer
+**Status**: Planlagt
+**Prioritet**: Lav
+- TTS hvert 5. minutt med snitt-puls, distanse, tempo
+- Talt økt-oppsummering ved slutt
 
 ---
 
@@ -352,4 +383,4 @@ class HRZoneController {
 
 ---
 
-*Sist oppdatert: 2026-02-25*
+*Sist oppdatert: 2026-04-06*

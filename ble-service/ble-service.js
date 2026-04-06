@@ -13,6 +13,7 @@ const { EventEmitter } = require('events');
 const FTMSNative = require('./ftms-native');
 const HRMNative = require('./hrm-native');
 const FitshowNative = require('./fitshow-native');
+const HRZoneController = require('./hr-zone-controller');
 
 // ── Config ──────────────────────────────────────────────────────────────────
 const CONFIG_PATH = path.join(__dirname, 'ble-config.json');
@@ -58,6 +59,9 @@ let sessionStartTime = null;
 let sessionActive = false;
 let currentTargetSpeed = 0;
 let currentTargetIncline = 0;
+let activeHRZoneController = null;
+let hrZoneControlEnabled = false;
+let sessionMaxHR = null;
 
 // Data buffer — flushed periodically
 let dataBuffer = [];
@@ -199,7 +203,8 @@ function buildCurrentState() {
     bleBackend: 'native',
     ftmsConnected: ftms.isConnected(),
     hrmConnected: hrm.isConnected(),
-    fitshow: fitshow.isConnected() ? fitshow.getState() : null
+    fitshow: fitshow.isConnected() ? fitshow.getState() : null,
+    hrZoneControl: activeHRZoneController ? activeHRZoneController.getState() : null
   };
 }
 
@@ -217,6 +222,22 @@ function stopStateBroadcast() {
     clearInterval(stateBroadcastTimer);
     stateBroadcastTimer = null;
   }
+}
+
+let hrZoneTickTimer = null;
+
+function startHRZoneTick() {
+  stopHRZoneTick();
+  hrZoneTickTimer = setInterval(() => {
+    if (activeHRZoneController && activeHRZoneController.active) {
+      const hr = hrm.getCurrentHeartRate();
+      activeHRZoneController.tick(hr);
+    }
+  }, 1000);
+}
+
+function stopHRZoneTick() {
+  if (hrZoneTickTimer) { clearInterval(hrZoneTickTimer); hrZoneTickTimer = null; }
 }
 
 let deviceStatusTimer = null;
@@ -284,6 +305,12 @@ function handleServerMessage(msg) {
       break;
     case 'ble_reconnect':
       handleBleReconnect(commandId, params);
+      break;
+    case 'set_speed':
+      handleSetSpeed(commandId, params);
+      break;
+    case 'set_incline':
+      handleSetIncline(commandId, params);
       break;
     default:
       sendCommandResponse(commandId, command, false, `Unknown command: ${command}`);
@@ -543,6 +570,10 @@ function setupFtmsListeners() {
     if (sessionActive && segmentTimer) {
       stopSegmentTimer();
       console.log('[Service] Segment timer paused due to disconnect');
+      if (activeHRZoneController) {
+        activeHRZoneController.pause(300000);
+        console.log('[Service] HR zone controller paused due to disconnect');
+      }
     }
     broadcastDeviceStatus();
     scheduleReconnect('treadmill');
@@ -672,6 +703,11 @@ async function reconnectFtms() {
           executeSegment(currentSegmentIndex);
         }
       }
+      // Resume HR zone controller if it was paused
+      if (activeHRZoneController && activeHRZoneController.paused) {
+        activeHRZoneController.resume();
+        console.log('[BLE] Resumed HR zone controller after reconnect');
+      }
     } catch (e) {
       console.error('[BLE] Failed to re-send targets after reconnect:', e.message);
     }
@@ -726,7 +762,9 @@ async function handleStartSession(commandId, params) {
   try {
     const body = {
       workout_id: currentWorkout ? currentWorkout.id : null,
-      heart_rate_source: hrm.isConnected() ? 'ble' : 'none'
+      heart_rate_source: hrm.isConnected() ? 'ble' : 'none',
+      profile_id: params.profileId || params.profile_id || null,
+      hr_zone_control_enabled: params.hr_zone_control_enabled ? 1 : 0
     };
     const res = await fetch(`${httpBase()}/api/sessions`, {
       method: 'POST',
@@ -741,10 +779,37 @@ async function handleStartSession(commandId, params) {
     sessionStartTime = Date.now();
     dataBuffer = [];
 
+    hrZoneControlEnabled = !!params.hr_zone_control_enabled;
+    sessionMaxHR = null;
+
+    if (hrZoneControlEnabled && (params.profileId || params.profile_id)) {
+      try {
+        const profileRes = await fetch(`${httpBase()}/api/profiles`);
+        if (profileRes.ok) {
+          const profiles = await profileRes.json();
+          const pid = parseInt(params.profileId || params.profile_id);
+          const profile = profiles.find(p => p.id === pid);
+          if (profile) sessionMaxHR = profile.max_hr;
+        }
+      } catch (e) {
+        console.error('[HRZone] Failed to fetch profile:', e.message);
+      }
+    }
+
+    if (hrZoneControlEnabled && !hrm.isConnected()) {
+      console.log('[HRZone] HRM not connected — disabling HR zone control');
+      hrZoneControlEnabled = false;
+    }
+    if (hrZoneControlEnabled && !sessionMaxHR) {
+      console.log('[HRZone] No maxHR available — disabling HR zone control');
+      hrZoneControlEnabled = false;
+    }
+
     console.log(`[Session] Started session ${sessionId}`);
 
     startDataFlush();
     startDriftDetection();
+    startHRZoneTick();
 
     if (currentWorkout && currentWorkout.segments && currentWorkout.segments.length > 0) {
       currentSegmentIndex = 0;
@@ -769,6 +834,13 @@ async function handleStopSession(commandId, params) {
   stopSegmentTimer();
   stopDataFlush();
   stopDriftDetection();
+  if (activeHRZoneController) {
+    activeHRZoneController.stop();
+    activeHRZoneController = null;
+  }
+  hrZoneControlEnabled = false;
+  sessionMaxHR = null;
+  stopHRZoneTick();
 
   // Stop the treadmill belt (unless it was a physical stop — belt already stopped)
   if (commandId !== 'physical-stop' && ftms.isConnected()) {
@@ -857,10 +929,53 @@ function handleSkipSegment(commandId, params) {
   sendCommandResponse(commandId, 'skip_segment', true);
 }
 
+async function handleSetSpeed(commandId, params) {
+  const speed = parseFloat(params.speed);
+  if (isNaN(speed) || speed < 0.1 || speed > 14.0) {
+    sendCommandResponse(commandId, 'set_speed', false, 'Invalid speed');
+    return;
+  }
+  currentTargetSpeed = speed;
+  try {
+    await ftms.setSpeed(speed);
+  } catch (err) {
+    sendCommandResponse(commandId, 'set_speed', false, err.message);
+    return;
+  }
+  if (activeHRZoneController) {
+    activeHRZoneController.pause(45000);
+    activeHRZoneController.updateBaseline(speed, currentTargetIncline);
+    console.log('[HRZone] Manual speed override — pausing controller for 45s');
+  }
+  sendCommandResponse(commandId, 'set_speed', true);
+}
+
+async function handleSetIncline(commandId, params) {
+  const incline = parseFloat(params.incline);
+  if (isNaN(incline) || incline < 0 || incline > 12) {
+    sendCommandResponse(commandId, 'set_incline', false, 'Invalid incline');
+    return;
+  }
+  currentTargetIncline = incline;
+  try {
+    await ftms.setIncline(incline);
+  } catch (err) {
+    sendCommandResponse(commandId, 'set_incline', false, err.message);
+    return;
+  }
+  if (activeHRZoneController) {
+    activeHRZoneController.pause(45000);
+    activeHRZoneController.updateBaseline(currentTargetSpeed, incline);
+    console.log('[HRZone] Manual incline override — pausing controller for 45s');
+  }
+  sendCommandResponse(commandId, 'set_incline', true);
+}
+
 // ── Segment Execution ───────────────────────────────────────────────────────
 async function executeSegment(index) {
   if (!currentWorkout || !currentWorkout.segments || index >= currentWorkout.segments.length) {
     console.log('[Session] All segments complete — stopping session');
+    if (activeHRZoneController) { activeHRZoneController.stop(); activeHRZoneController = null; }
     handleStopSession('auto-complete', {});
     return;
   }
@@ -871,11 +986,17 @@ async function executeSegment(index) {
 
   console.log(`[Session] Segment ${index}: "${segment.segment_name || 'unnamed'}" — ${currentTargetSpeed} km/h, ${currentTargetIncline}% for ${segment.duration_seconds}s`);
 
-  // Send commands to treadmill
+  const isHRControlled = hrZoneControlEnabled && segment.hr_zone_control === 1 && segment.target_max_zone && sessionMaxHR;
+
+  if (!isHRControlled && activeHRZoneController) {
+    activeHRZoneController.stop();
+    activeHRZoneController = null;
+    console.log('[HRZone] Segment not HR-controlled — stopped controller');
+  }
+
   if (ftms.isConnected()) {
     try {
       if (index === 0) {
-        // First segment: send FTMS Start command (0x07) to start the belt
         await ftms.start();
         await new Promise(resolve => setTimeout(resolve, 500));
       }
@@ -886,7 +1007,33 @@ async function executeSegment(index) {
     }
   }
 
-  // Set timer for segment duration (stopSegmentTimer clears segmentStartTime, so set it AFTER)
+  if (isHRControlled) {
+    const existingBuffer = activeHRZoneController ? activeHRZoneController.getRingBuffer() : undefined;
+    if (activeHRZoneController) activeHRZoneController.stop();
+
+    activeHRZoneController = new HRZoneController({
+      targetZone: segment.target_max_zone,
+      maxHR: sessionMaxHR,
+      controlMode: segment.hr_zone_control_mode || 'speed',
+      initialSpeed: currentTargetSpeed,
+      initialIncline: currentTargetIncline,
+      existingBuffer,
+      onSpeedChange: async (newSpeed) => {
+        currentTargetSpeed = newSpeed;
+        try { await ftms.setSpeed(newSpeed); } catch (e) { console.error('[HRZone] setSpeed failed:', e.message); }
+      },
+      onInclineChange: async (newIncline) => {
+        currentTargetIncline = newIncline;
+        try { await ftms.setIncline(newIncline); } catch (e) { console.error('[HRZone] setIncline failed:', e.message); }
+      },
+      onStatusChange: (status) => {
+        console.log(`[HRZone] ${status.action}: ${JSON.stringify(status)}`);
+        wsSend({ type: 'hr_zone_status', ...status });
+      },
+    });
+    console.log(`[HRZone] Started controller: zone ${segment.target_max_zone}, mode ${segment.hr_zone_control_mode || 'speed'}, maxHR ${sessionMaxHR}`);
+  }
+
   stopSegmentTimer();
   segmentStartTime = Date.now();
   segmentTimer = setTimeout(() => {

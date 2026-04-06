@@ -885,6 +885,54 @@
         }
 
         .tts-toast.show { opacity: 1; }
+
+        /* --- HR Zone control styles --- */
+        .hr-zone-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 8px;
+            background: rgba(76, 175, 80, 0.15);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+        .hr-zone-status.paused {
+            background: rgba(255, 152, 0, 0.15);
+            border-color: rgba(255, 152, 0, 0.3);
+        }
+        .hr-zone-value { font-weight: bold; }
+        .manual-adjust-controls {
+            display: flex;
+            gap: 16px;
+            justify-content: center;
+            margin: 8px 0;
+        }
+        .adjust-group {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .adjust-btn {
+            padding: 6px 12px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color, #444);
+            background: var(--bg-secondary, #2a2a2a);
+            color: var(--text-primary, #fff);
+            cursor: pointer;
+            font-size: 13px;
+        }
+        .adjust-btn:active { transform: scale(0.95); }
+        .adjust-label { font-size: 12px; color: var(--text-secondary, #aaa); min-width: 50px; text-align: center; }
+        .setting-row { margin-bottom: 8px; }
+        .toggle-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            font-size: 14px;
+        }
     </style>
 </head>
 <body>
@@ -932,6 +980,7 @@
                     <button class="filter-btn" data-filter="beginner">Nybegynner</button>
                     <button class="filter-btn" data-filter="intermediate">Middels</button>
                     <button class="filter-btn" data-filter="advanced">Avansert</button>
+                    <button id="hrZoneFilterBtn" class="filter-btn" onclick="toggleHRZoneFilter()" title="Vis bare sonestyrt-egnede økter">🎯 Sonestyrt</button>
                 </div>
             </div>
             <div id="workoutListContainer" class="workout-list">
@@ -983,6 +1032,14 @@
                 </select>
             </div>
 
+            <div id="hrZoneToggleContainer" class="setting-row" style="display:none;">
+                <label class="toggle-label">
+                    <input type="checkbox" id="hrZoneToggle">
+                    <span>🎯 Sonestyring</span>
+                </label>
+                <small id="hrZoneToggleHint" style="color: var(--text-secondary);">Automatisk fartsjustering basert på pulssone</small>
+            </div>
+
             <div class="ready-hint">Eller trykk Start på møllen</div>
 
             <div class="ready-actions">
@@ -1014,6 +1071,12 @@
                     <div class="dash-unit">bpm</div>
                     <div class="hr-zone" id="vHRZone"></div>
                 </div>
+            </div>
+
+            <!-- HR Zone status indicator -->
+            <div id="hrZoneStatus" class="hr-zone-status" style="display:none;">
+                <span id="hrZoneLabel"></span>
+                <span id="hrZoneAction" class="hr-zone-value"></span>
             </div>
 
             <!-- Workout section -->
@@ -1062,6 +1125,20 @@
             <div class="active-controls">
                 <button class="btn btn-secondary" id="btnSkipSegment">Hopp segment &#x23ED;</button>
                 <button class="btn btn-danger" id="btnStopSession">Stopp økt &#x25A0;</button>
+            </div>
+
+            <!-- Manual speed/incline adjustment controls -->
+            <div id="manualAdjustControls" class="manual-adjust-controls" style="display:none;">
+                <div class="adjust-group">
+                    <button class="adjust-btn" onclick="adjustSpeed(-0.5)">- 0.5</button>
+                    <span class="adjust-label">Fart</span>
+                    <button class="adjust-btn" onclick="adjustSpeed(0.5)">+ 0.5</button>
+                </div>
+                <div class="adjust-group">
+                    <button class="adjust-btn" onclick="adjustIncline(-1)">- 1%</button>
+                    <span class="adjust-label">Stigning</span>
+                    <button class="adjust-btn" onclick="adjustIncline(1)">+ 1%</button>
+                </div>
             </div>
 
             <div class="secondary-row">
@@ -1801,7 +1878,7 @@
         var searchQuery = '';
 
         function getFilteredWorkouts() {
-            return workoutList.filter(function (w) {
+            var filtered = workoutList.filter(function (w) {
                 // Filter by difficulty
                 if (activeFilter !== 'all' && w.difficulty !== activeFilter) return false;
                 // Filter by search query
@@ -1813,6 +1890,11 @@
                 }
                 return true;
             });
+            // HR zone eligible filter
+            if (hrZoneFilterActive) {
+                filtered = filtered.filter(function (w) { return w.hr_zone_eligible === 1; });
+            }
+            return filtered;
         }
 
         function renderWorkoutList() {
@@ -2043,6 +2125,7 @@
                 }
             }
 
+            updateHRZoneToggleVisibility(w);
             switchState('ready');
         }
 
@@ -2065,7 +2148,8 @@
             $btnStartSession.disabled = true;
             $btnStartSession.textContent = 'Starter...';
 
-            sendCommand('start_session').then(function () {
+            var hrZoneToggle = document.getElementById('hrZoneToggle');
+            sendCommand('start_session', { profileId: selectedProfileId, hr_zone_control_enabled: (hrZoneToggle && hrZoneToggle.checked) || false }).then(function () {
                 // Active state will be triggered by treadmill_state broadcast
                 $btnStartSession.textContent = 'Start økt';
                 $btnStartSession.disabled = false;
@@ -2109,6 +2193,11 @@
         // ACTIVE state rendering
         // -------------------------------------------------------------------
         function renderActiveState(data) {
+            lastState = data;
+
+            // HR Zone display
+            updateHRZoneDisplay(data);
+
             // Speed
             var speedEl = document.getElementById('vSpeed');
             speedEl.textContent = (data.speed !== null && data.speed !== undefined)
@@ -2259,6 +2348,77 @@
 
         // Load profiles on page load
         loadProfiles();
+
+        // -------------------------------------------------------------------
+        // HR Zone filter
+        // -------------------------------------------------------------------
+        var hrZoneFilterActive = false;
+        var lastState = null;
+
+        function toggleHRZoneFilter() {
+            hrZoneFilterActive = !hrZoneFilterActive;
+            var btn = document.getElementById('hrZoneFilterBtn');
+            if (btn) btn.classList.toggle('active', hrZoneFilterActive);
+            renderWorkoutList();
+        }
+        window.toggleHRZoneFilter = toggleHRZoneFilter;
+
+        // Show/hide HR zone toggle based on loaded workout
+        function updateHRZoneToggleVisibility(workout) {
+            var container = document.getElementById('hrZoneToggleContainer');
+            if (container) {
+                container.style.display = workout && workout.hr_zone_eligible ? 'block' : 'none';
+            }
+        }
+
+        // Manual speed/incline adjustment
+        function adjustSpeed(delta) {
+            var current = (lastState && lastState.targetSpeed) || (lastState && lastState.speed) || 8;
+            var newSpeed = Math.round((current + delta) * 10) / 10;
+            sendCommand('set_speed', { speed: Math.max(0.1, Math.min(14, newSpeed)) });
+        }
+        window.adjustSpeed = adjustSpeed;
+
+        function adjustIncline(delta) {
+            var current = (lastState && lastState.targetIncline) || (lastState && lastState.incline) || 0;
+            var newIncline = Math.round((current + delta) * 10) / 10;
+            sendCommand('set_incline', { incline: Math.max(0, Math.min(12, newIncline)) });
+        }
+        window.adjustIncline = adjustIncline;
+
+        // Update HR zone display from treadmill_state
+        function updateHRZoneDisplay(state) {
+            var container = document.getElementById('hrZoneStatus');
+            var adjustControls = document.getElementById('manualAdjustControls');
+            if (!container) return;
+
+            var hzc = state.hrZoneControl;
+            if (!hzc || !hzc.active) {
+                container.style.display = 'none';
+                if (adjustControls) adjustControls.style.display = 'none';
+                return;
+            }
+
+            container.style.display = 'flex';
+            if (adjustControls) adjustControls.style.display = 'flex';
+
+            var label = document.getElementById('hrZoneLabel');
+            var action = document.getElementById('hrZoneAction');
+
+            if (hzc.paused) {
+                label.textContent = '🎯 Sonestyring pauset (' + hzc.pauseRemaining + 's)';
+                container.className = 'hr-zone-status paused';
+            } else {
+                label.textContent = '🎯 Sone ' + hzc.targetZone + ' — Sonestyrt';
+                container.className = 'hr-zone-status';
+            }
+
+            if (hzc.controlMode === 'speed') {
+                action.textContent = hzc.currentControlledValue + ' km/h';
+            } else {
+                action.textContent = hzc.currentControlledValue + '%';
+            }
+        }
 
     })();
     </script>

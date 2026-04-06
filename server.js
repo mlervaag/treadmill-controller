@@ -161,6 +161,15 @@ try { db.exec('ALTER TABLE workouts ADD COLUMN target_max_zone INTEGER'); } catc
 try { db.exec('ALTER TABLE workout_segments ADD COLUMN target_max_zone INTEGER'); } catch(e) {}
 try { db.exec('ALTER TABLE workout_sessions ADD COLUMN profile_id INTEGER'); } catch(e) {}
 
+// Add profile_id to strava_auth for per-profile Strava connections
+try { db.exec('ALTER TABLE strava_auth ADD COLUMN profile_id INTEGER'); } catch(e) {}
+
+// HR zone control columns
+try { db.exec('ALTER TABLE workout_segments ADD COLUMN hr_zone_control INTEGER DEFAULT 0'); } catch(e) {}
+try { db.exec("ALTER TABLE workout_segments ADD COLUMN hr_zone_control_mode TEXT DEFAULT 'speed'"); } catch(e) {}
+try { db.exec('ALTER TABLE workouts ADD COLUMN hr_zone_eligible INTEGER DEFAULT 0'); } catch(e) {}
+try { db.exec('ALTER TABLE workout_sessions ADD COLUMN hr_zone_control_enabled INTEGER DEFAULT 0'); } catch(e) {}
+
 // --- TTS and Coaching setup ---
 const ttsService = new TTSService({
   apiKey: process.env.OPENAI_API_KEY || null,
@@ -170,6 +179,15 @@ const ttsService = new TTSService({
 
 let activeCoachingEngine = null;
 const ttsConfigs = new Map(); // Map<ws, { enabled, target, profileId }>
+
+// HR zone eligibility heuristic
+function calculateHRZoneEligible(segments) {
+  if (!segments || !Array.isArray(segments)) return 0;
+  return segments.some(seg =>
+    (seg.target_max_zone || 0) > 0 &&
+    (seg.duration_seconds || seg.duration || 0) >= 180
+  ) ? 1 : 0;
+}
 
 // API Routes
 app.get('/api/workouts', (req, res) => {
@@ -272,8 +290,8 @@ app.post('/api/workouts', (req, res) => {
 
     if (segments && Array.isArray(segments) && segments.length > 0) {
       const insertSegment = db.prepare(`
-        INSERT INTO workout_segments (workout_id, segment_order, duration_seconds, speed_kmh, incline_percent, segment_name)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO workout_segments (workout_id, segment_order, duration_seconds, speed_kmh, incline_percent, segment_name, target_max_zone, hr_zone_control, hr_zone_control_mode)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
       segments.forEach((segment, index) => {
@@ -293,10 +311,17 @@ app.post('/api/workouts', (req, res) => {
           validDuration,
           validSpeed,
           validIncline,
-          segment.segment_name ? segment.segment_name.substring(0, 100) : null
+          segment.segment_name ? segment.segment_name.substring(0, 100) : null,
+          segment.target_max_zone || null,
+          segment.hr_zone_control || 0,
+          segment.hr_zone_control_mode || 'speed'
         );
       });
     }
+
+    // Calculate and set hr_zone_eligible
+    const hrEligible = calculateHRZoneEligible(segments);
+    db.prepare('UPDATE workouts SET hr_zone_eligible = ? WHERE id = ?').run(hrEligible, workoutId);
 
     res.json({ id: workoutId, name: name.trim(), description, difficulty: validatedDifficulty });
   } catch (error) {
@@ -333,8 +358,8 @@ app.put('/api/workouts/:id', (req, res) => {
     const updateWorkout = db.prepare('UPDATE workouts SET name = ?, description = ?, difficulty = ? WHERE id = ?');
     const deleteSegments = db.prepare('DELETE FROM workout_segments WHERE workout_id = ?');
     const insertSegment = db.prepare(`
-      INSERT INTO workout_segments (workout_id, segment_order, duration_seconds, speed_kmh, incline_percent, segment_name)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO workout_segments (workout_id, segment_order, duration_seconds, speed_kmh, incline_percent, segment_name, target_max_zone, hr_zone_control, hr_zone_control_mode)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     db.transaction(() => {
@@ -357,11 +382,19 @@ app.put('/api/workouts/:id', (req, res) => {
             validDuration,
             validSpeed,
             validIncline,
-            segment.segment_name ? segment.segment_name.substring(0, 100) : null
+            segment.segment_name ? segment.segment_name.substring(0, 100) : null,
+            segment.target_max_zone || null,
+            segment.hr_zone_control || 0,
+            segment.hr_zone_control_mode || 'speed'
           );
         });
       }
     })();
+
+    // Recalculate hr_zone_eligible
+    const freshSegments = db.prepare('SELECT target_max_zone, duration_seconds FROM workout_segments WHERE workout_id = ?').all(id);
+    const hrEligible = calculateHRZoneEligible(freshSegments);
+    db.prepare('UPDATE workouts SET hr_zone_eligible = ? WHERE id = ?').run(hrEligible, id);
 
     const updated = db.prepare('SELECT * FROM workouts WHERE id = ?').get(id);
     if (updated.tags) {
@@ -474,11 +507,11 @@ app.delete('/api/sessions/:id', (req, res) => {
 });
 
 app.get('/api/sessions', (req, res) => {
-  const { limit: limitParam, offset: offsetParam, startDate, endDate } = req.query;
+  const { limit: limitParam, offset: offsetParam, startDate, endDate, profileId } = req.query;
   const limit = Math.min(parseInt(limitParam) || 50, 100);
   const offset = parseInt(offsetParam) || 0;
 
-  // Build WHERE clause dynamically for date filtering
+  // Build WHERE clause dynamically for date and profile filtering
   const conditions = [];
   const params = [];
 
@@ -490,15 +523,20 @@ app.get('/api/sessions', (req, res) => {
     conditions.push('s.started_at <= ?');
     params.push(endDate);
   }
+  if (profileId) {
+    conditions.push('s.profile_id = ?');
+    params.push(parseInt(profileId));
+  }
 
   const whereClause = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
 
   const total = db.prepare(`SELECT COUNT(*) as count FROM workout_sessions s ${whereClause}`).get(...params).count;
 
   const sessions = db.prepare(`
-    SELECT s.*, w.name as workout_name
+    SELECT s.*, w.name as workout_name, p.name as profile_name
     FROM workout_sessions s
     LEFT JOIN workouts w ON s.workout_id = w.id
+    LEFT JOIN user_profiles p ON s.profile_id = p.id
     ${whereClause}
     ORDER BY s.started_at DESC
     LIMIT ? OFFSET ?
@@ -513,8 +551,8 @@ app.post('/api/sessions', (req, res) => {
     const validHRSource = heart_rate_source || 'none';
     const validProfileId = profile_id && !isNaN(parseInt(profile_id)) ? parseInt(profile_id) : null;
 
-    const insert = db.prepare('INSERT INTO workout_sessions (workout_id, heart_rate_source, profile_id) VALUES (?, ?, ?)');
-    const result = insert.run(validWorkoutId, validHRSource, validProfileId);
+    const insert = db.prepare('INSERT INTO workout_sessions (workout_id, heart_rate_source, profile_id, hr_zone_control_enabled) VALUES (?, ?, ?, ?)');
+    const result = insert.run(validWorkoutId, validHRSource, validProfileId, req.body.hr_zone_control_enabled ? 1 : 0);
     console.log(`Session ${result.lastInsertRowid} created (workout: ${validWorkoutId || 'manual'}, HR source: ${validHRSource}, profile: ${validProfileId || 'none'})`);
     res.json({ id: result.lastInsertRowid });
   } catch (error) {
@@ -562,6 +600,36 @@ app.put('/api/sessions/:id', (req, res) => {
   } catch (error) {
     console.error('Error updating session:', error);
     res.status(500).json({ error: 'Kunne ikke oppdatere økt' });
+  }
+});
+
+// Update session profile (works on both active and completed sessions)
+app.patch('/api/sessions/:id/profile', (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id) || id <= 0) {
+      return res.status(400).json({ error: 'Ugyldig ID' });
+    }
+
+    const { profile_id } = req.body;
+    const validProfileId = profile_id && !isNaN(parseInt(profile_id)) ? parseInt(profile_id) : null;
+
+    const existing = db.prepare('SELECT id FROM workout_sessions WHERE id = ?').get(id);
+    if (!existing) {
+      return res.status(404).json({ error: 'Økt ikke funnet' });
+    }
+
+    db.prepare('UPDATE workout_sessions SET profile_id = ? WHERE id = ?').run(validProfileId, id);
+
+    const profileName = validProfileId
+      ? (db.prepare('SELECT name FROM user_profiles WHERE id = ?').get(validProfileId)?.name || null)
+      : null;
+
+    console.log(`Session ${id} profile updated to: ${profileName || 'none'} (${validProfileId})`);
+    res.json({ success: true, profile_id: validProfileId, profile_name: profileName });
+  } catch (error) {
+    console.error('Error updating session profile:', error);
+    res.status(500).json({ error: 'Kunne ikke oppdatere profil' });
   }
 });
 
@@ -823,15 +891,17 @@ app.get('/auth/strava', (req, res) => {
   if (!clientId) {
     return res.status(500).json({ error: 'STRAVA_CLIENT_ID not configured' });
   }
+  const profileId = req.query.profileId || '';
   const redirectUri = `${req.protocol}://${req.get('host')}/auth/strava/callback`;
   const scope = 'activity:write,activity:read';
-  const authUrl = `https://www.strava.com/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}`;
+  const authUrl = `https://www.strava.com/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}&state=${encodeURIComponent(profileId)}`;
   res.redirect(authUrl);
 });
 
 // Strava OAuth: Callback — exchange code for tokens
 app.get('/auth/strava/callback', async (req, res) => {
-  const { code } = req.query;
+  const { code, state } = req.query;
+  const profileId = state && !isNaN(parseInt(state)) ? parseInt(state) : null;
 
   if (!code) {
     return res.redirect('/?strava=error');
@@ -857,17 +927,19 @@ app.get('/auth/strava/callback', async (req, res) => {
     const data = await response.json();
 
     db.prepare(`
-      INSERT OR REPLACE INTO strava_auth (athlete_id, access_token, refresh_token, expires_at, scope, athlete_name, connected_at)
-      VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      INSERT OR REPLACE INTO strava_auth (athlete_id, access_token, refresh_token, expires_at, scope, athlete_name, profile_id, connected_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
     `).run(
       data.athlete.id,
       data.access_token,
       data.refresh_token,
       data.expires_at,
       'activity:write,activity:read',
-      `${data.athlete.firstname} ${data.athlete.lastname}`
+      `${data.athlete.firstname} ${data.athlete.lastname}`,
+      profileId
     );
 
+    console.log(`Strava connected: ${data.athlete.firstname} ${data.athlete.lastname} (athlete ${data.athlete.id}, profile ${profileId || 'none'})`);
     res.redirect('/?strava=connected');
   } catch (error) {
     console.error('Strava auth error:', error);
@@ -878,17 +950,16 @@ app.get('/auth/strava/callback', async (req, res) => {
 // Get Strava connection status
 app.get('/api/strava/status', (req, res) => {
   try {
-    const auth = db.prepare('SELECT * FROM strava_auth ORDER BY connected_at DESC LIMIT 1').get();
-
-    if (!auth) {
-      return res.json({ connected: false });
-    }
+    const connections = db.prepare(`
+      SELECT sa.athlete_id, sa.athlete_name, sa.profile_id, sa.connected_at, p.name as profile_name
+      FROM strava_auth sa
+      LEFT JOIN user_profiles p ON sa.profile_id = p.id
+      ORDER BY sa.connected_at DESC
+    `).all();
 
     res.json({
-      connected: true,
-      athlete_id: auth.athlete_id,
-      athlete_name: auth.athlete_name,
-      connected_at: auth.connected_at
+      connected: connections.length > 0,
+      connections
     });
   } catch (error) {
     console.error('Error checking Strava status:', error);
@@ -896,10 +967,17 @@ app.get('/api/strava/status', (req, res) => {
   }
 });
 
-// Disconnect Strava
+// Disconnect Strava (per profile or all)
 app.delete('/api/strava/disconnect', (req, res) => {
   try {
-    db.prepare('DELETE FROM strava_auth').run();
+    const profileId = req.query.profileId;
+    if (profileId) {
+      const parsedId = parseInt(profileId);
+      if (isNaN(parsedId)) return res.status(400).json({ error: 'Ugyldig profileId' });
+      db.prepare('DELETE FROM strava_auth WHERE profile_id = ?').run(parsedId);
+    } else {
+      db.prepare('DELETE FROM strava_auth').run();
+    }
     res.json({ success: true });
   } catch (error) {
     console.error('Error disconnecting Strava:', error);
@@ -915,8 +993,6 @@ app.post('/api/strava/upload/:sessionId', async (req, res) => {
   }
 
   try {
-    const accessToken = await getValidStravaToken();
-
     const session = db.prepare(`
       SELECT s.*, w.name as workout_name
       FROM workout_sessions s
@@ -927,6 +1003,8 @@ app.post('/api/strava/upload/:sessionId', async (req, res) => {
     if (!session) {
       return res.status(404).json({ error: 'Økt ikke funnet' });
     }
+
+    const accessToken = await getValidStravaToken(session.profile_id);
 
     const dataPoints = db.prepare(`
       SELECT * FROM session_data
@@ -1149,8 +1227,8 @@ function initializeTemplates() {
     let updatedCount = 0;
 
     const insertWorkout = db.prepare(`
-      INSERT INTO workouts (name, description, difficulty, is_template, tags, target_max_zone)
-      VALUES (?, ?, ?, 1, ?, ?)
+      INSERT INTO workouts (name, description, difficulty, is_template, tags, target_max_zone, hr_zone_eligible)
+      VALUES (?, ?, ?, 1, ?, ?, ?)
     `);
 
     const updateWorkout = db.prepare(`
@@ -1162,8 +1240,8 @@ function initializeTemplates() {
     const deleteSegments = db.prepare('DELETE FROM workout_segments WHERE workout_id = ?');
 
     const insertSegment = db.prepare(`
-      INSERT INTO workout_segments (workout_id, segment_order, duration_seconds, speed_kmh, incline_percent, segment_name, target_max_zone)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO workout_segments (workout_id, segment_order, duration_seconds, speed_kmh, incline_percent, segment_name, target_max_zone, hr_zone_control, hr_zone_control_mode)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     db.transaction(() => {
@@ -1174,25 +1252,36 @@ function initializeTemplates() {
         if (!existing) {
           console.log(`   ➕ Adding new template: ${template.name}`);
 
+          const eligible = calculateHRZoneEligible((template.segments || []).map(s => ({
+            target_max_zone: s.target_max_zone, duration_seconds: s.duration
+          })));
           const result = insertWorkout.run(
             template.name,
             template.description || '',
             template.difficulty || 'beginner',
             tagsJson,
-            template.target_max_zone || null
+            template.target_max_zone || null,
+            eligible
           );
           const workoutId = result.lastInsertRowid;
 
           if (template.segments && Array.isArray(template.segments)) {
             template.segments.forEach((segment, index) => {
+              const segTargetZone = segment.target_max_zone || null;
+              const segDuration = segment.duration || 60;
+              const segIncline = segment.incline || 0;
+              const hrControl = (segTargetZone && segDuration >= 180) ? (segment.hr_zone_control !== undefined ? segment.hr_zone_control : 1) : 0;
+              const hrMode = segment.hr_zone_control_mode || (segIncline > 2 ? 'incline' : 'speed');
               insertSegment.run(
                 workoutId,
                 index,
-                segment.duration || 60,
+                segDuration,
                 segment.speed || 0,
-                segment.incline || 0,
+                segIncline,
                 segment.name || null,
-                segment.target_max_zone || null
+                segTargetZone,
+                hrControl,
+                hrMode
               );
             });
           }
@@ -1211,14 +1300,21 @@ function initializeTemplates() {
           deleteSegments.run(existing.id);
           if (template.segments && Array.isArray(template.segments)) {
             template.segments.forEach((segment, index) => {
+              const segTargetZone = segment.target_max_zone || null;
+              const segDuration = segment.duration || 60;
+              const segIncline = segment.incline || 0;
+              const hrControl = (segTargetZone && segDuration >= 180) ? (segment.hr_zone_control !== undefined ? segment.hr_zone_control : 1) : 0;
+              const hrMode = segment.hr_zone_control_mode || (segIncline > 2 ? 'incline' : 'speed');
               insertSegment.run(
                 existing.id,
                 index,
-                segment.duration || 60,
+                segDuration,
                 segment.speed || 0,
-                segment.incline || 0,
+                segIncline,
                 segment.name || null,
-                segment.target_max_zone || null
+                segTargetZone,
+                hrControl,
+                hrMode
               );
             });
           }
@@ -1226,6 +1322,14 @@ function initializeTemplates() {
         }
       });
     })();
+
+    // Calculate hr_zone_eligible for all templates
+    const allTemplates = db.prepare('SELECT id FROM workouts WHERE is_template = 1').all();
+    const updateEligible = db.prepare('UPDATE workouts SET hr_zone_eligible = ? WHERE id = ?');
+    allTemplates.forEach(t => {
+      const segs = db.prepare('SELECT target_max_zone, duration_seconds FROM workout_segments WHERE workout_id = ?').all(t.id);
+      updateEligible.run(calculateHRZoneEligible(segs), t.id);
+    });
 
     if (addedCount > 0 || updatedCount > 0) {
       console.log(`✅ Synced templates: ${addedCount} added, ${updatedCount} updated.`);
@@ -1242,11 +1346,13 @@ function initializeTemplates() {
 initializeTemplates();
 
 // Strava helper: Get valid access token (refresh if expired)
-async function getValidStravaToken() {
-  const auth = db.prepare('SELECT * FROM strava_auth ORDER BY connected_at DESC LIMIT 1').get();
+async function getValidStravaToken(profileId = null) {
+  const auth = profileId
+    ? db.prepare('SELECT * FROM strava_auth WHERE profile_id = ?').get(profileId)
+    : db.prepare('SELECT * FROM strava_auth ORDER BY connected_at DESC LIMIT 1').get();
 
   if (!auth) {
-    throw new Error('Not connected to Strava');
+    throw new Error(profileId ? `Profile ${profileId} not connected to Strava` : 'Not connected to Strava');
   }
 
   const now = Math.floor(Date.now() / 1000);
@@ -1606,6 +1712,33 @@ function handleConnection(ws, req) {
             }
           }
         }
+        return;
+      }
+
+      // --- HR zone controller status messages ---
+      if (data.type === 'hr_zone_status') {
+        const ttsMessages = {
+          'decrease_speed': data.toValue ? `Senker farten til ${data.toValue}.` : null,
+          'increase_speed': data.toValue ? `Øker farten til ${data.toValue}.` : null,
+          'decrease_incline': data.toValue ? `Senker stigningen til ${data.toValue} prosent.` : null,
+          'increase_incline': data.toValue ? `Øker stigningen til ${data.toValue} prosent.` : null,
+          'hrm_dropout': 'Mistet pulssignal. Holder nåværende fart.',
+          'hrm_timeout': 'Sonestyring deaktivert. Ingen pulsdata.',
+          'hrm_recovered': 'Pulssignal gjenopprettet. Gjenopptar sonestyring.',
+          'safety_high_hr': 'Pulsen er svært høy. Senker farten for sikkerhet.',
+          'sustained_overload': 'Pulsen er vedvarende høy. Vurder å stoppe.',
+          'hrm_precaution': 'Senker farten som sikkerhetstiltak.',
+        };
+        const msg = ttsMessages[data.action];
+        if (msg) {
+          (async () => {
+            try {
+              const filename = await ttsService.speak(msg);
+              deliverTTS(msg, filename);
+            } catch (e) { console.error('[TTS] HR zone message failed:', e.message); }
+          })();
+        }
+        broadcast(data);
         return;
       }
 
