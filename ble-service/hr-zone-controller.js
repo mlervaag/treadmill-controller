@@ -39,6 +39,7 @@ class HRZoneController {
     this.outlierCount = 0;
     this.hrmDropoutStart = null;
     this.hrmStatus = 'connected';
+    this.precautionApplied = false;
 
     this.graduatedResumeTicksLeft = 0;
     this.graduatedResumeInterval = 30;
@@ -73,7 +74,8 @@ class HRZoneController {
       const dropoutMs = Date.now() - this.hrmDropoutStart;
       const timeoutMs = this.targetZone >= 4 ? 60000 : 120000;
 
-      if (this.targetZone >= 4 && dropoutMs >= 30000 && dropoutMs < 31000) {
+      if (this.targetZone >= 4 && !this.precautionApplied && dropoutMs >= 30000) {
+        this.precautionApplied = true;
         this._adjustSpeed(-0.3, 'hrm_precaution');
       }
 
@@ -88,6 +90,7 @@ class HRZoneController {
     if (this.hrmDropoutStart) {
       this.hrmDropoutStart = null;
       this.hrmStatus = 'connected';
+      this.precautionApplied = false;
       this.onStatusChange({ action: 'hrm_recovered', reason: 'signal_restored' });
     }
 

@@ -1270,7 +1270,7 @@ function initializeTemplates() {
               const segTargetZone = segment.target_max_zone || null;
               const segDuration = segment.duration || 60;
               const segIncline = segment.incline || 0;
-              const hrControl = (segTargetZone && segDuration >= 180) ? (segment.hr_zone_control !== undefined ? segment.hr_zone_control : 1) : 0;
+              const hrControl = (segTargetZone && segDuration >= 180) ? (segment.hr_zone_control !== undefined ? segment.hr_zone_control : 0) : 0;
               const hrMode = segment.hr_zone_control_mode || (segIncline > 2 ? 'incline' : 'speed');
               insertSegment.run(
                 workoutId,
@@ -1303,7 +1303,7 @@ function initializeTemplates() {
               const segTargetZone = segment.target_max_zone || null;
               const segDuration = segment.duration || 60;
               const segIncline = segment.incline || 0;
-              const hrControl = (segTargetZone && segDuration >= 180) ? (segment.hr_zone_control !== undefined ? segment.hr_zone_control : 1) : 0;
+              const hrControl = (segTargetZone && segDuration >= 180) ? (segment.hr_zone_control !== undefined ? segment.hr_zone_control : 0) : 0;
               const hrMode = segment.hr_zone_control_mode || (segIncline > 2 ? 'incline' : 'speed');
               insertSegment.run(
                 existing.id,
@@ -1728,6 +1728,9 @@ function handleConnection(ws, req) {
           'safety_high_hr': 'Pulsen er svært høy. Senker farten for sikkerhet.',
           'sustained_overload': 'Pulsen er vedvarende høy. Vurder å stoppe.',
           'hrm_precaution': 'Senker farten som sikkerhetstiltak.',
+          'disabled': data.reason === 'hrm_not_connected'
+            ? 'Sonestyring deaktivert. Pulsmonitor ikke tilkoblet.'
+            : 'Sonestyring deaktivert. Mangler pulsinformasjon.',
         };
         const msg = ttsMessages[data.action];
         if (msg) {

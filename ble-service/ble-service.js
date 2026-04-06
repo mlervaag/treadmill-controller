@@ -799,10 +799,12 @@ async function handleStartSession(commandId, params) {
     if (hrZoneControlEnabled && !hrm.isConnected()) {
       console.log('[HRZone] HRM not connected — disabling HR zone control');
       hrZoneControlEnabled = false;
+      wsSend({ type: 'hr_zone_status', action: 'disabled', reason: 'hrm_not_connected' });
     }
     if (hrZoneControlEnabled && !sessionMaxHR) {
       console.log('[HRZone] No maxHR available — disabling HR zone control');
       hrZoneControlEnabled = false;
+      wsSend({ type: 'hr_zone_status', action: 'disabled', reason: 'no_max_hr' });
     }
 
     console.log(`[Session] Started session ${sessionId}`);

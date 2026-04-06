@@ -2336,6 +2336,7 @@
             var filterBtns = document.querySelectorAll('.filter-btn');
             for (var i = 0; i < filterBtns.length; i++) {
                 filterBtns[i].addEventListener('click', function (e) {
+                    if (!e.target.dataset.filter) return;
                     for (var j = 0; j < filterBtns.length; j++) {
                         filterBtns[j].classList.remove('active');
                     }
