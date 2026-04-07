@@ -17,15 +17,17 @@ En moderne, fullstendig webapplikasjon for å kontrollere tredemøllen din via B
 - **Drift-deteksjon**: Sender BLE-kommandoer på nytt hvis faktisk != mål
 
 ### 💪 Treningsøkter
-- **39 profesjonelle treningsøkter** fordelt på 3 nivåer:
+- **44 profesjonelle treningsøkter** fordelt på 3 nivåer:
   - **Beginner (23)**: Couch to 5K (9 uker), Steady State, Standard intervaller, Motbakke intro
   - **Intermediate (9)**: VO2max 5x3, Threshold 2x10, Tempo 20 min, Hill Repeats, Pyramide
   - **Advanced (9)**: VO2max 6x4, Speed 400m x12, Threshold 3x12, Hill Sprints, Long Runs, MaxHR Test
+  - **Sonestyrt (5)**: Sone 2 Utholdenhet, Sone 3 Tempo, Sone 4 Terskel 3x8, Progressiv Sonetrening, Sone 2 Bakketrening
+- **HR-sonestyrt trening**: Tredemøllen justerer fart eller stigning automatisk for å holde deg i målsone. Kontrolleres av RPi — uavhengig av nettleser. Krever pulsbelte (HRM).
 - **Målsoner**: Alle templates har anbefalte HR-soner per segment for coaching
 - **Egendefinerte økter**: Lag og rediger dine egne treningsøkter med flere segmenter
 - **Automatisk kjøring**: Appen styrer hastighet og stigning automatisk gjennom segmentene
 - **Lydvarsler**: Pip ved segmentbytte, stigende tone ved fullført økt (Web Audio API)
-- **Smart filtrering**: Søk på difficulty, tags (c25k, vo2max, threshold, etc.) og varighet
+- **Smart filtrering**: Søk på difficulty, tags (c25k, vo2max, threshold, hr-zone etc.) og varighet
 - **Auto-stopp**: Når tredemøllen stoppes fysisk, avsluttes økten automatisk uten bekreftelse
 
 ### 🎙️ TTS-coaching
@@ -48,14 +50,17 @@ En moderne, fullstendig webapplikasjon for å kontrollere tredemøllen din via B
 - **Gjennomsnitt per økt**: Automatisk beregning av gjennomsnittsverdier
 - **Treningsdata-graf**: Interaktiv graf med fart, puls og stigning over tid (Chart.js)
 - **Datofilter**: Filtrer økter etter tidsperiode (7 dager, denne mnd, 3 mnd, egendefinert)
+- **Profil-tagging**: Hver økt viser hvem som løp, kan endres i etterkant
+- **Profil-filtrering**: Filtrer historikk etter løper (Alle / Magnus / Nansy)
 - **Per-segment feedback**: Se gjennomsnittsfart, puls og tid per segment etter fullført økt
 - **Eksport**: Last ned øktdata som JSON, CSV eller TCX
 - **Slett økter**: Fjern testøkter fra historikken
 
 ### 🔶 Strava-integrasjon
+- **Per-profil tilkobling**: Hver bruker kobler sin egen Strava-konto (en API-app, flere brukere)
 - **OAuth 2.0**: Koble til Strava-kontoen din direkte fra appen
 - **Manuell opplasting**: Last opp enkeltøkter til Strava med ett klikk
-- **Automatisk opplasting**: Aktiver auto-sync for å laste opp automatisk etter hver økt
+- **Automatisk opplasting**: Laster opp automatisk etter økt hvis profilen har Strava-tilkobling
 - **TCX-format**: Genererer komplett TCX med hastighet, puls, distanse og tid
 - **Duplicate-beskyttelse**: Bruker `external_id` for å unngå duplikater
 - **Token refresh**: Automatisk fornyelse av utløpte tokens
@@ -240,10 +245,10 @@ For enheter uten Web Bluetooth-støtte:
 ```
 treadmill-controller/
 ├── server.js                  # Express server (~1500 linjer): API, WebSocket, Strava, TTS coaching
-├── coaching-engine.js         # HR-soner, trigger-evaluering, norske meldinger
+├── coaching-engine.js         # HR-soner, trigger-evaluering, norske meldinger (suppresser zone-violation under sonestyring)
 ├── tts-service.js             # OpenAI TTS API, SHA256-caching, A2DP-avspilling
 ├── package.json               # npm konfigurasjon
-├── templates.json             # 39 treningsøkter med target_max_zone
+├── templates.json             # 44 treningsøkter med target_max_zone og hr_zone_control
 ├── migrate.js                 # Database migrations (ALTER TABLE)
 ├── deploy-to-pi.sh            # Bash deploy-skript for Raspberry Pi
 ├── Dockerfile                 # Docker container build
@@ -263,6 +268,15 @@ treadmill-controller/
 ├── certs/                     # SSL-sertifikater (git-ignored)
 │   ├── server.key
 │   └── server.crt
+├── ble-service/               # Native BLE-tjeneste (kjører på RPi host, utenfor Docker)
+│   ├── ble-service.js         # Noble-basert BLE-kobling, session/segment-håndtering
+│   ├── ftms-native.js         # FTMS-protokoll for tredemølle
+│   ├── hrm-native.js          # Heart Rate Monitor-protokoll
+│   ├── hr-zone-controller.js  # HR-sonestyrt kontrollloop (fart/stigning-justering)
+│   ├── hr-utils.js            # Delt soneberegning (getZone, getZoneBoundaries)
+│   ├── fitshow-native.js      # Alternativ tredemølleprotokoll
+│   ├── ble-config.json        # Lagrede BLE-enhetsadresser
+│   └── treadmill-ble.service  # Systemd service-definisjon
 ├── docs/                      # Brukerveiledninger
 │   ├── HOME_USAGE_GUIDE.md    # Komplett bruksanvisning
 │   ├── WEB_BLUETOOTH_SETUP.md # Web Bluetooth oppsettguide
@@ -315,7 +329,7 @@ id, name (UNIQUE), max_hr, created_at
 
 ### `strava_auth`
 ```sql
-id, athlete_id (UNIQUE), access_token, refresh_token, expires_at, scope, athlete_name, connected_at
+id, athlete_id (UNIQUE), access_token, refresh_token, expires_at, scope, athlete_name, profile_id, connected_at
 ```
 
 ## 🔌 API Endepunkter
@@ -342,25 +356,26 @@ id, athlete_id (UNIQUE), access_token, refresh_token, expires_at, scope, athlete
 ### Sessions
 | Metode | Endepunkt | Beskrivelse |
 |--------|-----------|-------------|
-| GET | `/api/sessions?startDate=&endDate=` | Hent historikk (med datofilter) |
+| GET | `/api/sessions?startDate=&endDate=&profileId=` | Hent historikk (med dato- og profilfilter) |
 | GET | `/api/sessions/:id/details` | Hent økt med alle datapunkter |
 | GET | `/api/sessions/:id/segments` | Per-segment feedback |
 | GET | `/api/sessions/:id/export/json` | Eksporter som JSON |
 | GET | `/api/sessions/:id/export/csv` | Eksporter som CSV |
 | GET | `/api/sessions/:id/export/tcx` | Eksporter som TCX |
-| POST | `/api/sessions` | Start ny økt |
-| PUT | `/api/sessions/:id` | Oppdater økt (avslutt) |
+| POST | `/api/sessions` | Start ny økt `{ workout_id, profile_id, heart_rate_source }` |
+| PUT | `/api/sessions/:id` | Fullfør økt (avviser hvis allerede fullført) |
+| PATCH | `/api/sessions/:id/profile` | Oppdater øktprofil (fungerer på fullførte økter) |
 | POST | `/api/sessions/:id/data` | Registrer datapunkt |
 | DELETE | `/api/sessions/:id` | Slett økt |
 
-### Strava
+### Strava (per-profil tilkoblinger)
 | Metode | Endepunkt | Beskrivelse |
 |--------|-----------|-------------|
-| GET | `/auth/strava` | OAuth redirect til Strava |
-| GET | `/auth/strava/callback` | OAuth callback |
-| GET | `/api/strava/status` | Tilkoblingsstatus |
-| DELETE | `/api/strava/disconnect` | Koble fra Strava |
-| POST | `/api/strava/upload/:sessionId` | Last opp økt til Strava |
+| GET | `/auth/strava?profileId=X` | OAuth redirect (profileId via state-param) |
+| GET | `/auth/strava/callback` | OAuth callback (leser profileId fra state) |
+| GET | `/api/strava/status` | Tilkoblingsstatus per profil |
+| DELETE | `/api/strava/disconnect?profileId=X` | Koble fra Strava (per profil eller alle) |
+| POST | `/api/strava/upload/:sessionId` | Last opp økt (bruker øktens profil for tokens) |
 
 ### Statistics
 | Metode | Endepunkt | Beskrivelse |
@@ -460,10 +475,12 @@ Se [ROADMAP.md](ROADMAP.md) for komplett veikart. Oppsummering:
 - Fjernkontroll + dashboard for iPad/iPhone
 - TTS-coaching med OpenAI (norsk stemme, segment/sone/milepæl-triggere)
 - HR-soner med brukerprofiler (5-soner basert på maxHR)
-- Flerbruker-støtte (lettvekts profiler med navn + maxHR)
-- Målsoner på alle 39 templates
+- Flerbruker-støtte (profiler med navn + maxHR, per-profil Strava)
+- Profil-tagging og -filtrering i historikk
+- Målsoner på alle 44 templates
 - MaxHR-test-økt
 - A2DP-lydavspilling til tredemølle-høyttalere
+- HR-sonestyrt trening med automatisk fart/stigningsjustering (5 dedikerte templates)
 
 ### 🔜 Planlagt
 - **Workout Builder** — Visuell drag-and-drop segment-creator

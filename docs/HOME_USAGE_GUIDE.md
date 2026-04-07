@@ -112,6 +112,32 @@ Deretter:
 
 ---
 
+## 🎯 HR-sonestyrt trening
+
+Tredemøllen kan automatisk justere fart eller stigning for å holde deg i en bestemt pulssone.
+
+### Slik bruker du det
+1. Koble pulsbelte (HRM) via BLE-tjenesten på RPi
+2. Åpne view.html på iPad/iPhone
+3. Trykk **🎯 Sonestyrt** filteret for å se egnede økter
+4. Velg en økt (f.eks. "Sonestyrt: Sone 2 Utholdenhet 45")
+5. Aktiver **Sonestyring**-toggle og velg profil
+6. Trykk Start — tredemøllen justerer farten automatisk
+
+### Tilgjengelige sonestyrt-økter
+- **Sone 2 Utholdenhet 45 min** — Rolig langkjøring med fartsjustering
+- **Sone 3 Tempo 30 min** — Tempotrening med fartsjustering
+- **Sone 4 Terskel 3x8 min** — Terskelintervaller med aktiv hvile
+- **Progressiv Sonetrening 40 min** — Sone 2 → 3 → 4 med fartsjustering
+- **Sone 2 Bakketrening 35 min** — Stigningsjustering i sone 2
+
+### Viktig å vite
+- **Krever pulsbelte** — uten HRM-tilkobling startes økten som vanlig (fast fart)
+- **Manuell override** — bruk +/- knappene for å overstyre. Sonestyring pauser i 45 sekunder
+- **Kjører på RPi** — fungerer kun via native BLE-tjeneste (ikke browser-basert kontroll)
+
+---
+
 ## 🔧 Vedlikehold
 
 ### Månedlig
