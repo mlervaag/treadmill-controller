@@ -251,8 +251,12 @@ function broadcastDeviceStatus() {
       type: 'device_status',
       treadmill: ftms.isConnected() ? 'connected' : 'disconnected',
       treadmillName: ftms.isConnected() ? (fitshow.isConnected() ? fitshow.getState().model : 'Tredemølle') : null,
+      treadmillRetrying: !ftms.isConnected() && ftmsReconnectAttempts > 0 && ftmsReconnectAttempts <= BLE_MAX_ATTEMPTS,
+      treadmillGaveUp: ftmsReconnectAttempts > BLE_MAX_ATTEMPTS,
       hrm: hrm.isConnected() ? 'connected' : 'disconnected',
       hrmName: hrm.isConnected() ? hrm.getDeviceName() : null,
+      hrmRetrying: !hrm.isConnected() && hrmReconnectAttempts > 0 && hrmReconnectAttempts <= BLE_MAX_ATTEMPTS,
+      hrmGaveUp: hrmReconnectAttempts > BLE_MAX_ATTEMPTS,
       heartRate: hrm.getCurrentHeartRate(),
       bleBackend: 'native'
     });
@@ -453,15 +457,22 @@ async function handleBleReconnect(commandId, params) {
   const { deviceType } = params || {};
   try {
     if (deviceType === 'treadmill' && config.treadmillAddress) {
+      ftmsReconnectAttempts = 0;
+      ftmsReconnectDelay = 1000;
       await reconnectFtms();
       sendCommandResponse(commandId, 'ble_reconnect', true, null, { deviceType: 'treadmill' });
     } else if (deviceType === 'hrm' && config.hrmAddress) {
+      hrmReconnectAttempts = 0;
+      hrmReconnectDelay = 1000;
       await reconnectHrm();
       sendCommandResponse(commandId, 'ble_reconnect', true, null, { deviceType: 'hrm' });
     } else {
       sendCommandResponse(commandId, 'ble_reconnect', false, 'No saved address');
     }
   } catch (err) {
+    // First attempt failed — schedule retry loop
+    if (deviceType === 'treadmill') scheduleReconnect('treadmill');
+    if (deviceType === 'hrm') scheduleReconnect('hrm');
     sendCommandResponse(commandId, 'ble_reconnect', false, err.message);
   }
 }

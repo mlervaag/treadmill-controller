@@ -187,6 +187,17 @@
             font-weight: 700;
             font-size: 15px;
         }
+        .device-info-item .reconnect-link {
+            color: var(--warning-color);
+            font-size: 12px;
+            cursor: pointer;
+            text-decoration: underline;
+        }
+        .device-info-item .reconnect-link:active { opacity: 0.6; }
+        .device-info-item.disconnected .device-name {
+            color: var(--text-secondary);
+            opacity: 0.5;
+        }
         .scan-results {
             background: var(--card-bg);
             border: 1px solid var(--border-color);
@@ -1497,7 +1508,11 @@
             if (data.hrm) deviceStatus.hrm = data.hrm;
             if (data.bleBackend) deviceStatus.bleBackend = data.bleBackend;
             if (data.treadmillName !== undefined) deviceStatus.treadmillName = data.treadmillName;
+            if (data.treadmillRetrying !== undefined) deviceStatus.treadmillRetrying = data.treadmillRetrying;
+            if (data.treadmillGaveUp !== undefined) deviceStatus.treadmillGaveUp = data.treadmillGaveUp;
             if (data.hrmName !== undefined) deviceStatus.hrmName = data.hrmName;
+            if (data.hrmRetrying !== undefined) deviceStatus.hrmRetrying = data.hrmRetrying;
+            if (data.hrmGaveUp !== undefined) deviceStatus.hrmGaveUp = data.hrmGaveUp;
             if (data.heartRate !== undefined) deviceStatus.heartRate = data.heartRate;
             updateDeviceDots();
             hideNoControllerMsg();
@@ -1567,9 +1582,9 @@
 
         function updateDeviceInfoBar() {
             var $bar = document.getElementById('deviceInfoBar');
-            var anyConnected = deviceStatus.treadmill === 'connected' || deviceStatus.hrm === 'connected';
+            var hasBackend = deviceStatus.bleBackend === 'native';
 
-            if (!anyConnected) {
+            if (!hasBackend) {
                 $bar.classList.add('hidden');
                 return;
             }
@@ -1579,10 +1594,17 @@
             var $tmInfo = document.getElementById('treadmillInfo');
             var $tmName = document.getElementById('treadmillNameLabel');
             if (deviceStatus.treadmill === 'connected') {
-                $tmInfo.style.display = '';
+                $tmInfo.className = 'device-info-item';
                 $tmName.textContent = deviceStatus.treadmillName || 'Tredemølle';
             } else {
-                $tmInfo.style.display = 'none';
+                $tmInfo.className = 'device-info-item disconnected';
+                if (deviceStatus.treadmillRetrying) {
+                    $tmName.innerHTML = 'Mølle — kobler til...';
+                } else if (deviceStatus.treadmillGaveUp) {
+                    $tmName.innerHTML = 'Mølle frakoblet <span class="reconnect-link" onclick="reconnectDevice(\'treadmill\')">Prøv igjen</span>';
+                } else {
+                    $tmName.innerHTML = 'Mølle frakoblet';
+                }
             }
 
             // HRM info
@@ -1590,7 +1612,7 @@
             var $hrmName = document.getElementById('hrmNameLabel');
             var $liveHr = document.getElementById('liveHrLabel');
             if (deviceStatus.hrm === 'connected') {
-                $hrmInfo.style.display = '';
+                $hrmInfo.className = 'device-info-item';
                 $hrmName.textContent = deviceStatus.hrmName || 'Pulsmåler';
                 if (deviceStatus.heartRate && deviceStatus.heartRate > 0) {
                     $liveHr.textContent = deviceStatus.heartRate + ' bpm';
@@ -1598,8 +1620,24 @@
                     $liveHr.textContent = '—';
                 }
             } else {
-                $hrmInfo.style.display = 'none';
+                $hrmInfo.className = 'device-info-item disconnected';
+                $liveHr.textContent = '';
+                if (deviceStatus.hrmRetrying) {
+                    $hrmName.innerHTML = 'Puls — kobler til...';
+                } else if (deviceStatus.hrmGaveUp) {
+                    $hrmName.innerHTML = 'Puls frakoblet <span class="reconnect-link" onclick="reconnectDevice(\'hrm\')">Prøv igjen</span>';
+                } else {
+                    $hrmName.innerHTML = 'Puls frakoblet';
+                }
             }
+        }
+
+        function reconnectDevice(deviceType) {
+            sendCommand('ble_reconnect', { deviceType: deviceType }).then(function () {
+                showToast((deviceType === 'treadmill' ? 'Mølle' : 'Pulsbelte') + ' tilkoblet!');
+            }).catch(function () {
+                showToast('Tilkobling feilet — prøver automatisk...');
+            });
         }
 
         function showToast(msg) {
