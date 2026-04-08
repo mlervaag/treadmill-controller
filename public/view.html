@@ -160,20 +160,6 @@
         }
         .ble-btn:active { opacity: 0.7; }
         .ble-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-        .ble-btn.connected {
-            border-color: var(--success-color);
-            color: var(--success-color);
-            background: rgba(52, 199, 89, 0.1);
-        }
-        .ble-btn.connecting {
-            border-color: var(--warning-color);
-            color: var(--warning-color);
-            animation: ble-pulse 1.5s ease-in-out infinite;
-        }
-        @keyframes ble-pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
         .device-info-bar {
             display: flex;
             justify-content: space-between;
@@ -1012,11 +998,9 @@
             </div>
         </div>
 
-        <!-- BLE controls (native backend only, hidden when all connected) -->
+        <!-- BLE controls (shown only when a device is missing) -->
         <div id="bleControls" class="ble-controls hidden">
             <button class="ble-btn" id="btnBleScan">Skann enheter</button>
-            <button class="ble-btn" id="btnBleConnectTreadmill">Koble mølle</button>
-            <button class="ble-btn" id="btnBleConnectHrm">Koble puls</button>
         </div>
 
         <!-- ============================================================
@@ -1573,44 +1557,11 @@
         function updateBleControls() {
             var bothConnected = deviceStatus.treadmill === 'connected' && deviceStatus.hrm === 'connected';
 
-            // Hide BLE controls entirely when both devices are connected
+            // Show scan button only when a device is missing and backend is native
             if (bothConnected || deviceStatus.bleBackend !== 'native') {
                 $bleControls.classList.add('hidden');
-            } else if (deviceStatus.bleBackend === 'native') {
+            } else {
                 $bleControls.classList.remove('hidden');
-            }
-
-            var btnTm = document.getElementById('btnBleConnectTreadmill');
-            var btnHrm = document.getElementById('btnBleConnectHrm');
-
-            // Treadmill button
-            btnTm.className = 'ble-btn';
-            if (deviceStatus.treadmill === 'connected') {
-                btnTm.textContent = 'Mølle tilkoblet';
-                btnTm.classList.add('connected');
-                btnTm.disabled = true;
-            } else if (deviceStatus.treadmill === 'connecting') {
-                btnTm.textContent = 'Kobler til mølle...';
-                btnTm.classList.add('connecting');
-                btnTm.disabled = true;
-            } else {
-                btnTm.textContent = 'Koble mølle';
-                btnTm.disabled = false;
-            }
-
-            // HRM button
-            btnHrm.className = 'ble-btn';
-            if (deviceStatus.hrm === 'connected') {
-                btnHrm.textContent = 'Puls tilkoblet';
-                btnHrm.classList.add('connected');
-                btnHrm.disabled = true;
-            } else if (deviceStatus.hrm === 'connecting') {
-                btnHrm.textContent = 'Kobler til puls...';
-                btnHrm.classList.add('connecting');
-                btnHrm.disabled = true;
-            } else {
-                btnHrm.textContent = 'Koble puls';
-                btnHrm.disabled = false;
             }
         }
 
@@ -1852,31 +1803,18 @@
         var $scanResults = null;
         var bleBusy = false;
 
-        function setBleButtonsBusy(busy, activeBtn) {
-            bleBusy = busy;
-            var btns = [
-                document.getElementById('btnBleScan'),
-                document.getElementById('btnBleConnectTreadmill'),
-                document.getElementById('btnBleConnectHrm')
-            ];
-            btns.forEach(function (b) {
-                if (b !== activeBtn) b.disabled = busy;
-            });
-        }
-
         document.getElementById('btnBleScan').addEventListener('click', function () {
             if (bleBusy) return;
             var btn = document.getElementById('btnBleScan');
             btn.textContent = 'Skanner...';
             btn.disabled = true;
-            setBleButtonsBusy(true, btn);
+            bleBusy = true;
 
             sendCommand('ble_scan', { duration: 8000 }).then(function (res) {
                 var devices = (res && res.data && res.data.devices) || [];
                 btn.textContent = 'Skann enheter';
                 btn.disabled = false;
-                setBleButtonsBusy(false);
-                updateBleControls();
+                bleBusy = false;
 
                 if (devices.length === 0) {
                     showToast('Ingen enheter funnet. Er møllen/pulsbeltet på?');
@@ -1887,8 +1825,7 @@
             }).catch(function (err) {
                 btn.textContent = 'Skann enheter';
                 btn.disabled = false;
-                setBleButtonsBusy(false);
-                updateBleControls();
+                bleBusy = false;
                 showToast('Skanning feilet: ' + err.message);
             });
         });
@@ -1911,16 +1848,15 @@
                     if (bleBusy) return;
                     var deviceType = d.hasFTMS ? 'treadmill' : 'hrm';
                     item.innerHTML = icon + ' <strong>' + escapeHtml(d.name || 'Ukjent') + '</strong> — <em style="color:var(--warning-color)">Kobler til...</em>';
-                    setBleButtonsBusy(true, null);
+                    bleBusy = true;
                     sendCommand('ble_connect', { deviceType: deviceType, address: d.address }).then(function () {
                         item.innerHTML = icon + ' <strong>' + escapeHtml(d.name) + '</strong> — <span style="color:var(--success-color)">Tilkoblet!</span>';
-                        setBleButtonsBusy(false);
+                        bleBusy = false;
                         updateBleControls();
                         setTimeout(function () { if ($scanResults) $scanResults.remove(); $scanResults = null; }, 2000);
                     }).catch(function (err) {
                         item.innerHTML = icon + ' <strong>' + escapeHtml(d.name) + '</strong> — <span style="color:var(--danger-color)">' + err.message + '</span>';
-                        setBleButtonsBusy(false);
-                        updateBleControls();
+                        bleBusy = false;
                     });
                 });
                 $scanResults.appendChild(item);
@@ -1931,37 +1867,6 @@
             bleCtrl.parentNode.insertBefore($scanResults, bleCtrl.nextSibling);
         }
 
-        document.getElementById('btnBleConnectTreadmill').addEventListener('click', function () {
-            if (bleBusy) return;
-            deviceStatus.treadmill = 'connecting';
-            setBleButtonsBusy(true, null);
-            updateBleControls();
-            sendCommand('ble_reconnect', { deviceType: 'treadmill' }).then(function () {
-                setBleButtonsBusy(false);
-                showToast('Mølle tilkoblet!');
-            }).catch(function (err) {
-                deviceStatus.treadmill = 'disconnected';
-                setBleButtonsBusy(false);
-                updateBleControls();
-                showToast('Feilet: ' + err.message + '. Prøv Skann først.');
-            });
-        });
-
-        document.getElementById('btnBleConnectHrm').addEventListener('click', function () {
-            if (bleBusy) return;
-            deviceStatus.hrm = 'connecting';
-            setBleButtonsBusy(true, null);
-            updateBleControls();
-            sendCommand('ble_reconnect', { deviceType: 'hrm' }).then(function () {
-                setBleButtonsBusy(false);
-                showToast('Pulsbelte tilkoblet!');
-            }).catch(function (err) {
-                deviceStatus.hrm = 'disconnected';
-                setBleButtonsBusy(false);
-                updateBleControls();
-                showToast('Feilet: ' + err.message + '. Prøv Skann først.');
-            });
-        });
 
         // -------------------------------------------------------------------
         // Command response handler
