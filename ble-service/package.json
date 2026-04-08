@@ -1,7 +1,7 @@
 {
   "name": "treadmill-ble-service",
   "version": "1.0.0",
-  "description": "Native BLE service for treadmill controller — connects to FTMS treadmill and HRM via noble",
+  "description": "Native BLE service for treadmill controller — connects to FTMS treadmill and HRM via BlueZ/D-Bus",
   "main": "ble-service.js",
   "scripts": {
     "start": "node ble-service.js"
@@ -10,7 +10,7 @@
     "node": ">= 18"
   },
   "dependencies": {
-    "@abandonware/noble": "^1.9.2-26",
+    "node-ble": "^1.13.0",
     "ws": "^8.19.0",
     "node-fetch": "^3.3.2"
   }

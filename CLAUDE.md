@@ -34,7 +34,7 @@ ssh pi@192.168.1.12 "curl -s http://localhost:3000/api/profiles"
 openssl req -x509 -newkey rsa:4096 -nodes -out certs/server.crt -keyout certs/server.key -days 365
 
 # BLE Service (on RPi host, outside Docker)
-cd ~/treadmill-controller/ble-service && bash install.sh  # First-time setup
+cd ~/treadmill-controller/ble-service && bash install.sh  # First-time setup (installs node-ble, D-Bus config)
 sudo systemctl start treadmill-ble    # Start BLE service
 sudo systemctl status treadmill-ble   # Check status
 sudo journalctl -u treadmill-ble -f   # View logs
@@ -59,7 +59,7 @@ No test suite exists. No linter configured.
 - `public/sw.js` — Service worker for PWA offline support. Cache-first for static assets, network-first for API.
 - `public/manifest.json` — PWA manifest with Norwegian locale.
 
-**BLE Service** (`ble-service/`): Separate Node.js process on RPi host (not Docker). Uses `@abandonware/noble` for BLE. Runs as systemd service (`treadmill-ble.service`). Connects to server via WebSocket on `ws://localhost:3000`. Stores known device addresses in `ble-config.json`.
+**BLE Service** (`ble-service/`): Separate Node.js process on RPi host (not Docker). Uses `node-ble` (D-Bus/BlueZ) for BLE — supports simultaneous connections to treadmill and heart rate monitor. Runs as systemd service (`treadmill-ble.service`). Connects to server via WebSocket on `ws://localhost:3000`. Stores known device addresses in `ble-config.json`.
 
 **HR Zone Controller** (`ble-service/hr-zone-controller.js`): Automatic speed/incline adjustment to maintain target HR zone. Runs as part of the BLE service, ticked every 1 second. Uses `ble-service/hr-utils.js` for zone calculation. Adjusts every 20 seconds with hysteresis, accumulation caps, and direction-change cooldown to prevent oscillation. Pauses on manual override (45s) and FTMS disconnect.
 
@@ -195,6 +195,7 @@ Things that have caused confusion or bugs — read these before making changes:
 15. **Coaching engine suppresses zone-violation TTS when HR zone controller is active** — `state.hrZoneControl.active` flag controls this. Zone violation messages (trigger 2) are skipped; HR zone controller sends its own TTS via `hr_zone_status` WebSocket messages.
 16. **Sonestyring only works via native BLE service** — `app.js` browser-based `executeSegment()` does not support HR zone control. iPad/view.html starts sessions via WebSocket → ble-service handles everything.
 17. **`set_speed`/`set_incline` WebSocket commands** are new — added for manual override during HR zone control. They also work for non-HR-controlled sessions. These pause the HR zone controller for 45 seconds.
+18. **BLE service uses node-ble (D-Bus/BlueZ), not noble** — supports multiple simultaneous BLE connections. Requires D-Bus config file at `/etc/dbus-1/system.d/node-ble.conf` (installed by install.sh). If BLE connections fail, check `systemctl status bluetooth` and D-Bus permissions.
 
 ## Known Issues
 

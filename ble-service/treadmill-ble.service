@@ -1,5 +1,5 @@
 [Unit]
-Description=Treadmill BLE Service (native noble)
+Description=Treadmill BLE Service (BlueZ/D-Bus)
 After=bluetooth.target network.target
 Wants=bluetooth.target
 

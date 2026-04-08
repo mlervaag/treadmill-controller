@@ -1,45 +1,39 @@
-#!/usr/bin/env bash
-# install.sh — Set up the Treadmill BLE Service on a Raspberry Pi / Linux host
-set -euo pipefail
-
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SERVICE_NAME="treadmill-ble"
-SERVICE_FILE="${SCRIPT_DIR}/treadmill-ble.service"
+#!/bin/bash
+set -e
 
 echo "=== Treadmill BLE Service Installer ==="
 
-# 1. Install system dependencies
-echo ""
-echo "--- Installing apt dependencies ---"
+# Ensure bluetooth and D-Bus packages are installed
+echo "Installing system packages..."
 sudo apt-get update
-sudo apt-get install -y bluetooth bluez libbluetooth-dev libudev-dev build-essential
+sudo apt-get install -y bluetooth bluez
 
-# 2. Install Node.js dependencies
-echo ""
-echo "--- Installing npm packages ---"
-cd "${SCRIPT_DIR}"
+# Install npm dependencies (no native bindings needed)
+echo "Installing npm dependencies..."
+cd "$(dirname "$0")"
 npm install --production
 
-# 3. Enable bluetooth systemd service
-echo ""
-echo "--- Enabling bluetooth service ---"
+# Install D-Bus permissions for node-ble
+echo "Installing D-Bus config..."
+sudo cp dbus-node-ble.conf /etc/dbus-1/system.d/node-ble.conf
+sudo systemctl reload dbus
+
+# Ensure bluetooth service is running (node-ble uses BlueZ via D-Bus)
 sudo systemctl enable bluetooth
 sudo systemctl start bluetooth
 
-# 4. Copy and enable the systemd unit
-echo ""
-echo "--- Installing systemd service ---"
-sudo cp "${SERVICE_FILE}" /etc/systemd/system/${SERVICE_NAME}.service
+# Add pi user to bluetooth group
+sudo usermod -aG bluetooth pi
+
+# Install systemd service
+echo "Installing systemd service..."
+sudo cp treadmill-ble.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable ${SERVICE_NAME}.service
+sudo systemctl enable treadmill-ble
 
 echo ""
 echo "=== Installation complete ==="
-echo ""
-echo "Edit ble-config.json to set your server URL if needed."
-echo ""
-echo "Commands:"
-echo "  sudo systemctl start ${SERVICE_NAME}    # Start the service"
-echo "  sudo systemctl stop ${SERVICE_NAME}     # Stop the service"
-echo "  sudo systemctl status ${SERVICE_NAME}   # Check status"
-echo "  journalctl -u ${SERVICE_NAME} -f        # Follow logs"
+echo "Start:   sudo systemctl start treadmill-ble"
+echo "Stop:    sudo systemctl stop treadmill-ble"
+echo "Status:  sudo systemctl status treadmill-ble"
+echo "Logs:    journalctl -u treadmill-ble -f"

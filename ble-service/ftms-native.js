@@ -1,19 +1,22 @@
-// FTMS (Fitness Machine Service) — native BLE implementation using noble
-// Ported from public/ftms.js for headless operation on Linux/Raspberry Pi
+// FTMS (Fitness Machine Service) — native BLE implementation using node-ble (D-Bus/BlueZ)
+// Ported from noble-based implementation for multi-connection support on Raspberry Pi
 // UUID Reference: https://www.bluetooth.com/specifications/specs/fitness-machine-service-1-0/
 
 const { EventEmitter } = require('events');
 
-const FTMS_SERVICE_UUID = '1826';
-const TREADMILL_DATA_UUID = '2acd';
-const FITNESS_MACHINE_CONTROL_POINT_UUID = '2ad9';
-const FITNESS_MACHINE_STATUS_UUID = '2ada';
-const FITNESS_MACHINE_FEATURE_UUID = '2acc';
+// Full 128-bit UUIDs required by node-ble
+const FTMS_SERVICE_UUID = '00001826-0000-1000-8000-00805f9b34fb';
+const TREADMILL_DATA_UUID = '00002acd-0000-1000-8000-00805f9b34fb';
+const FITNESS_MACHINE_CONTROL_POINT_UUID = '00002ad9-0000-1000-8000-00805f9b34fb';
+const FITNESS_MACHINE_STATUS_UUID = '00002ada-0000-1000-8000-00805f9b34fb';
+const FITNESS_MACHINE_FEATURE_UUID = '00002acc-0000-1000-8000-00805f9b34fb';
 
 class FTMSNative extends EventEmitter {
   constructor() {
     super();
-    this.peripheral = null;
+    this._device = null;
+    this._gattServer = null;
+    this._connected = false;
     this.controlPoint = null;
     this.treadmillDataChar = null;
     this.statusCharacteristic = null;
@@ -33,64 +36,68 @@ class FTMSNative extends EventEmitter {
     // Flags to distinguish app-initiated commands from manual treadmill changes
     this._expectingSpeedConfirm = false;
     this._expectingInclineConfirm = false;
+    this._connectionCheckTimer = null;
   }
 
-  async connect(peripheral) {
-    this.peripheral = peripheral;
+  async connect(device) {
+    this._device = device;
+    this._connected = false;
 
-    peripheral.once('disconnect', () => {
-      console.log('[FTMS] Peripheral disconnected');
+    // Listen for disconnect
+    device.once('disconnect', () => {
+      console.log('[FTMS] Device disconnected');
+      this._connected = false;
       this.controlPoint = null;
       this.treadmillDataChar = null;
       this.statusCharacteristic = null;
+      this._gattServer = null;
       this.emit('disconnect');
     });
 
-    console.log('[FTMS] Connecting to peripheral:', peripheral.advertisement.localName || peripheral.id);
-    await new Promise((resolve, reject) => {
-      peripheral.connect((err) => err ? reject(err) : resolve());
-    });
+    console.log('[FTMS] Connecting to device...');
+    // Connect with 30s timeout
+    await Promise.race([
+      device.connect(),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Connection timeout (30s) — is the treadmill on?')), 30000)
+      )
+    ]);
+    this._connected = true;
 
     console.log('[FTMS] Discovering services and characteristics...');
-    const { characteristics: allCharacteristics } = await new Promise((resolve, reject) => {
-      peripheral.discoverAllServicesAndCharacteristics(
-        (err, services, characteristics) => {
-          if (err) return reject(err);
-          resolve({ services, characteristics });
-        }
-      );
-    });
+    const gattServer = await device.gatt();
+    this._gattServer = gattServer;
 
-    // Store all characteristics so callers can pass them to other protocol handlers (e.g. FitShow)
-    this._allCharacteristics = allCharacteristics;
-    const characteristics = allCharacteristics;
+    const ftmsService = await gattServer.getPrimaryService(FTMS_SERVICE_UUID);
 
-    for (const char of characteristics) {
-      const uuid = char.uuid.toLowerCase();
-      if (uuid === TREADMILL_DATA_UUID) this.treadmillDataChar = char;
-      else if (uuid === FITNESS_MACHINE_CONTROL_POINT_UUID) this.controlPoint = char;
-      else if (uuid === FITNESS_MACHINE_STATUS_UUID) this.statusCharacteristic = char;
+    // Discover individual characteristics by UUID
+    this.treadmillDataChar = await ftmsService.getCharacteristic(TREADMILL_DATA_UUID);
+    this.controlPoint = await ftmsService.getCharacteristic(FITNESS_MACHINE_CONTROL_POINT_UUID);
+
+    try {
+      this.statusCharacteristic = await ftmsService.getCharacteristic(FITNESS_MACHINE_STATUS_UUID);
+    } catch (err) {
+      console.log('[FTMS] Status characteristic not available:', err.message);
+      this.statusCharacteristic = null;
     }
 
     if (!this.controlPoint) throw new Error('Control Point characteristic not found');
     if (!this.treadmillDataChar) throw new Error('Treadmill Data characteristic not found');
 
     // Subscribe to treadmill data notifications
-    await new Promise((resolve, reject) => {
-      this.treadmillDataChar.subscribe((err) => err ? reject(err) : resolve());
-    });
-    this.treadmillDataChar.on('data', (data) => {
-      this._handleTreadmillData(data);
+    await this.treadmillDataChar.startNotifications();
+    this.treadmillDataChar.on('valuechanged', (raw) => {
+      const buf = Buffer.isBuffer(raw) ? raw : Buffer.from(raw);
+      this._handleTreadmillData(buf);
     });
 
     // Subscribe to status notifications
     if (this.statusCharacteristic) {
       try {
-        await new Promise((resolve, reject) => {
-          this.statusCharacteristic.subscribe((err) => err ? reject(err) : resolve());
-        });
-        this.statusCharacteristic.on('data', (data) => {
-          this._handleStatusChange(data);
+        await this.statusCharacteristic.startNotifications();
+        this.statusCharacteristic.on('valuechanged', (raw) => {
+          const buf = Buffer.isBuffer(raw) ? raw : Buffer.from(raw);
+          this._handleStatusChange(buf);
         });
       } catch (err) {
         console.log('[FTMS] Status characteristic not available:', err.message);
@@ -98,7 +105,34 @@ class FTMSNative extends EventEmitter {
     }
 
     console.log('[FTMS] Connected and subscribed to notifications');
+
+    this._connectionCheckTimer = setInterval(async () => {
+      try {
+        if (this._device) {
+          const connected = await this._device.isConnected().catch(() => false);
+          if (!connected && this._connected) {
+            this._connected = false;
+            clearInterval(this._connectionCheckTimer);
+            this._connectionCheckTimer = null;
+            console.log('[FTMS] Peripheral disconnected');
+            this.controlPoint = null;
+            this.treadmillDataChar = null;
+            this.statusCharacteristic = null;
+            this.emit('disconnect');
+          }
+        }
+      } catch (e) { /* ignore check errors */ }
+    }, 5000);
+
     return true;
+  }
+
+  /**
+   * Returns the GATT server so other protocol handlers (e.g. FitShow) can
+   * discover additional services/characteristics on the same connection.
+   */
+  getGattServer() {
+    return this._gattServer;
   }
 
   _handleTreadmillData(buf) {
@@ -303,12 +337,8 @@ class FTMSNative extends EventEmitter {
     if (!this.controlPoint) throw new Error('Not connected');
     await this._ensureCommandGap();
 
-    await new Promise((resolve, reject) => {
-      this.controlPoint.write(buf, false, (err) => {
-        if (err) return reject(err);
-        resolve();
-      });
-    });
+    // FTMS Control Point requires Write With Response
+    await this.controlPoint.writeValueWithResponse(buf);
     this.lastWriteTime = Date.now();
   }
 
@@ -414,15 +444,25 @@ class FTMSNative extends EventEmitter {
     return this.lastReportedIncline;
   }
 
+  /**
+   * Returns all characteristics discovered during connect().
+   * With node-ble, callers should use getGattServer() instead to discover
+   * characteristics on-demand via the GATT API.
+   */
   getAllCharacteristics() {
-    return this._allCharacteristics || [];
+    return null;
   }
 
   isConnected() {
-    return this.peripheral && this.peripheral.state === 'connected';
+    return this._connected;
   }
 
-  disconnect() {
+  async disconnect() {
+    if (this._connectionCheckTimer) {
+      clearInterval(this._connectionCheckTimer);
+      this._connectionCheckTimer = null;
+    }
+
     if (this.pendingSpeedConfirm) {
       clearTimeout(this.pendingSpeedConfirm.timeoutId);
       this.pendingSpeedConfirm.resolve(false);
@@ -434,8 +474,9 @@ class FTMSNative extends EventEmitter {
       this.pendingInclineConfirm = null;
     }
 
-    if (this.peripheral && this.peripheral.state === 'connected') {
-      this.peripheral.disconnect();
+    if (this._device && this._connected) {
+      await this._device.disconnect();
+      this._connected = false;
       console.log('[FTMS] Disconnected from treadmill');
     }
   }

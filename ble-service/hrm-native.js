@@ -1,98 +1,97 @@
-// Heart Rate Monitor (HRM) — native BLE implementation using noble
-// Ported from public/hrm.js for headless operation on Linux/Raspberry Pi
-// Standard Heart Rate Service UUID: 0x180D
-// Reference: https://www.bluetooth.com/specifications/specs/heart-rate-service-1-0/
-
 const { EventEmitter } = require('events');
 
-const HEART_RATE_SERVICE_UUID = '180d';
-const HEART_RATE_MEASUREMENT_UUID = '2a37';
-const BODY_SENSOR_LOCATION_UUID = '2a38';
+const HEART_RATE_SERVICE_UUID = '0000180d-0000-1000-8000-00805f9b34fb';
+const HEART_RATE_MEASUREMENT_UUID = '00002a37-0000-1000-8000-00805f9b34fb';
+const BODY_SENSOR_LOCATION_UUID = '00002a38-0000-1000-8000-00805f9b34fb';
 
 class HRMNative extends EventEmitter {
   constructor() {
     super();
-    this.peripheral = null;
+    this.device = null;
     this.characteristic = null;
     this.currentHeartRate = null;
     this.deviceName = null;
+    this._connected = false;
+    this._connectionCheckTimer = null;
   }
 
-  async connect(peripheral) {
-    this.peripheral = peripheral;
-    this.deviceName = peripheral.advertisement.localName || peripheral.id;
-
-    peripheral.once('disconnect', () => {
-      console.log('[HRM] Peripheral disconnected');
-      this.characteristic = null;
-      this.currentHeartRate = null;
-      this.emit('disconnect');
-    });
+  async connect(device, deviceName) {
+    this.device = device;
+    this.deviceName = deviceName || 'HRM';
+    this._connected = false;
 
     console.log('[HRM] Connecting to peripheral:', this.deviceName);
-    await new Promise((resolve, reject) => {
-      peripheral.connect((err) => err ? reject(err) : resolve());
-    });
+    await Promise.race([
+      device.connect(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Connection timeout (30s)')), 30000))
+    ]);
+    this._connected = true;
 
     console.log('[HRM] Discovering services and characteristics...');
-    const { characteristics } = await new Promise((resolve, reject) => {
-      peripheral.discoverSomeServicesAndCharacteristics(
-        [HEART_RATE_SERVICE_UUID],
-        [HEART_RATE_MEASUREMENT_UUID, BODY_SENSOR_LOCATION_UUID],
-        (err, services, characteristics) => {
-          if (err) return reject(err);
-          resolve({ services, characteristics });
-        }
-      );
-    });
+    const gattServer = await device.gatt();
 
-    let measurementChar = null;
-    let locationChar = null;
-    for (const char of characteristics) {
-      const uuid = char.uuid.toLowerCase();
-      if (uuid === HEART_RATE_MEASUREMENT_UUID) measurementChar = char;
-      else if (uuid === BODY_SENSOR_LOCATION_UUID) locationChar = char;
+    let hrsService;
+    try {
+      hrsService = await gattServer.getPrimaryService(HEART_RATE_SERVICE_UUID);
+    } catch (e) {
+      throw new Error('Heart Rate Service (180D) not found');
     }
 
-    if (!measurementChar) throw new Error('Heart Rate Measurement characteristic not found');
+    let measurementChar;
+    try {
+      measurementChar = await hrsService.getCharacteristic(HEART_RATE_MEASUREMENT_UUID);
+    } catch (e) {
+      throw new Error('Heart Rate Measurement characteristic not found');
+    }
     this.characteristic = measurementChar;
 
     // Try to read body sensor location (optional)
-    if (locationChar) {
-      try {
-        const locBuf = await new Promise((resolve, reject) => {
-          locationChar.read((err, data) => err ? reject(err) : resolve(data));
-        });
-        const location = this._getBodySensorLocation(locBuf.readUInt8(0));
-        console.log('[HRM] Body sensor location:', location);
-      } catch (err) {
-        console.log('[HRM] Body sensor location not available');
-      }
+    try {
+      const locationChar = await hrsService.getCharacteristic(BODY_SENSOR_LOCATION_UUID);
+      const locBuf = await locationChar.readValue();
+      const location = this._getBodySensorLocation(locBuf.readUInt8(0));
+      console.log('[HRM] Body sensor location:', location);
+    } catch (err) {
+      console.log('[HRM] Body sensor location not available');
     }
 
     // Subscribe to heart rate notifications
-    await new Promise((resolve, reject) => {
-      this.characteristic.subscribe((err) => err ? reject(err) : resolve());
-    });
-    this.characteristic.on('data', (data) => {
-      this._handleHeartRateChange(data);
+    await this.characteristic.startNotifications();
+    this.characteristic.on('valuechanged', (raw) => {
+      const buffer = Buffer.isBuffer(raw) ? raw : Buffer.from(raw);
+      this._handleHeartRateChange(buffer);
     });
 
     console.log('[HRM] Connected and subscribed to notifications');
+
+    this._connectionCheckTimer = setInterval(async () => {
+      try {
+        if (this.device) {
+          const connected = await this.device.isConnected().catch(() => false);
+          if (!connected && this._connected) {
+            this._connected = false;
+            clearInterval(this._connectionCheckTimer);
+            this._connectionCheckTimer = null;
+            console.log('[HRM] Peripheral disconnected');
+            this.characteristic = null;
+            this.currentHeartRate = null;
+            this.emit('disconnect');
+          }
+        }
+      } catch (e) { /* ignore */ }
+    }, 5000);
+
     return true;
   }
 
   _handleHeartRateChange(buf) {
-    // Parse Heart Rate Measurement per Bluetooth Heart Rate Service spec
     const flags = buf.readUInt8(0);
-    const rate16Bits = flags & 0x01;       // Bit 0: Heart Rate Value Format
-    const contactDetected = flags & 0x06;  // Bit 1-2: Sensor Contact Status
-    const energyExpended = flags & 0x08;   // Bit 3: Energy Expended Status
+    const rate16Bits = flags & 0x01;
+    const contactDetected = flags & 0x06;
 
     let heartRate;
     let offset = 1;
 
-    // Read heart rate value (8-bit or 16-bit)
     if (rate16Bits) {
       heartRate = buf.readUInt16LE(offset);
       offset += 2;
@@ -101,7 +100,6 @@ class HRMNative extends EventEmitter {
       offset += 1;
     }
 
-    // Check sensor contact (optional)
     const contactSupported = (contactDetected & 0x04) !== 0;
     const contactGood = (contactDetected & 0x02) !== 0;
 
@@ -115,36 +113,26 @@ class HRMNative extends EventEmitter {
   }
 
   _getBodySensorLocation(value) {
-    const locations = {
-      0: 'Other',
-      1: 'Chest',
-      2: 'Wrist',
-      3: 'Finger',
-      4: 'Hand',
-      5: 'Ear Lobe',
-      6: 'Foot'
-    };
+    const locations = { 0: 'Other', 1: 'Chest', 2: 'Wrist', 3: 'Finger', 4: 'Hand', 5: 'Ear Lobe', 6: 'Foot' };
     return locations[value] || 'Unknown';
   }
 
-  getCurrentHeartRate() {
-    return this.currentHeartRate;
-  }
-
-  getDeviceName() {
-    return this.deviceName;
-  }
-
-  isConnected() {
-    return this.peripheral && this.peripheral.state === 'connected';
-  }
+  getCurrentHeartRate() { return this.currentHeartRate; }
+  getDeviceName() { return this.deviceName; }
+  isConnected() { return this._connected === true; }
 
   disconnect() {
-    if (this.peripheral && this.peripheral.state === 'connected') {
-      this.peripheral.disconnect();
+    if (this._connectionCheckTimer) {
+      clearInterval(this._connectionCheckTimer);
+      this._connectionCheckTimer = null;
+    }
+
+    this._connected = false;
+    this.currentHeartRate = null;
+    if (this.device) {
+      this.device.disconnect().catch(() => {});
       console.log('[HRM] Disconnected from Heart Rate Monitor');
     }
-    this.currentHeartRate = null;
   }
 }
 

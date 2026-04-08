@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 // Native BLE Service for Treadmill Controller
 // Runs as a headless daemon, connects to the server via WebSocket,
-// and drives FTMS treadmill + HRM via noble (no browser required).
+// and drives FTMS treadmill + HRM via node-ble (D-Bus/BlueZ).
 
-const noble = require('@abandonware/noble');
+const { createBluetooth } = require('node-ble');
+const { bluetooth, destroy: destroyBluetooth } = createBluetooth();
+let adapter = null;
 const WebSocket = require('ws');
 const fetch = (...args) => import('node-fetch').then(({ default: f }) => f(...args));
 const fs = require('fs');
@@ -71,9 +73,6 @@ let dataFlushTimer = null;
 // Drift detection
 let driftTimer = null;
 const DRIFT_CHECK_INTERVAL = 8000; // ms
-
-// Scan guard
-let scanInProgress = false;
 
 // State broadcast timer
 let stateBroadcastTimer = null;
@@ -327,78 +326,48 @@ function sendCommandResponse(commandId, command, success, error, data) {
 
 // ── BLE Scan ────────────────────────────────────────────────────────────────
 async function handleBleScan(commandId, params) {
-  if (scanInProgress) {
-    sendCommandResponse(commandId, 'ble_scan', false, 'Scan already in progress');
-    return;
+  try {
+    const devices = await doBleScan(params);
+    sendCommandResponse(commandId, 'ble_scan', true, null, { devices });
+  } catch (err) {
+    sendCommandResponse(commandId, 'ble_scan', false, err.message);
   }
+}
 
+async function doBleScan(params) {
   const duration = (params && params.duration) || 10000;
-  scanInProgress = true;
-  const discovered = [];
-
   console.log(`[BLE] Starting scan for ${duration / 1000}s...`);
 
-  // Ensure noble is powered on
-  if (noble.state !== 'poweredOn') {
-    await new Promise((resolve) => {
-      const timeout = setTimeout(() => resolve(), 5000);
-      noble.once('stateChange', (state) => {
-        clearTimeout(timeout);
-        resolve();
-      });
-      if (noble.state === 'poweredOn') { clearTimeout(timeout); resolve(); }
-    });
+  if (!adapter) adapter = await bluetooth.defaultAdapter();
+  if (!await adapter.isPowered()) throw new Error('Bluetooth adapter not powered on');
+
+  if (!await adapter.isDiscovering()) {
+    await adapter.startDiscovery();
   }
 
-  if (noble.state !== 'poweredOn') {
-    scanInProgress = false;
-    sendCommandResponse(commandId, 'ble_scan', false, 'Bluetooth not powered on');
-    return;
-  }
+  await new Promise(r => setTimeout(r, duration));
 
-  const onDiscover = (peripheral) => {
-    const name = peripheral.advertisement.localName || null;
-    const addr = peripheral.address || peripheral.id;
-    const serviceUuids = peripheral.advertisement.serviceUuids || [];
-    const hasFTMS = serviceUuids.some(u => u.toLowerCase().replace(/-/g, '').includes('1826'));
-    const hasHRM = serviceUuids.some(u => u.toLowerCase().replace(/-/g, '').includes('180d'));
+  try { await adapter.stopDiscovery(); } catch (e) { /* may already be stopped */ }
 
-    // Only report devices that have FTMS, HRM, or a recognizable name
-    if (hasFTMS || hasHRM || name) {
-      const entry = { name, address: addr, services: serviceUuids, hasFTMS, hasHRM };
-      // Avoid duplicates
-      if (!discovered.find(d => d.address === addr)) {
-        discovered.push(entry);
-        // Send incremental result
-        wsSend({ type: 'ble_scan_device', device: entry });
+  const deviceAddresses = await adapter.devices();
+  const discovered = [];
+
+  for (const addr of deviceAddresses) {
+    try {
+      const device = await adapter.waitDevice(addr, 1000);
+      const name = await device.getName().catch(() => null);
+      const uuids = await device.getUUIDs().catch(() => []);
+      const hasFTMS = uuids.some(u => u.toLowerCase().includes('1826'));
+      const hasHRM = uuids.some(u => u.toLowerCase().includes('180d'));
+
+      if (hasFTMS || hasHRM || name) {
+        discovered.push({ name, address: addr, services: uuids, hasFTMS, hasHRM });
       }
-    }
-  };
-
-  noble.on('discover', onDiscover);
-
-  try {
-    await new Promise((resolve, reject) => {
-      noble.startScanning([], true, (err) => {
-        if (err) return reject(err);
-        resolve();
-      });
-    });
-  } catch (err) {
-    scanInProgress = false;
-    noble.removeListener('discover', onDiscover);
-    sendCommandResponse(commandId, 'ble_scan', false, err.message);
-    return;
+    } catch (e) { /* Device may have gone out of range */ }
   }
 
-  // Stop after duration
-  setTimeout(() => {
-    noble.stopScanning();
-    noble.removeListener('discover', onDiscover);
-    scanInProgress = false;
-    console.log(`[BLE] Scan complete, found ${discovered.length} device(s)`);
-    sendCommandResponse(commandId, 'ble_scan', true, null, { devices: discovered });
-  }, duration);
+  console.log(`[BLE] Scan complete, found ${discovered.length} device(s)`);
+  return discovered;
 }
 
 // ── BLE Connect ─────────────────────────────────────────────────────────────
@@ -408,92 +377,55 @@ async function handleBleConnect(commandId, params) {
     sendCommandResponse(commandId, 'ble_connect', false, 'No address provided');
     return;
   }
-
   try {
-    const peripheral = await findPeripheralByAddress(address);
-    if (!peripheral) {
-      sendCommandResponse(commandId, 'ble_connect', false, 'Device not found. Try scanning first.');
-      return;
-    }
-
-    if (deviceType === 'treadmill') {
-      await ftms.connect(peripheral);
-      setupFtmsListeners();
-      // Also connect FitShow FFF0 using pre-discovered characteristics
-      try {
-        await fitshow.connectWithCharacteristics(peripheral, ftms.getAllCharacteristics());
-        setupFitshowListeners();
-        console.log('[BLE] FitShow FFF0 protocol connected');
-      } catch (e) {
-        console.log('[BLE] FitShow FFF0 not available:', e.message);
-      }
-      config.treadmillAddress = address;
-      saveConfig(config);
-      ftmsReconnectDelay = 1000;
-      sendCommandResponse(commandId, 'ble_connect', true, null, { deviceType: 'treadmill', name: peripheral.advertisement.localName, fitshow: fitshow.isConnected() });
-    } else if (deviceType === 'hrm') {
-      await hrm.connect(peripheral);
-      setupHrmListeners();
-      config.hrmAddress = address;
-      saveConfig(config);
-      hrmReconnectDelay = 1000;
-      sendCommandResponse(commandId, 'ble_connect', true, null, { deviceType: 'hrm', name: peripheral.advertisement.localName });
-    } else {
-      sendCommandResponse(commandId, 'ble_connect', false, 'Unknown device type');
-    }
+    const result = await doBleConnect(deviceType, address);
+    sendCommandResponse(commandId, 'ble_connect', true, null, result);
   } catch (err) {
     console.error(`[BLE] Connect failed (${deviceType}):`, err.message);
     sendCommandResponse(commandId, 'ble_connect', false, err.message);
   }
 }
 
-async function findPeripheralByAddress(address) {
-  const addr = address.toLowerCase();
+async function doBleConnect(deviceType, address) {
+  if (!adapter) adapter = await bluetooth.defaultAdapter();
 
-  // Ensure powered on
-  if (noble.state !== 'poweredOn') {
-    await new Promise((resolve) => {
-      const timeout = setTimeout(() => resolve(), 5000);
-      noble.once('stateChange', () => { clearTimeout(timeout); resolve(); });
-      if (noble.state === 'poweredOn') { clearTimeout(timeout); resolve(); }
-    });
+  // Brief discovery to ensure BlueZ sees the device
+  if (!await adapter.isDiscovering()) {
+    await adapter.startDiscovery();
+    await new Promise(r => setTimeout(r, 3000));
+    try { await adapter.stopDiscovery(); } catch (e) {}
   }
 
-  if (noble.state !== 'poweredOn') throw new Error('Bluetooth not powered on');
+  const device = await adapter.waitDevice(address, 15000);
+  const name = await device.getName().catch(() => address);
 
-  return new Promise((resolve, reject) => {
-    let found = null;
-    const scanTimeout = setTimeout(() => {
-      noble.stopScanning();
-      noble.removeListener('discover', onDiscover);
-      scanInProgress = false;
-      if (found) resolve(found);
-      else reject(new Error(`Device ${address} not found after scan`));
-    }, 15000);
-
-    const onDiscover = (peripheral) => {
-      const pAddr = (peripheral.address || peripheral.id || '').toLowerCase();
-      if (pAddr === addr) {
-        found = peripheral;
-        clearTimeout(scanTimeout);
-        noble.stopScanning();
-        noble.removeListener('discover', onDiscover);
-        scanInProgress = false;
-        resolve(peripheral);
-      }
-    };
-
-    noble.on('discover', onDiscover);
-    scanInProgress = true;
-    noble.startScanning([], true, (err) => {
-      if (err) {
-        clearTimeout(scanTimeout);
-        noble.removeListener('discover', onDiscover);
-        scanInProgress = false;
-        reject(err);
-      }
-    });
-  });
+  if (deviceType === 'treadmill') {
+    await ftms.connect(device);
+    setupFtmsListeners();
+    try {
+      const gattServer = ftms.getGattServer();
+      await fitshow.connectWithGatt(gattServer);
+      setupFitshowListeners();
+      console.log('[BLE] FitShow FFF0 protocol connected');
+    } catch (e) {
+      console.log('[BLE] FitShow FFF0 not available:', e.message);
+    }
+    config.treadmillAddress = address;
+    saveConfig(config);
+    ftmsReconnectDelay = 1000;
+    broadcastDeviceStatus();
+    return { deviceType: 'treadmill', name, fitshow: fitshow.isConnected() };
+  } else if (deviceType === 'hrm') {
+    await hrm.connect(device, name);
+    setupHrmListeners();
+    config.hrmAddress = address;
+    saveConfig(config);
+    hrmReconnectDelay = 1000;
+    broadcastDeviceStatus();
+    return { deviceType: 'hrm', name };
+  } else {
+    throw new Error('Unknown device type');
+  }
 }
 
 // ── BLE Disconnect ──────────────────────────────────────────────────────────
@@ -669,11 +601,22 @@ function scheduleReconnect(deviceType) {
 async function reconnectFtms() {
   if (ftms.isConnected()) return;
   if (!config.treadmillAddress) throw new Error('No treadmill address saved');
-  const peripheral = await findPeripheralByAddress(config.treadmillAddress);
-  await ftms.connect(peripheral);
+
+  if (!adapter) adapter = await bluetooth.defaultAdapter();
+
+  // Brief discovery to ensure BlueZ sees the device
+  if (!await adapter.isDiscovering()) {
+    await adapter.startDiscovery();
+    await new Promise(r => setTimeout(r, 3000));
+    try { await adapter.stopDiscovery(); } catch (e) {}
+  }
+
+  const device = await adapter.waitDevice(config.treadmillAddress, 15000);
+  await ftms.connect(device);
   setupFtmsListeners();
   try {
-    await fitshow.connectWithCharacteristics(peripheral, ftms.getAllCharacteristics());
+    const gattServer = ftms.getGattServer();
+    await fitshow.connectWithGatt(gattServer);
     setupFitshowListeners();
     console.log('[BLE] FitShow reconnected');
   } catch (e) {
@@ -717,8 +660,19 @@ async function reconnectFtms() {
 async function reconnectHrm() {
   if (hrm.isConnected()) return;
   if (!config.hrmAddress) throw new Error('No HRM address saved');
-  const peripheral = await findPeripheralByAddress(config.hrmAddress);
-  await hrm.connect(peripheral);
+
+  if (!adapter) adapter = await bluetooth.defaultAdapter();
+
+  // Brief discovery to ensure BlueZ sees the device
+  if (!await adapter.isDiscovering()) {
+    await adapter.startDiscovery();
+    await new Promise(r => setTimeout(r, 3000));
+    try { await adapter.stopDiscovery(); } catch (e) {}
+  }
+
+  const device = await adapter.waitDevice(config.hrmAddress, 15000);
+  const name = await device.getName().catch(() => config.hrmAddress);
+  await hrm.connect(device, name);
   setupHrmListeners();
   broadcastDeviceStatus();
   console.log('[BLE] HRM reconnected');
@@ -1136,39 +1090,29 @@ async function checkDrift() {
 // ── Auto-Connect on Startup ─────────────────────────────────────────────────
 async function autoConnect() {
   if (!config.autoConnect) return;
-
-  // Wait for Bluetooth to be ready
-  if (noble.state !== 'poweredOn') {
-    await new Promise((resolve) => {
-      const timeout = setTimeout(() => resolve(), 10000);
-      noble.once('stateChange', (state) => {
-        clearTimeout(timeout);
-        resolve();
-      });
-      if (noble.state === 'poweredOn') { clearTimeout(timeout); resolve(); }
-    });
-  }
-
-  if (noble.state !== 'poweredOn') {
-    console.log('[BLE] Bluetooth not available, skipping auto-connect');
+  try {
+    adapter = await bluetooth.defaultAdapter();
+    if (!await adapter.isPowered()) {
+      console.log('[BLE] Bluetooth not powered, waiting...');
+      setTimeout(() => autoConnect(), 5000);
+      return;
+    }
+  } catch (e) {
+    console.error('[BLE] Failed to get adapter:', e.message);
+    setTimeout(() => autoConnect(), 5000);
     return;
   }
 
   if (config.treadmillAddress) {
     console.log(`[BLE] Auto-connecting to treadmill: ${config.treadmillAddress}`);
-    try {
-      await reconnectFtms();
-    } catch (err) {
+    try { await reconnectFtms(); } catch (err) {
       console.error('[BLE] Treadmill auto-connect failed:', err.message);
       scheduleReconnect('treadmill');
     }
   }
-
   if (config.hrmAddress) {
     console.log(`[BLE] Auto-connecting to HRM: ${config.hrmAddress}`);
-    try {
-      await reconnectHrm();
-    } catch (err) {
+    try { await reconnectHrm(); } catch (err) {
       console.error('[BLE] HRM auto-connect failed:', err.message);
       scheduleReconnect('hrm');
     }
@@ -1185,18 +1129,8 @@ console.log(`[Service] Auto-connect: ${config.autoConnect}`);
 // Connect to server WebSocket
 connectWebSocket();
 
-// Auto-connect to BLE devices
-noble.on('stateChange', (state) => {
-  console.log(`[BLE] Adapter state: ${state}`);
-  if (state === 'poweredOn') {
-    autoConnect();
-  }
-});
-
-// If already powered on
-if (noble.state === 'poweredOn') {
-  autoConnect();
-}
+// Auto-connect to BLE devices (after short delay to let BlueZ settle)
+setTimeout(() => autoConnect(), 2000);
 
 // Graceful shutdown
 process.on('SIGINT', () => {
@@ -1207,7 +1141,9 @@ process.on('SIGINT', () => {
   stopSegmentTimer();
   ftms.disconnect();
   hrm.disconnect();
+  fitshow.disconnect();
   if (ws) ws.close();
+  destroyBluetooth();
   process.exit(0);
 });
 
@@ -1215,6 +1151,8 @@ process.on('SIGTERM', () => {
   console.log('[Service] Terminated');
   ftms.disconnect();
   hrm.disconnect();
+  fitshow.disconnect();
   if (ws) ws.close();
+  destroyBluetooth();
   process.exit(0);
 });

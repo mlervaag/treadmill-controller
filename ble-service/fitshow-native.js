@@ -9,9 +9,9 @@
 
 const { EventEmitter } = require('events');
 
-const FFF0_SERVICE_UUID = 'fff0';
-const FFF1_NOTIFY_UUID = 'fff1';
-const FFF2_WRITE_UUID = 'fff2';
+const FFF0_SERVICE_UUID = '0000fff0-0000-1000-8000-00805f9b34fb';
+const FFF1_NOTIFY_UUID = '0000fff1-0000-1000-8000-00805f9b34fb';
+const FFF2_WRITE_UUID = '0000fff2-0000-1000-8000-00805f9b34fb';
 
 // System commands (first payload byte)
 const SYS_INFO = 0x50;
@@ -59,7 +59,6 @@ const ERROR_NAMES = {
 class FitshowNative extends EventEmitter {
   constructor() {
     super();
-    this.peripheral = null;
     this.notifyChar = null;
     this.writeChar = null;
     this.connected = false;
@@ -125,35 +124,21 @@ class FitshowNative extends EventEmitter {
 
   // === Connection ===
 
-  // Connect using pre-discovered characteristics (from a shared discoverAll call)
-  async connectWithCharacteristics(peripheral, allCharacteristics) {
-    this.peripheral = peripheral;
+  // Connect using GATT server (from a shared node-ble connection)
+  async connectWithGatt(gattServer) {
+    const fff0Service = await gattServer.getPrimaryService(FFF0_SERVICE_UUID);
+    this.notifyChar = await fff0Service.getCharacteristic(FFF1_NOTIFY_UUID);
+    this.writeChar = await fff0Service.getCharacteristic(FFF2_WRITE_UUID);
+    console.log('[FitShow] Found FFF2 write characteristic');
 
-    for (const char of allCharacteristics) {
-      if (char.uuid.includes(FFF1_NOTIFY_UUID)) {
-        this.notifyChar = char;
-        char.on('data', (data) => this.handleNotification(data));
-        await new Promise((resolve, reject) => {
-          char.subscribe((err) => { if (err) reject(err); else resolve(); });
-        });
-        console.log('[FitShow] Subscribed to FFF1 notifications');
-      } else if (char.uuid.includes(FFF2_WRITE_UUID)) {
-        this.writeChar = char;
-        console.log('[FitShow] Found FFF2 write characteristic');
-      }
-    }
-
-    if (!this.notifyChar || !this.writeChar) {
-      throw new Error('FFF0 service characteristics not found');
-    }
+    await this.notifyChar.startNotifications();
+    this.notifyChar.on('valuechanged', (raw) => {
+      const buffer = Buffer.isBuffer(raw) ? raw : Buffer.from(raw);
+      this.handleNotification(buffer);
+    });
+    console.log('[FitShow] Subscribed to FFF1 notifications');
 
     this.connected = true;
-
-    peripheral.once('disconnect', () => {
-      this.connected = false;
-      this.stopPolling();
-      this.emit('disconnect');
-    });
 
     // Query device info
     await this.queryAllInfo();
@@ -169,11 +154,7 @@ class FitshowNative extends EventEmitter {
   async write(payload) {
     if (!this.writeChar) throw new Error('Not connected');
     const pkt = this.buildPacket(payload);
-    return new Promise((resolve, reject) => {
-      this.writeChar.write(pkt, true, (err) => {
-        if (err) reject(err); else resolve();
-      });
-    });
+    await this.writeChar.writeValueWithoutResponse(pkt);
   }
 
   async queryStatus() {
@@ -479,15 +460,13 @@ class FitshowNative extends EventEmitter {
   // === State ===
 
   isConnected() {
-    return this.connected && this.peripheral && this.peripheral.state === 'connected';
+    return this.connected === true;
   }
 
   disconnect() {
     this.stopPolling();
     this.connected = false;
-    if (this.peripheral) {
-      this.peripheral.disconnect();
-    }
+    this.emit('disconnect');
   }
 
   getState() {
