@@ -1089,6 +1089,7 @@
                 <small id="hrZoneToggleHint" style="color: var(--text-secondary);">Automatisk fartsjustering basert på pulssone</small>
             </div>
 
+            <div id="readyWarnings" style="margin-bottom: 8px;"></div>
             <div class="ready-hint">Eller trykk Start på møllen</div>
 
             <div class="ready-actions">
@@ -1332,6 +1333,7 @@
             $idleState.classList.toggle('hidden', newState !== 'idle');
             $readyState.classList.toggle('hidden', newState !== 'ready');
             $activeDashboard.classList.toggle('hidden', newState !== 'active');
+            if (newState === 'ready') updateReadyWarnings();
         }
 
         // -------------------------------------------------------------------
@@ -1518,6 +1520,7 @@
             hideNoControllerMsg();
             updateBleControls();
             updateDeviceInfoBar();
+            if (uiState === 'ready') updateReadyWarnings();
         }
 
         function handleControllerInfo(data) {
@@ -2242,6 +2245,28 @@
         // -------------------------------------------------------------------
         // READY → ACTIVE: Start session
         // -------------------------------------------------------------------
+        function updateReadyWarnings() {
+            var $w = document.getElementById('readyWarnings');
+            if (!$w) return;
+            var warnings = [];
+            if (deviceStatus.treadmill !== 'connected') {
+                warnings.push('<div style="color:var(--danger-color);font-size:13px;padding:4px 0;">Tredemølle ikke tilkoblet</div>');
+            }
+            if (deviceStatus.hrm !== 'connected') {
+                var hrZoneToggle = document.getElementById('hrZoneToggle');
+                var isHrZone = hrZoneToggle && hrZoneToggle.checked;
+                var color = isHrZone ? 'var(--danger-color)' : 'var(--warning-color)';
+                var text = isHrZone ? 'Pulsbelte ikke tilkoblet (kreves for sonestyring)' : 'Pulsbelte ikke tilkoblet — økt uten pulsdata';
+                warnings.push('<div style="color:' + color + ';font-size:13px;padding:4px 0;">' + text + '</div>');
+            }
+            $w.innerHTML = warnings.join('');
+
+            // Disable start if treadmill missing, or if HR zone enabled without HRM
+            var hrZoneToggle = document.getElementById('hrZoneToggle');
+            var hrZoneRequiresHrm = hrZoneToggle && hrZoneToggle.checked && deviceStatus.hrm !== 'connected';
+            $btnStartSession.disabled = deviceStatus.treadmill !== 'connected' || hrZoneRequiresHrm;
+        }
+
         $btnStartSession.addEventListener('click', function () {
             // Unlock AudioContext on user gesture (required for iOS)
             initAudioContext();
@@ -2472,6 +2497,14 @@
                 container.style.display = workout && workout.hr_zone_eligible ? 'block' : 'none';
             }
         }
+
+        // Update warnings when HR zone toggle changes
+        (function () {
+            var toggle = document.getElementById('hrZoneToggle');
+            if (toggle) toggle.addEventListener('change', function () {
+                if (uiState === 'ready') updateReadyWarnings();
+            });
+        })();
 
         // Manual speed/incline adjustment
         function adjustSpeed(delta) {
