@@ -65,7 +65,10 @@ class FTMSNative extends EventEmitter {
     this._connected = true;
 
     console.log('[FTMS] Discovering services and characteristics...');
-    const gattServer = await device.gatt();
+    const gattServer = await Promise.race([
+      device.gatt(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('GATT discovery timeout (20s)')), 20000))
+    ]);
     this._gattServer = gattServer;
 
     const ftmsService = await gattServer.getPrimaryService(FTMS_SERVICE_UUID);

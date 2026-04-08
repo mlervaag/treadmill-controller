@@ -634,13 +634,20 @@ async function reconnectFtms() {
   if (!adapter) adapter = await bluetooth.defaultAdapter();
 
   // Brief discovery to ensure BlueZ sees the device
-  if (!await adapter.isDiscovering()) {
-    await adapter.startDiscovery();
+  try {
+    if (!await adapter.isDiscovering()) {
+      await adapter.startDiscovery();
+    }
     await new Promise(r => setTimeout(r, 3000));
     try { await adapter.stopDiscovery(); } catch (e) {}
+  } catch (e) {
+    console.log('[BLE] Discovery error (non-fatal):', e.message);
   }
 
-  const device = await adapter.waitDevice(config.treadmillAddress, 15000);
+  const device = await Promise.race([
+    adapter.waitDevice(config.treadmillAddress, 15000),
+    new Promise((_, reject) => setTimeout(() => reject(new Error('Device not found (15s)')), 16000))
+  ]);
   await ftms.connect(device);
   setupFtmsListeners();
   try {
@@ -693,13 +700,20 @@ async function reconnectHrm() {
   if (!adapter) adapter = await bluetooth.defaultAdapter();
 
   // Brief discovery to ensure BlueZ sees the device
-  if (!await adapter.isDiscovering()) {
-    await adapter.startDiscovery();
+  try {
+    if (!await adapter.isDiscovering()) {
+      await adapter.startDiscovery();
+    }
     await new Promise(r => setTimeout(r, 3000));
     try { await adapter.stopDiscovery(); } catch (e) {}
+  } catch (e) {
+    console.log('[BLE] Discovery error (non-fatal):', e.message);
   }
 
-  const device = await adapter.waitDevice(config.hrmAddress, 15000);
+  const device = await Promise.race([
+    adapter.waitDevice(config.hrmAddress, 15000),
+    new Promise((_, reject) => setTimeout(() => reject(new Error('Device not found (15s)')), 16000))
+  ]);
   const name = await device.getName().catch(() => config.hrmAddress);
   await hrm.connect(device, name);
   setupHrmListeners();

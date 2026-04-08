@@ -28,7 +28,10 @@ class HRMNative extends EventEmitter {
     this._connected = true;
 
     console.log('[HRM] Discovering services and characteristics...');
-    const gattServer = await device.gatt();
+    const gattServer = await Promise.race([
+      device.gatt(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('GATT discovery timeout (20s)')), 20000))
+    ]);
 
     let hrsService;
     try {
