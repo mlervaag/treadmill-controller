@@ -50,7 +50,10 @@ const WS_MAX_RECONNECT = 30000;
 
 let ftmsReconnectDelay = 1000;
 let hrmReconnectDelay = 1000;
-const BLE_MAX_RECONNECT = 30000;
+const BLE_MAX_RECONNECT = 300000; // 5 minutes max backoff
+const BLE_MAX_ATTEMPTS = 20;      // give up after ~30 min total
+let ftmsReconnectAttempts = 0;
+let hrmReconnectAttempts = 0;
 
 let currentWorkout = null;       // { id, segments }
 let currentSegmentIndex = 0;
@@ -569,12 +572,18 @@ function setupFitshowListeners() {
 // ── Auto-Reconnect with Exponential Backoff ─────────────────────────────────
 function scheduleReconnect(deviceType) {
   if (deviceType === 'treadmill' && config.treadmillAddress) {
+    ftmsReconnectAttempts++;
+    if (ftmsReconnectAttempts > BLE_MAX_ATTEMPTS) {
+      console.log(`[BLE] Treadmill reconnect gave up after ${BLE_MAX_ATTEMPTS} attempts. Will retry on next restart.`);
+      return;
+    }
     const delay = ftmsReconnectDelay;
-    console.log(`[BLE] Treadmill reconnect in ${delay / 1000}s...`);
+    console.log(`[BLE] Treadmill reconnect in ${delay / 1000}s... (attempt ${ftmsReconnectAttempts}/${BLE_MAX_ATTEMPTS})`);
     setTimeout(async () => {
       try {
         await reconnectFtms();
-        ftmsReconnectDelay = 1000; // reset on success
+        ftmsReconnectDelay = 1000;
+        ftmsReconnectAttempts = 0;
       } catch (err) {
         console.error('[BLE] Treadmill reconnect failed:', err.message);
         ftmsReconnectDelay = Math.min(ftmsReconnectDelay * 2, BLE_MAX_RECONNECT);
@@ -585,12 +594,18 @@ function scheduleReconnect(deviceType) {
   }
 
   if (deviceType === 'hrm' && config.hrmAddress) {
+    hrmReconnectAttempts++;
+    if (hrmReconnectAttempts > BLE_MAX_ATTEMPTS) {
+      console.log(`[BLE] HRM reconnect gave up after ${BLE_MAX_ATTEMPTS} attempts. Will retry on next restart.`);
+      return;
+    }
     const delay = hrmReconnectDelay;
-    console.log(`[BLE] HRM reconnect in ${delay / 1000}s...`);
+    console.log(`[BLE] HRM reconnect in ${delay / 1000}s... (attempt ${hrmReconnectAttempts}/${BLE_MAX_ATTEMPTS})`);
     setTimeout(async () => {
       try {
         await reconnectHrm();
-        hrmReconnectDelay = 1000; // reset on success
+        hrmReconnectDelay = 1000;
+        hrmReconnectAttempts = 0;
       } catch (err) {
         console.error('[BLE] HRM reconnect failed:', err.message);
         hrmReconnectDelay = Math.min(hrmReconnectDelay * 2, BLE_MAX_RECONNECT);
