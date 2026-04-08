@@ -174,6 +174,33 @@
             0%, 100% { opacity: 1; }
             50% { opacity: 0.5; }
         }
+        .device-info-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            background: var(--card-bg);
+            border-radius: 10px;
+            margin-bottom: 10px;
+            font-size: 13px;
+            gap: 12px;
+        }
+        .device-info-bar.hidden { display: none !important; }
+        .device-info-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--text-secondary);
+        }
+        .device-info-item .device-name {
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+        .device-info-item .live-hr {
+            color: var(--danger-color);
+            font-weight: 700;
+            font-size: 15px;
+        }
         .scan-results {
             background: var(--card-bg);
             border: 1px solid var(--border-color);
@@ -972,7 +999,20 @@
             </div>
         </header>
 
-        <!-- BLE controls (native backend only) -->
+        <!-- Device info bar (shown when devices are connected) -->
+        <div id="deviceInfoBar" class="device-info-bar hidden">
+            <div class="device-info-item" id="treadmillInfo">
+                <span>🏃</span>
+                <span class="device-name" id="treadmillNameLabel">—</span>
+            </div>
+            <div class="device-info-item" id="hrmInfo">
+                <span>❤️</span>
+                <span class="device-name" id="hrmNameLabel">—</span>
+                <span class="live-hr" id="liveHrLabel"></span>
+            </div>
+        </div>
+
+        <!-- BLE controls (native backend only, hidden when all connected) -->
         <div id="bleControls" class="ble-controls hidden">
             <button class="ble-btn" id="btnBleScan">Skann enheter</button>
             <button class="ble-btn" id="btnBleConnectTreadmill">Koble mølle</button>
@@ -1472,9 +1512,13 @@
             if (data.treadmill) deviceStatus.treadmill = data.treadmill;
             if (data.hrm) deviceStatus.hrm = data.hrm;
             if (data.bleBackend) deviceStatus.bleBackend = data.bleBackend;
+            if (data.treadmillName !== undefined) deviceStatus.treadmillName = data.treadmillName;
+            if (data.hrmName !== undefined) deviceStatus.hrmName = data.hrmName;
+            if (data.heartRate !== undefined) deviceStatus.heartRate = data.heartRate;
             updateDeviceDots();
             hideNoControllerMsg();
             updateBleControls();
+            updateDeviceInfoBar();
         }
 
         function handleControllerInfo(data) {
@@ -1527,10 +1571,13 @@
         var $bleControls = document.getElementById('bleControls');
 
         function updateBleControls() {
-            if (deviceStatus.bleBackend === 'native') {
-                $bleControls.classList.remove('hidden');
-            } else {
+            var bothConnected = deviceStatus.treadmill === 'connected' && deviceStatus.hrm === 'connected';
+
+            // Hide BLE controls entirely when both devices are connected
+            if (bothConnected || deviceStatus.bleBackend !== 'native') {
                 $bleControls.classList.add('hidden');
+            } else if (deviceStatus.bleBackend === 'native') {
+                $bleControls.classList.remove('hidden');
             }
 
             var btnTm = document.getElementById('btnBleConnectTreadmill');
@@ -1564,6 +1611,43 @@
             } else {
                 btnHrm.textContent = 'Koble puls';
                 btnHrm.disabled = false;
+            }
+        }
+
+        function updateDeviceInfoBar() {
+            var $bar = document.getElementById('deviceInfoBar');
+            var anyConnected = deviceStatus.treadmill === 'connected' || deviceStatus.hrm === 'connected';
+
+            if (!anyConnected) {
+                $bar.classList.add('hidden');
+                return;
+            }
+            $bar.classList.remove('hidden');
+
+            // Treadmill info
+            var $tmInfo = document.getElementById('treadmillInfo');
+            var $tmName = document.getElementById('treadmillNameLabel');
+            if (deviceStatus.treadmill === 'connected') {
+                $tmInfo.style.display = '';
+                $tmName.textContent = deviceStatus.treadmillName || 'Tredemølle';
+            } else {
+                $tmInfo.style.display = 'none';
+            }
+
+            // HRM info
+            var $hrmInfo = document.getElementById('hrmInfo');
+            var $hrmName = document.getElementById('hrmNameLabel');
+            var $liveHr = document.getElementById('liveHrLabel');
+            if (deviceStatus.hrm === 'connected') {
+                $hrmInfo.style.display = '';
+                $hrmName.textContent = deviceStatus.hrmName || 'Pulsmåler';
+                if (deviceStatus.heartRate && deviceStatus.heartRate > 0) {
+                    $liveHr.textContent = deviceStatus.heartRate + ' bpm';
+                } else {
+                    $liveHr.textContent = '—';
+                }
+            } else {
+                $hrmInfo.style.display = 'none';
             }
         }
 

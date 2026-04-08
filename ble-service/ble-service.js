@@ -247,7 +247,10 @@ function broadcastDeviceStatus() {
     wsSend({
       type: 'device_status',
       treadmill: ftms.isConnected() ? 'connected' : 'disconnected',
+      treadmillName: ftms.isConnected() ? (fitshow.isConnected() ? fitshow.getState().model : 'Tredemølle') : null,
       hrm: hrm.isConnected() ? 'connected' : 'disconnected',
+      hrmName: hrm.isConnected() ? hrm.getDeviceName() : null,
+      heartRate: hrm.getCurrentHeartRate(),
       bleBackend: 'native'
     });
   };
