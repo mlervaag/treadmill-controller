@@ -27,10 +27,12 @@ class HRZoneController {
     this.paused = false;
     this.pauseEndTime = 0;
     this.tickCount = 0;
-    this.adjustInterval = 20;
+    this.adjustIntervalDown = 10;  // faster response when HR too high
+    this.adjustIntervalUp = 20;   // gentler when HR too low
     this.lastAdjustTick = 0;
     this.accumulatedChange = 0;
-    this.accumulationCap = 0.8;
+    this.accumulationCapDown = 2.0;  // allow larger total decrease before pause
+    this.accumulationCapUp = 0.8;    // conservative increase
     this.lastDirection = null;
     this.directionChangeCooldownUntil = 0;
     this.adjustmentCount = 0;
@@ -113,7 +115,12 @@ class HRZoneController {
 
     if (this.ringBuffer.length < 8) return;
 
-    let currentInterval = this.adjustInterval;
+    // Determine if HR is above or below target zone for interval selection
+    const hrPctPrecheck = getHRPercent(
+      this.ringBuffer.reduce((a, b) => a + b, 0) / this.ringBuffer.length, this.maxHR
+    );
+    const isOverZone = hrPctPrecheck > this.zoneHigh;
+    let currentInterval = isOverZone ? this.adjustIntervalDown : this.adjustIntervalUp;
     if (this.graduatedResumeTicksLeft > 0) {
       currentInterval = this.graduatedResumeInterval;
     }
@@ -149,7 +156,7 @@ class HRZoneController {
 
     if (hrPct > overThreshold) {
       const zonesOver = Math.max(1, Math.floor((hrPct - this.zoneHigh) / 10));
-      const stepSize = Math.min(0.5, 0.2 + (zonesOver - 1) * 0.15);
+      const stepSize = Math.min(0.8, 0.3 + (zonesOver - 1) * 0.25);
       this._adjust(-stepSize, 'over_zone');
 
     } else if (hrPct < this.zoneLow - 2) {
@@ -176,20 +183,22 @@ class HRZoneController {
 
   _adjust(step, reason) {
     const direction = step > 0 ? 'up' : 'down';
+    const cooldownTicks = direction === 'down' ? 15 : 30;
 
     if (this.lastDirection && this.lastDirection !== direction) {
       this.accumulatedChange = 0;
-      this.directionChangeCooldownUntil = this.tickCount + 30;
+      this.directionChangeCooldownUntil = this.tickCount + cooldownTicks;
       this.lastDirection = direction;
       this.onStatusChange({ action: 'direction_change_cooldown', reason });
       return;
     }
     this.lastDirection = direction;
 
+    const cap = direction === 'down' ? this.accumulationCapDown : this.accumulationCapUp;
     this.accumulatedChange += Math.abs(step);
-    if (this.accumulatedChange > this.accumulationCap) {
+    if (this.accumulatedChange > cap) {
       this.accumulatedChange = 0;
-      this.directionChangeCooldownUntil = this.tickCount + 30;
+      this.directionChangeCooldownUntil = this.tickCount + cooldownTicks;
       this.onStatusChange({ action: 'accumulation_pause', reason });
       return;
     }
