@@ -239,7 +239,7 @@ class FTMSNative extends EventEmitter {
 
     // Total Energy
     if ((flags & 0x100) && offset < buf.length) {
-      data.total_energy_kcal = buf.readUInt16LE(offset);
+      data.total_energy_kcal = buf.readUInt16LE(offset) / 1000;
       offset += 2;
       // Energy per hour
       if (offset < buf.length) {
