@@ -32,6 +32,8 @@ class FTMSNative extends EventEmitter {
     // Tracked actuals from treadmill data notifications
     this.lastReportedSpeed = null;
     this.lastReportedIncline = null;
+    this.lastReportedDistance = null;
+    this.lastReportedCalories = null;
 
     // Flags to distinguish app-initiated commands from manual treadmill changes
     this._expectingSpeedConfirm = false;
@@ -146,6 +148,12 @@ class FTMSNative extends EventEmitter {
     }
     if (data.incline_percent !== undefined) {
       this.lastReportedIncline = data.incline_percent;
+    }
+    if (data.total_distance_m !== undefined) {
+      this.lastReportedDistance = data.total_distance_m / 1000; // km
+    }
+    if (data.total_energy_kcal !== undefined) {
+      this.lastReportedCalories = data.total_energy_kcal;
     }
 
     this.emit('data', data);
@@ -445,6 +453,14 @@ class FTMSNative extends EventEmitter {
 
   getLastReportedIncline() {
     return this.lastReportedIncline;
+  }
+
+  getLastReportedDistance() {
+    return this.lastReportedDistance;
+  }
+
+  getLastReportedCalories() {
+    return this.lastReportedCalories;
   }
 
   /**

@@ -196,9 +196,9 @@ function buildCurrentState() {
     incline: ftms.getLastReportedIncline(),
     heartRate: hrm.getCurrentHeartRate(),
     heartRateSource: hrm.isConnected() ? 'ble' : 'none',
-    distance: null, // computed server-side
+    distance: ftms.getLastReportedDistance(),
     elapsedTime: elapsed,
-    calories: null,
+    calories: ftms.getLastReportedCalories(),
     targetSpeed: currentTargetSpeed,
     targetIncline: currentTargetIncline,
     workout: workoutInfo,
@@ -861,8 +861,8 @@ async function handleStopSession(commandId, params) {
     const statsRes = await fetch(`${httpBase()}/api/sessions/${sessionId}/details`);
     if (statsRes.ok) {
       const details = await statsRes.json();
-      if (details.data_points && details.data_points.length > 0) {
-        const points = details.data_points;
+      const points = details.dataPoints || details.data_points;
+      if (points && points.length > 0) {
         const lastPoint = points[points.length - 1];
         distance = lastPoint.distance_km || 0;
         calories = lastPoint.calories || 0;
