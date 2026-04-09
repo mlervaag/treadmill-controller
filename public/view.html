@@ -1732,7 +1732,10 @@
             profiles.forEach(function (p) {
                 var opt = document.createElement('option');
                 opt.value = p.id;
-                opt.textContent = escapeHtml(p.name) + ' (' + p.max_hr + ')';
+                var label = escapeHtml(p.name) + ' (HR ' + p.max_hr;
+                if (p.weight_kg) label += ', ' + p.weight_kg + 'kg';
+                label += ')';
+                opt.textContent = label;
                 $profileSelect.appendChild(opt);
             });
             if (selectedProfileId) {
@@ -1803,11 +1806,20 @@
             if (!name) return;
             var hr = prompt('Maks hjertefrekvens:', profile.max_hr);
             if (!hr) return;
+            var weight = prompt('Vekt (kg):', profile.weight_kg || '');
+            var age = prompt('Alder:', profile.age || '');
+            var gender = prompt('Kjønn (male/female):', profile.gender || 'male');
             try {
                 var resp = await fetch('/api/profiles/' + selectedProfileId, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name: name, max_hr: parseInt(hr, 10) })
+                    body: JSON.stringify({
+                        name: name,
+                        max_hr: parseInt(hr, 10),
+                        weight_kg: weight ? parseFloat(weight) : null,
+                        age: age ? parseInt(age, 10) : null,
+                        gender: gender || 'male'
+                    })
                 });
                 if (!resp.ok) {
                     var err = await resp.json();

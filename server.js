@@ -164,6 +164,11 @@ try { db.exec('ALTER TABLE workout_sessions ADD COLUMN profile_id INTEGER'); } c
 // Add profile_id to strava_auth for per-profile Strava connections
 try { db.exec('ALTER TABLE strava_auth ADD COLUMN profile_id INTEGER'); } catch(e) {}
 
+// Profile body metrics (for calorie calculation)
+try { db.exec('ALTER TABLE user_profiles ADD COLUMN weight_kg REAL'); } catch(e) {}
+try { db.exec('ALTER TABLE user_profiles ADD COLUMN age INTEGER'); } catch(e) {}
+try { db.exec("ALTER TABLE user_profiles ADD COLUMN gender TEXT DEFAULT 'male'"); } catch(e) {}
+
 // HR zone control columns
 try { db.exec('ALTER TABLE workout_segments ADD COLUMN hr_zone_control INTEGER DEFAULT 0'); } catch(e) {}
 try { db.exec("ALTER TABLE workout_segments ADD COLUMN hr_zone_control_mode TEXT DEFAULT 'speed'"); } catch(e) {}
@@ -444,12 +449,14 @@ app.get('/api/profiles/:id', (req, res) => {
 
 app.post('/api/profiles', (req, res) => {
   try {
-    const { name, max_hr } = req.body;
+    const { name, max_hr, weight_kg, age, gender } = req.body;
     if (!name || !name.trim()) return res.status(400).json({ error: 'Navn er påkrevd' });
     const hr = parseInt(max_hr);
     if (isNaN(hr) || hr < 100 || hr > 250) return res.status(400).json({ error: 'MaxHR må være mellom 100 og 250' });
-    const result = db.prepare('INSERT INTO user_profiles (name, max_hr) VALUES (?, ?)').run(name.trim(), hr);
-    res.json({ id: result.lastInsertRowid, name: name.trim(), max_hr: hr });
+    const result = db.prepare('INSERT INTO user_profiles (name, max_hr, weight_kg, age, gender) VALUES (?, ?, ?, ?, ?)').run(
+      name.trim(), hr, weight_kg || null, age || null, gender || 'male'
+    );
+    res.json({ id: result.lastInsertRowid, name: name.trim(), max_hr: hr, weight_kg: weight_kg || null, age: age || null, gender: gender || 'male' });
   } catch (error) {
     if (error.message && error.message.includes('UNIQUE')) {
       return res.status(409).json({ error: 'En profil med dette navnet finnes allerede' });
@@ -462,14 +469,16 @@ app.post('/api/profiles', (req, res) => {
 app.put('/api/profiles/:id', (req, res) => {
   const id = parseInt(req.params.id);
   if (isNaN(id) || id <= 0) return res.status(400).json({ error: 'Ugyldig ID' });
-  const { name, max_hr } = req.body;
+  const { name, max_hr, weight_kg, age, gender } = req.body;
   if (!name || !name.trim()) return res.status(400).json({ error: 'Navn er påkrevd' });
   const hr = parseInt(max_hr);
   if (isNaN(hr) || hr < 100 || hr > 250) return res.status(400).json({ error: 'MaxHR må være mellom 100 og 250' });
   try {
-    const result = db.prepare('UPDATE user_profiles SET name = ?, max_hr = ? WHERE id = ?').run(name.trim(), hr, id);
+    const result = db.prepare('UPDATE user_profiles SET name = ?, max_hr = ?, weight_kg = ?, age = ?, gender = ? WHERE id = ?').run(
+      name.trim(), hr, weight_kg || null, age || null, gender || 'male', id
+    );
     if (result.changes === 0) return res.status(404).json({ error: 'Profil ikke funnet' });
-    res.json({ id, name: name.trim(), max_hr: hr });
+    res.json({ id, name: name.trim(), max_hr: hr, weight_kg: weight_kg || null, age: age || null, gender: gender || 'male' });
   } catch (error) {
     if (error.message && error.message.includes('UNIQUE')) {
       return res.status(409).json({ error: 'En profil med dette navnet finnes allerede' });

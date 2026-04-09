@@ -67,6 +67,17 @@ let currentTargetIncline = 0;
 let activeHRZoneController = null;
 let hrZoneControlEnabled = false;
 let sessionMaxHR = null;
+let sessionProfile = null;  // { weight_kg, age, gender } for calorie calculation
+let sessionCalories = 0;    // accumulated kcal from Keytel formula
+
+// Keytel (2005) calorie formula — kcal per minute from heart rate
+function keytelCaloriesPerMinute(hr, weightKg, age, gender) {
+  if (!hr || !weightKg || !age) return 0;
+  if (gender === 'female') {
+    return (-20.4022 + 0.4472 * hr - 0.1263 * weightKg + 0.074 * age) / 4.184;
+  }
+  return (-55.0969 + 0.6309 * hr + 0.1988 * weightKg + 0.2017 * age) / 4.184;
+}
 
 // Data buffer — flushed periodically
 let dataBuffer = [];
@@ -198,7 +209,7 @@ function buildCurrentState() {
     heartRateSource: hrm.isConnected() ? 'ble' : 'none',
     distance: ftms.getLastReportedDistance(),
     elapsedTime: elapsed,
-    calories: ftms.getLastReportedCalories(),
+    calories: sessionCalories > 0 ? Math.round(sessionCalories) : ftms.getLastReportedCalories(),
     targetSpeed: currentTargetSpeed,
     targetIncline: currentTargetIncline,
     workout: workoutInfo,
@@ -486,12 +497,19 @@ function setupFtmsListeners() {
 
   ftms.on('data', (data) => {
     if (sessionActive && sessionId) {
+      const hr = hrm.getCurrentHeartRate() || null;
+
+      // Accumulate calories from Keytel formula (1 data point ≈ 1 second)
+      if (hr && sessionProfile && sessionProfile.weight_kg && sessionProfile.age) {
+        sessionCalories += keytelCaloriesPerMinute(hr, sessionProfile.weight_kg, sessionProfile.age, sessionProfile.gender) / 60;
+      }
+
       dataBuffer.push({
         speed_kmh: data.speed_kmh || 0,
         incline_percent: data.incline_percent || 0,
         distance_km: data.total_distance_m ? data.total_distance_m / 1000 : 0,
-        heart_rate: hrm.getCurrentHeartRate() || null,
-        calories: data.total_energy_kcal || null,
+        heart_rate: hr,
+        calories: Math.round(sessionCalories),
         segment_index: currentSegmentIndex
       });
     }
@@ -778,18 +796,24 @@ async function handleStartSession(commandId, params) {
 
     hrZoneControlEnabled = !!params.hr_zone_control_enabled;
     sessionMaxHR = null;
+    sessionProfile = null;
+    sessionCalories = 0;
 
-    if (hrZoneControlEnabled && (params.profileId || params.profile_id)) {
+    // Fetch profile for HR zone control and calorie calculation
+    const pid = parseInt(params.profileId || params.profile_id);
+    if (pid) {
       try {
-        const profileRes = await fetch(`${httpBase()}/api/profiles`);
+        const profileRes = await fetch(`${httpBase()}/api/profiles/${pid}`);
         if (profileRes.ok) {
-          const profiles = await profileRes.json();
-          const pid = parseInt(params.profileId || params.profile_id);
-          const profile = profiles.find(p => p.id === pid);
-          if (profile) sessionMaxHR = profile.max_hr;
+          const profile = await profileRes.json();
+          sessionMaxHR = profile.max_hr;
+          sessionProfile = { weight_kg: profile.weight_kg, age: profile.age, gender: profile.gender || 'male' };
+          if (sessionProfile.weight_kg && sessionProfile.age) {
+            console.log(`[Session] Calorie calc: Keytel formula (${sessionProfile.weight_kg}kg, age ${sessionProfile.age}, ${sessionProfile.gender})`);
+          }
         }
       } catch (e) {
-        console.error('[HRZone] Failed to fetch profile:', e.message);
+        console.error('[Session] Failed to fetch profile:', e.message);
       }
     }
 
@@ -897,6 +921,8 @@ async function handleStopSession(commandId, params) {
   sessionActive = false;
   sessionId = null;
   sessionStartTime = null;
+  sessionProfile = null;
+  sessionCalories = 0;
   currentWorkout = null;
   currentSegmentIndex = 0;
   currentTargetSpeed = 0;
