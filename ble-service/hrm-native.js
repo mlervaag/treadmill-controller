@@ -27,6 +27,9 @@ class HRMNative extends EventEmitter {
     ]);
     this._connected = true;
 
+    // Brief delay to let BlueZ finish service resolution after connect
+    await new Promise(r => setTimeout(r, 2000));
+
     console.log('[HRM] Discovering services and characteristics...');
     const gattServer = await Promise.race([
       device.gatt(),
