@@ -529,6 +529,34 @@ function setupFtmsListeners() {
       console.log('[Service] Treadmill stopped/reset — auto-stopping session');
       handleStopSession('physical-stop', {});
     }
+
+    // Manual speed/incline change on treadmill (not from app)
+    if (!isAppInitiated && sessionActive) {
+      if (statusCode === 0x0A) { // Target Speed Changed
+        const newSpeed = ftms.getLastReportedSpeed();
+        if (newSpeed !== null && Math.abs(newSpeed - currentTargetSpeed) > 0.3) {
+          currentTargetSpeed = newSpeed;
+          console.log(`[Service] Manual speed change on treadmill: ${newSpeed} km/t`);
+          if (activeHRZoneController) {
+            activeHRZoneController.pause(45000);
+            activeHRZoneController.updateBaseline(newSpeed, currentTargetIncline);
+            console.log('[HRZone] Manual treadmill override — pausing controller for 45s');
+          }
+        }
+      }
+      if (statusCode === 0x0B) { // Target Incline Changed
+        const newIncline = ftms.getLastReportedIncline();
+        if (newIncline !== null && Math.abs(newIncline - currentTargetIncline) > 0.3) {
+          currentTargetIncline = newIncline;
+          console.log(`[Service] Manual incline change on treadmill: ${newIncline}%`);
+          if (activeHRZoneController) {
+            activeHRZoneController.pause(45000);
+            activeHRZoneController.updateBaseline(currentTargetSpeed, newIncline);
+            console.log('[HRZone] Manual treadmill override — pausing controller for 45s');
+          }
+        }
+      }
+    }
   });
 
   ftms.on('disconnect', () => {
