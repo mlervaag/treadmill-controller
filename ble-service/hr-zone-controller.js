@@ -50,6 +50,21 @@ class HRZoneController {
 
     this.overloadStart = null;
 
+    // Boundary escalation: if HR stays above zoneHigh (raw zone ceiling) but below
+    // the hysteresis-padded overThreshold, the controller would do nothing. Track
+    // time spent in that gray zone and force a step down after boundaryTimeoutMs.
+    // Uses hysteresis so brief dips below zoneHigh don't reset the timer.
+    this.boundaryStart = null;
+    this.boundaryTimeoutMs = 60000;
+    this.boundaryResetMargin = 3;   // pp below zoneHigh that HR must drop to before timer resets
+    this.boundaryBelowTicks = 0;    // ticks HR has been clearly below zoneHigh
+
+    // Sustained-high tracking: when HR has been above zoneHigh for a long time,
+    // bypass the accumulation cap so the controller can keep dropping speed/incline
+    // (e.g. all the way to walking pace if needed). The user explicitly wants this.
+    this.sustainedHighStart = null;
+    this.sustainedHighThresholdMs = 90000;
+
     const bounds = getZoneBoundaries(targetZone);
     this.zoneLow = bounds ? bounds.low : 0;
     this.zoneHigh = bounds ? bounds.high : 100;
@@ -154,10 +169,38 @@ class HRZoneController {
 
     const overThreshold = this.zoneHigh + this.hysteresis;
 
+    // Hysteresis-tolerant boundary tracking. boundaryStart only resets after HR has
+    // been clearly below zoneHigh (by boundaryResetMargin) for several ticks — brief
+    // dips don't reset the timer.
+    if (hrPct > this.zoneHigh) {
+      if (!this.boundaryStart) this.boundaryStart = Date.now();
+      this.boundaryBelowTicks = 0;
+    } else if (hrPct < this.zoneHigh - this.boundaryResetMargin) {
+      this.boundaryBelowTicks++;
+      if (this.boundaryBelowTicks >= 5) {
+        this.boundaryStart = null;
+        this.sustainedHighStart = null;
+      }
+    }
+
+    // Sustained-high tracking parallels boundaryStart but uses overThreshold (well
+    // above zone). When HR has been clearly above zone for a long time, allow the
+    // controller to bypass the accumulation cap.
+    if (hrPct > overThreshold) {
+      if (!this.sustainedHighStart) this.sustainedHighStart = Date.now();
+    }
+
     if (hrPct > overThreshold) {
       const zonesOver = Math.max(1, Math.floor((hrPct - this.zoneHigh) / 10));
       const stepSize = Math.min(0.8, 0.3 + (zonesOver - 1) * 0.25);
       this._adjust(-stepSize, 'over_zone');
+
+    } else if (hrPct > this.zoneHigh && this.boundaryStart &&
+               (Date.now() - this.boundaryStart) >= this.boundaryTimeoutMs) {
+      // Sustained at boundary (between zoneHigh and zoneHigh+hysteresis) —
+      // push speed down one notch to escape the gray zone.
+      this._adjust(-0.3, 'boundary_timeout');
+      this.boundaryStart = Date.now(); // restart timer so it can fire again if still stuck
 
     } else if (hrPct < this.zoneLow - 2) {
       this._adjust(0.2, 'under_zone_far');
@@ -185,7 +228,15 @@ class HRZoneController {
     const direction = step > 0 ? 'up' : 'down';
     const cooldownTicks = direction === 'down' ? 15 : 30;
 
-    if (this.lastDirection && this.lastDirection !== direction) {
+    // Sustained-high override: when HR has been clearly above zone for a long time,
+    // skip the direction-change and accumulation-cap brakes for downward steps.
+    // This lets the controller keep descending past the cap when the runner needs
+    // to cool down — including all the way to walking pace.
+    const sustainedHigh = direction === 'down'
+      && this.sustainedHighStart
+      && (Date.now() - this.sustainedHighStart) >= this.sustainedHighThresholdMs;
+
+    if (!sustainedHigh && this.lastDirection && this.lastDirection !== direction) {
       this.accumulatedChange = 0;
       this.directionChangeCooldownUntil = this.tickCount + cooldownTicks;
       this.lastDirection = direction;
@@ -196,7 +247,7 @@ class HRZoneController {
 
     const cap = direction === 'down' ? this.accumulationCapDown : this.accumulationCapUp;
     this.accumulatedChange += Math.abs(step);
-    if (this.accumulatedChange > cap) {
+    if (!sustainedHigh && this.accumulatedChange > cap) {
       this.accumulatedChange = 0;
       this.directionChangeCooldownUntil = this.tickCount + cooldownTicks;
       this.onStatusChange({ action: 'accumulation_pause', reason });

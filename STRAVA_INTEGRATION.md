@@ -1,6 +1,8 @@
 # Strava Integration - Technical Analysis
 
-> **Status: ✅ IMPLEMENTERT** (februar 2026). OAuth, TCX-upload og auto-sync er live. Se server.js for implementasjonen.
+> **⚠️ HISTORISK DOKUMENT** — Denne filen ble skrevet februar 2026 og er ikke oppdatert med nyere endringer (bl.a. per-profil Strava-tilkoblinger, OAuth state-parameter, endret API-respons). **Se CLAUDE.md for oppdatert dokumentasjon.** Koden i server.js er alltid source of truth.
+
+> **Status: ✅ IMPLEMENTERT** (februar 2026, utvidet april 2026 med per-profil støtte). OAuth, TCX-upload og auto-sync er live. Se server.js for implementasjonen.
 
 ## 🎯 Mål
 Automatisk synkronisering av tredemølle-økter til Strava, med komplett data inkludert puls, hastighet, stigning, distanse og kalorier.

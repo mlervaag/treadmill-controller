@@ -18,6 +18,7 @@ class CoachingEngine {
     this.pendingMessages = []; // { priority, text } — lower number = higher priority
     this.active = false;
     this.processing = false; // async guard
+    this.lastHrmEventTime = 0; // cooldown for hrm_lost / hrm_recovered events
   }
 
   static getZone(hr, maxHR) {
@@ -43,10 +44,29 @@ class CoachingEngine {
     this.lastMinuteAnnounced = false;
     this.pendingMessages = [];
     this.processing = false;
+    this.lastHrmEventTime = 0;
   }
 
   stop() {
     this.active = false;
+  }
+
+  /**
+   * External event hook — called from server.js when ble-service forwards a
+   * coaching_event WS message. Pushes a high-priority message into the queue.
+   */
+  pushEvent(event) {
+    if (!this.active) return;
+    const now = Date.now();
+    if (now - this.lastHrmEventTime < 30000) return; // 30s cooldown to avoid spam on flicker
+
+    if (event === 'hrm_lost') {
+      this.pendingMessages.push({ priority: 1, text: 'Pulsbelte mistet kontakt. Sjekk stroppen.' });
+      this.lastHrmEventTime = now;
+    } else if (event === 'hrm_recovered') {
+      this.pendingMessages.push({ priority: 2, text: 'Pulsbeltet er tilbake.' });
+      this.lastHrmEventTime = now;
+    }
   }
 
   /**

@@ -21,54 +21,63 @@ class HRMNative extends EventEmitter {
     this._connected = false;
 
     console.log('[HRM] Connecting to peripheral:', this.deviceName);
-    await Promise.race([
-      device.connect(),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('Connection timeout (30s)')), 30000))
-    ]);
-    this._connected = true;
-
-    // Brief delay to let BlueZ finish service resolution after connect
-    await new Promise(r => setTimeout(r, 2000));
-
-    console.log('[HRM] Discovering services and characteristics...');
-    const gattServer = await Promise.race([
-      device.gatt(),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('GATT discovery timeout (20s)')), 20000))
-    ]);
-
-    let hrsService;
     try {
-      hrsService = await gattServer.getPrimaryService(HEART_RATE_SERVICE_UUID);
-    } catch (e) {
-      throw new Error('Heart Rate Service (180D) not found');
-    }
+      await Promise.race([
+        device.connect(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Connection timeout (10s)')), 10000))
+      ]);
 
-    let measurementChar;
-    try {
-      measurementChar = await hrsService.getCharacteristic(HEART_RATE_MEASUREMENT_UUID);
-    } catch (e) {
-      throw new Error('Heart Rate Measurement characteristic not found');
-    }
-    this.characteristic = measurementChar;
+      // Brief delay to let BlueZ finish service resolution after connect
+      await new Promise(r => setTimeout(r, 2000));
 
-    // Try to read body sensor location (optional)
-    try {
-      const locationChar = await hrsService.getCharacteristic(BODY_SENSOR_LOCATION_UUID);
-      const locBuf = await locationChar.readValue();
-      const location = this._getBodySensorLocation(locBuf.readUInt8(0));
-      console.log('[HRM] Body sensor location:', location);
+      console.log('[HRM] Discovering services and characteristics...');
+      const gattServer = await Promise.race([
+        device.gatt(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('GATT discovery timeout (8s)')), 8000))
+      ]);
+
+      let hrsService;
+      try {
+        hrsService = await gattServer.getPrimaryService(HEART_RATE_SERVICE_UUID);
+      } catch (e) {
+        throw new Error('Heart Rate Service (180D) not found');
+      }
+
+      let measurementChar;
+      try {
+        measurementChar = await hrsService.getCharacteristic(HEART_RATE_MEASUREMENT_UUID);
+      } catch (e) {
+        throw new Error('Heart Rate Measurement characteristic not found');
+      }
+      this.characteristic = measurementChar;
+
+      // Try to read body sensor location (optional)
+      try {
+        const locationChar = await hrsService.getCharacteristic(BODY_SENSOR_LOCATION_UUID);
+        const locBuf = await locationChar.readValue();
+        const location = this._getBodySensorLocation(locBuf.readUInt8(0));
+        console.log('[HRM] Body sensor location:', location);
+      } catch (err) {
+        console.log('[HRM] Body sensor location not available');
+      }
+
+      // Subscribe to heart rate notifications
+      await this.characteristic.startNotifications();
+      this.characteristic.on('valuechanged', (raw) => {
+        const buffer = Buffer.isBuffer(raw) ? raw : Buffer.from(raw);
+        this._handleHeartRateChange(buffer);
+      });
+
+      // Only mark as connected after subscription succeeds — otherwise a half-connected
+      // state makes isConnected() lie and scheduleReconnect() silently no-ops.
+      this._connected = true;
+      console.log('[HRM] Connected and subscribed to notifications');
     } catch (err) {
-      console.log('[HRM] Body sensor location not available');
+      this._connected = false;
+      this.characteristic = null;
+      try { await device.disconnect(); } catch (e) { /* ignore */ }
+      throw err;
     }
-
-    // Subscribe to heart rate notifications
-    await this.characteristic.startNotifications();
-    this.characteristic.on('valuechanged', (raw) => {
-      const buffer = Buffer.isBuffer(raw) ? raw : Buffer.from(raw);
-      this._handleHeartRateChange(buffer);
-    });
-
-    console.log('[HRM] Connected and subscribed to notifications');
 
     this._connectionCheckTimer = setInterval(async () => {
       try {

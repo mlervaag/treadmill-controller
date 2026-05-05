@@ -57,59 +57,70 @@ class FTMSNative extends EventEmitter {
     });
 
     console.log('[FTMS] Connecting to device...');
-    // Connect with 30s timeout
-    await Promise.race([
-      device.connect(),
-      new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Connection timeout (30s) — is the treadmill on?')), 30000)
-      )
-    ]);
-    this._connected = true;
-
-    console.log('[FTMS] Discovering services and characteristics...');
-    const gattServer = await Promise.race([
-      device.gatt(),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('GATT discovery timeout (20s)')), 20000))
-    ]);
-    this._gattServer = gattServer;
-
-    const ftmsService = await gattServer.getPrimaryService(FTMS_SERVICE_UUID);
-
-    // Discover individual characteristics by UUID
-    this.treadmillDataChar = await ftmsService.getCharacteristic(TREADMILL_DATA_UUID);
-    this.controlPoint = await ftmsService.getCharacteristic(FITNESS_MACHINE_CONTROL_POINT_UUID);
-
     try {
-      this.statusCharacteristic = await ftmsService.getCharacteristic(FITNESS_MACHINE_STATUS_UUID);
-    } catch (err) {
-      console.log('[FTMS] Status characteristic not available:', err.message);
-      this.statusCharacteristic = null;
-    }
+      await Promise.race([
+        device.connect(),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Connection timeout (10s) — is the treadmill on?')), 10000)
+        )
+      ]);
 
-    if (!this.controlPoint) throw new Error('Control Point characteristic not found');
-    if (!this.treadmillDataChar) throw new Error('Treadmill Data characteristic not found');
+      console.log('[FTMS] Discovering services and characteristics...');
+      const gattServer = await Promise.race([
+        device.gatt(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('GATT discovery timeout (8s)')), 8000))
+      ]);
+      this._gattServer = gattServer;
 
-    // Subscribe to treadmill data notifications
-    await this.treadmillDataChar.startNotifications();
-    this.treadmillDataChar.on('valuechanged', (raw) => {
-      const buf = Buffer.isBuffer(raw) ? raw : Buffer.from(raw);
-      this._handleTreadmillData(buf);
-    });
+      const ftmsService = await gattServer.getPrimaryService(FTMS_SERVICE_UUID);
 
-    // Subscribe to status notifications
-    if (this.statusCharacteristic) {
+      // Discover individual characteristics by UUID
+      this.treadmillDataChar = await ftmsService.getCharacteristic(TREADMILL_DATA_UUID);
+      this.controlPoint = await ftmsService.getCharacteristic(FITNESS_MACHINE_CONTROL_POINT_UUID);
+
       try {
-        await this.statusCharacteristic.startNotifications();
-        this.statusCharacteristic.on('valuechanged', (raw) => {
-          const buf = Buffer.isBuffer(raw) ? raw : Buffer.from(raw);
-          this._handleStatusChange(buf);
-        });
+        this.statusCharacteristic = await ftmsService.getCharacteristic(FITNESS_MACHINE_STATUS_UUID);
       } catch (err) {
         console.log('[FTMS] Status characteristic not available:', err.message);
+        this.statusCharacteristic = null;
       }
-    }
 
-    console.log('[FTMS] Connected and subscribed to notifications');
+      if (!this.controlPoint) throw new Error('Control Point characteristic not found');
+      if (!this.treadmillDataChar) throw new Error('Treadmill Data characteristic not found');
+
+      // Subscribe to treadmill data notifications
+      await this.treadmillDataChar.startNotifications();
+      this.treadmillDataChar.on('valuechanged', (raw) => {
+        const buf = Buffer.isBuffer(raw) ? raw : Buffer.from(raw);
+        this._handleTreadmillData(buf);
+      });
+
+      // Subscribe to status notifications
+      if (this.statusCharacteristic) {
+        try {
+          await this.statusCharacteristic.startNotifications();
+          this.statusCharacteristic.on('valuechanged', (raw) => {
+            const buf = Buffer.isBuffer(raw) ? raw : Buffer.from(raw);
+            this._handleStatusChange(buf);
+          });
+        } catch (err) {
+          console.log('[FTMS] Status characteristic not available:', err.message);
+        }
+      }
+
+      // Only mark as connected after subscription succeeds — otherwise a half-connected
+      // state makes isConnected() lie and scheduleReconnect() silently no-ops.
+      this._connected = true;
+      console.log('[FTMS] Connected and subscribed to notifications');
+    } catch (err) {
+      this._connected = false;
+      this.controlPoint = null;
+      this.treadmillDataChar = null;
+      this.statusCharacteristic = null;
+      this._gattServer = null;
+      try { await device.disconnect(); } catch (e) { /* ignore */ }
+      throw err;
+    }
 
     this._connectionCheckTimer = setInterval(async () => {
       try {

@@ -194,6 +194,29 @@
             text-decoration: underline;
         }
         .device-info-item .reconnect-link:active { opacity: 0.6; }
+        .device-info-item .retry-hint {
+            color: var(--text-secondary);
+            font-size: 11px;
+            margin-left: 4px;
+        }
+        .readiness-panel {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 12px 14px;
+            margin-bottom: 10px;
+        }
+        .readiness-panel.hidden { display: none; }
+        .readiness-panel.ok { border-left: 4px solid #4caf50; }
+        .readiness-panel.warn { border-left: 4px solid var(--warning-color); }
+        .readiness-row { display: flex; align-items: center; gap: 10px; }
+        .readiness-icon { font-size: 20px; }
+        .readiness-text { flex: 1; font-size: 14px; }
+        .readiness-btn {
+            background: var(--warning-color); color: #fff;
+            border: none; border-radius: 8px;
+            padding: 8px 12px; font-size: 13px; font-weight: 600; cursor: pointer;
+        }
+        .readiness-btn:active { opacity: 0.7; }
         .device-info-item.disconnected .device-name {
             color: var(--text-secondary);
             opacity: 0.5;
@@ -1009,6 +1032,15 @@
             </div>
         </div>
 
+        <!-- Readiness panel (idle state only) -->
+        <div id="readinessPanel" class="readiness-panel hidden">
+            <div class="readiness-row">
+                <span class="readiness-icon" id="readinessIcon">⚠️</span>
+                <span class="readiness-text" id="readinessText">Sjekker enheter...</span>
+                <button class="readiness-btn" id="readinessResetBtn" onclick="forceResetBle()">🔄 Tilbakestill BLE</button>
+            </div>
+        </div>
+
         <!-- BLE controls (shown only when a device is missing) -->
         <div id="bleControls" class="ble-controls hidden">
             <button class="ble-btn" id="btnBleScan">Skann enheter</button>
@@ -1601,13 +1633,12 @@
                 $tmName.textContent = deviceStatus.treadmillName || 'Tredemølle';
             } else {
                 $tmInfo.className = 'device-info-item disconnected';
-                if (deviceStatus.treadmillRetrying) {
-                    $tmName.innerHTML = 'Mølle — kobler til...';
-                } else if (deviceStatus.treadmillGaveUp) {
-                    $tmName.innerHTML = 'Mølle frakoblet <span class="reconnect-link" onclick="reconnectDevice(\'treadmill\')">Prøv igjen</span>';
-                } else {
-                    $tmName.innerHTML = 'Mølle frakoblet';
-                }
+                var tmStatus = deviceStatus.treadmillRetrying ? 'kobler til...' : 'frakoblet';
+                var tmRetryHint = deviceStatus.treadmillNextRetryAt
+                    ? ' <span class="retry-hint">' + formatRetryCountdown(deviceStatus.treadmillNextRetryAt) + '</span>'
+                    : '';
+                $tmName.innerHTML = 'Mølle ' + tmStatus + tmRetryHint
+                    + ' <span class="reconnect-link" onclick="reconnectDevice(\'treadmill\')">Prøv nå</span>';
             }
 
             // HRM info
@@ -1625,14 +1656,20 @@
             } else {
                 $hrmInfo.className = 'device-info-item disconnected';
                 $liveHr.textContent = '';
-                if (deviceStatus.hrmRetrying) {
-                    $hrmName.innerHTML = 'Puls — kobler til...';
-                } else if (deviceStatus.hrmGaveUp) {
-                    $hrmName.innerHTML = 'Puls frakoblet <span class="reconnect-link" onclick="reconnectDevice(\'hrm\')">Prøv igjen</span>';
-                } else {
-                    $hrmName.innerHTML = 'Puls frakoblet';
-                }
+                var hrmStatus = deviceStatus.hrmRetrying ? 'kobler til...' : 'frakoblet';
+                var hrmRetryHint = deviceStatus.hrmNextRetryAt
+                    ? ' <span class="retry-hint">' + formatRetryCountdown(deviceStatus.hrmNextRetryAt) + '</span>'
+                    : '';
+                $hrmName.innerHTML = 'Puls ' + hrmStatus + hrmRetryHint
+                    + ' <span class="reconnect-link" onclick="reconnectDevice(\'hrm\')">Prøv nå</span>';
             }
+        }
+
+        function formatRetryCountdown(nextRetryAt) {
+            var seconds = Math.max(0, Math.ceil((nextRetryAt - Date.now()) / 1000));
+            if (seconds < 1) return 'prøver nå';
+            if (seconds < 60) return 'om ' + seconds + 's';
+            return 'om ' + Math.floor(seconds / 60) + 'm ' + (seconds % 60) + 's';
         }
 
         function reconnectDevice(deviceType) {
@@ -1642,6 +1679,57 @@
                 showToast('Tilkobling feilet — prøver automatisk...');
             });
         }
+
+        function forceResetBle() {
+            showToast('Tilbakestiller BLE...');
+            sendCommand('ble_force_reset', {}).then(function () {
+                showToast('Tilbakestilt — kobler til...');
+            }).catch(function (err) {
+                showToast('Feilet: ' + ((err && err.message) || err));
+            });
+        }
+        window.forceResetBle = forceResetBle;
+
+        function updateReadinessPanel() {
+            var $panel = document.getElementById('readinessPanel');
+            var $icon = document.getElementById('readinessIcon');
+            var $text = document.getElementById('readinessText');
+            var $btn = document.getElementById('readinessResetBtn');
+            if (!$panel) return;
+
+            // Hide during active session — runner doesn't need pre-flight check then
+            var inActiveSession = lastState && lastState.sessionActive;
+            if (inActiveSession || deviceStatus.bleBackend !== 'native') {
+                $panel.classList.add('hidden');
+                return;
+            }
+            $panel.classList.remove('hidden');
+
+            var tmOk = deviceStatus.treadmill === 'connected';
+            var hrmOk = deviceStatus.hrm === 'connected';
+
+            if (tmOk && hrmOk) {
+                $panel.className = 'readiness-panel ok';
+                $icon.textContent = '✅';
+                $text.textContent = 'Klar for løp — mølle og puls tilkoblet';
+                $btn.style.display = 'none';
+            } else {
+                $panel.className = 'readiness-panel warn';
+                $icon.textContent = '⚠️';
+                var missing = [];
+                if (!tmOk) missing.push('mølle');
+                if (!hrmOk) missing.push('puls');
+                $text.textContent = 'Mangler: ' + missing.join(' + ');
+                $btn.style.display = '';
+            }
+        }
+
+        // Re-render the device info bar + readiness panel every second so the
+        // retry countdown stays live even between device_status broadcasts.
+        setInterval(function () {
+            updateDeviceInfoBar();
+            updateReadinessPanel();
+        }, 1000);
 
         function showToast(msg) {
             var t = document.createElement('div');
@@ -2539,15 +2627,20 @@
             var adjustControls = document.getElementById('manualAdjustControls');
             if (!container) return;
 
+            // Manual ±-buttons should be available throughout an active session,
+            // not just during HR-controlled segments. The runner often wants to
+            // override e.g. cooldown speed.
+            if (adjustControls) {
+                adjustControls.style.display = state.sessionActive ? 'flex' : 'none';
+            }
+
             var hzc = state.hrZoneControl;
             if (!hzc || !hzc.active) {
                 container.style.display = 'none';
-                if (adjustControls) adjustControls.style.display = 'none';
                 return;
             }
 
             container.style.display = 'flex';
-            if (adjustControls) adjustControls.style.display = 'flex';
 
             var label = document.getElementById('hrZoneLabel');
             var action = document.getElementById('hrZoneAction');

@@ -11,6 +11,9 @@ const fetch = (...args) => import('node-fetch').then(({ default: f }) => f(...ar
 const fs = require('fs');
 const path = require('path');
 const { EventEmitter } = require('events');
+const { exec } = require('child_process');
+const { promisify } = require('util');
+const execAsync = promisify(exec);
 
 const FTMSNative = require('./ftms-native');
 const HRMNative = require('./hrm-native');
@@ -50,10 +53,12 @@ const WS_MAX_RECONNECT = 30000;
 
 let ftmsReconnectDelay = 1000;
 let hrmReconnectDelay = 1000;
-const BLE_MAX_RECONNECT = 300000; // 5 minutes max backoff
-const BLE_MAX_ATTEMPTS = 20;      // give up after ~30 min total
+const BLE_MAX_RECONNECT = 60000;            // cap backoff at 60s — 5min was too long when standing on treadmill
+const BLE_FAST_RETRY_ATTEMPTS = 3;          // first N retries skip backoff (devices often need 1-2 quick retries after a transient drop)
 let ftmsReconnectAttempts = 0;
 let hrmReconnectAttempts = 0;
+let ftmsGattTimeoutStreak = 0;              // consecutive GATT discovery failures — triggers BlueZ cache clear
+let hrmGattTimeoutStreak = 0;
 
 let currentWorkout = null;       // { id, segments }
 let currentSegmentIndex = 0;
@@ -69,6 +74,7 @@ let hrZoneControlEnabled = false;
 let sessionMaxHR = null;
 let sessionProfile = null;  // { weight_kg, age, gender } for calorie calculation
 let sessionCalories = 0;    // accumulated kcal from Keytel formula
+let lastCalorieTickAt = 0;  // timestamp of last calorie accumulation, for time-based delta
 
 // Keytel (2005) calorie formula — kcal per minute from heart rate
 function keytelCaloriesPerMinute(hr, weightKg, age, gender) {
@@ -262,12 +268,14 @@ function broadcastDeviceStatus() {
       type: 'device_status',
       treadmill: ftms.isConnected() ? 'connected' : 'disconnected',
       treadmillName: ftms.isConnected() ? (fitshow.isConnected() ? fitshow.getState().model : 'Tredemølle') : null,
-      treadmillRetrying: !ftms.isConnected() && ftmsReconnectAttempts > 0 && ftmsReconnectAttempts <= BLE_MAX_ATTEMPTS,
-      treadmillGaveUp: ftmsReconnectAttempts > BLE_MAX_ATTEMPTS,
+      treadmillRetrying: !ftms.isConnected() && ftmsReconnectAttempts > 0,
+      treadmillNextRetryAt: !ftms.isConnected() ? Date.now() + ftmsReconnectDelay : null,
+      treadmillAttempts: ftmsReconnectAttempts,
       hrm: hrm.isConnected() ? 'connected' : 'disconnected',
       hrmName: hrm.isConnected() ? hrm.getDeviceName() : null,
-      hrmRetrying: !hrm.isConnected() && hrmReconnectAttempts > 0 && hrmReconnectAttempts <= BLE_MAX_ATTEMPTS,
-      hrmGaveUp: hrmReconnectAttempts > BLE_MAX_ATTEMPTS,
+      hrmRetrying: !hrm.isConnected() && hrmReconnectAttempts > 0,
+      hrmNextRetryAt: !hrm.isConnected() ? Date.now() + hrmReconnectDelay : null,
+      hrmAttempts: hrmReconnectAttempts,
       heartRate: hrm.getCurrentHeartRate(),
       bleBackend: 'native'
     });
@@ -325,6 +333,9 @@ function handleServerMessage(msg) {
       break;
     case 'ble_reconnect':
       handleBleReconnect(commandId, params);
+      break;
+    case 'ble_force_reset':
+      handleBleForceReset(commandId, params);
       break;
     case 'set_speed':
       handleSetSpeed(commandId, params);
@@ -464,9 +475,107 @@ function handleBleDisconnect(commandId, params) {
 }
 
 // ── BLE Reconnect ───────────────────────────────────────────────────────────
+
+// Power-cycle the BlueZ adapter. Needed when the adapter is stale after long idle —
+// scans return 0 devices and waitDevice times out even though everything is on.
+// Only safe when no devices are currently connected; otherwise we'd kick them off.
+async function powerCycleAdapter() {
+  try {
+    await execAsync('bluetoothctl power off');
+    await new Promise(r => setTimeout(r, 500));
+    await execAsync('bluetoothctl power on');
+    await new Promise(r => setTimeout(r, 1500));
+    adapter = null; // force fresh adapter reference
+    console.log('[BLE] Adapter power-cycled');
+  } catch (e) {
+    console.log('[BLE] Power cycle failed (non-fatal):', e.message);
+  }
+}
+
+// Forcibly remove a single device from BlueZ's cache. Useful when GATT discovery
+// hangs because BlueZ holds a stale device reference.
+async function clearBluezDeviceCache(address) {
+  try {
+    await execAsync(`bluetoothctl remove ${address}`);
+    console.log(`[BLE] Cleared BlueZ cache for ${address}`);
+    await new Promise(r => setTimeout(r, 500));
+  } catch (e) {
+    // Device may already be gone — non-fatal
+    console.log(`[BLE] Cache clear for ${address} (non-fatal): ${e.message.split('\n')[0]}`);
+  }
+}
+
+// Rediscover a device by name when its saved address no longer responds. Polar H10
+// (and others) can rotate their BLE MAC after a hard reset / battery swap. We scan,
+// match by name, and update the saved address.
+async function rediscoverByName(savedAddress, expectedNamePrefix) {
+  try {
+    if (!adapter) adapter = await bluetooth.defaultAdapter();
+    if (!await adapter.isDiscovering()) {
+      await adapter.startDiscovery();
+    }
+    await new Promise(r => setTimeout(r, 6000));
+    try { await adapter.stopDiscovery(); } catch (e) {}
+
+    const addresses = await adapter.devices();
+    for (const addr of addresses) {
+      if (addr.toLowerCase() === savedAddress.toLowerCase()) continue; // already tried this
+      try {
+        const device = await adapter.waitDevice(addr, 1000);
+        const name = await device.getName().catch(() => null);
+        if (name && name.toLowerCase().includes(expectedNamePrefix.toLowerCase())) {
+          console.log(`[BLE] Rediscovered "${name}" at new address ${addr} (was ${savedAddress})`);
+          return addr;
+        }
+      } catch (e) { /* skip */ }
+    }
+  } catch (e) {
+    console.log('[BLE] Rediscovery failed:', e.message);
+  }
+  return null;
+}
+
+// Nuclear-option recovery: tear down everything, clear BlueZ cache for both saved
+// addresses, power-cycle the adapter, reset attempt counters, attempt fresh connect.
+async function handleBleForceReset(commandId, params) {
+  console.log('[BLE] Force reset requested');
+  try {
+    try { ftms.disconnect(); } catch (e) {}
+    try { hrm.disconnect(); } catch (e) {}
+    try { fitshow.disconnect(); } catch (e) {}
+
+    if (config.treadmillAddress) await clearBluezDeviceCache(config.treadmillAddress);
+    if (config.hrmAddress) await clearBluezDeviceCache(config.hrmAddress);
+
+    await powerCycleAdapter();
+
+    ftmsReconnectAttempts = 0; ftmsReconnectDelay = 1000; ftmsGattTimeoutStreak = 0;
+    hrmReconnectAttempts = 0; hrmReconnectDelay = 1000; hrmGattTimeoutStreak = 0;
+
+    if (config.treadmillAddress) {
+      reconnectFtms().catch(() => scheduleReconnect('treadmill'));
+    }
+    if (config.hrmAddress) {
+      reconnectHrm().catch(() => scheduleReconnect('hrm'));
+    }
+
+    broadcastDeviceStatus();
+    sendCommandResponse(commandId, 'ble_force_reset', true);
+  } catch (err) {
+    console.error('[BLE] Force reset failed:', err.message);
+    sendCommandResponse(commandId, 'ble_force_reset', false, err.message);
+  }
+}
+
 async function handleBleReconnect(commandId, params) {
   const { deviceType } = params || {};
   try {
+    // If both devices are down, the adapter itself is likely stale — power-cycle it
+    // before attempting reconnect. If only one is down, leave the adapter alone so
+    // we don't knock out the other device.
+    const bothDown = !ftms.isConnected() && !hrm.isConnected();
+    if (bothDown) await powerCycleAdapter();
+
     if (deviceType === 'treadmill' && config.treadmillAddress) {
       ftmsReconnectAttempts = 0;
       ftmsReconnectDelay = 1000;
@@ -499,9 +608,16 @@ function setupFtmsListeners() {
     if (sessionActive && sessionId) {
       const hr = hrm.getCurrentHeartRate() || null;
 
-      // Accumulate calories from Keytel formula (1 data point ≈ 1 second)
+      // Time-based calorie accumulation. FTMS sends data at variable rate (~3 Hz on
+      // our treadmill), so per-event accumulation overestimates by ~3x.
       if (hr && sessionProfile && sessionProfile.weight_kg && sessionProfile.age) {
-        sessionCalories += keytelCaloriesPerMinute(hr, sessionProfile.weight_kg, sessionProfile.age, sessionProfile.gender) / 60;
+        const now = Date.now();
+        if (lastCalorieTickAt > 0) {
+          const dtMs = Math.min(now - lastCalorieTickAt, 5000); // cap at 5s gap (e.g. paused/disconnect)
+          const kcalPerMin = keytelCaloriesPerMinute(hr, sessionProfile.weight_kg, sessionProfile.age, sessionProfile.gender);
+          sessionCalories += kcalPerMin * (dtMs / 60000);
+        }
+        lastCalorieTickAt = now;
       }
 
       dataBuffer.push({
@@ -587,6 +703,13 @@ function setupHrmListeners() {
   hrm.on('disconnect', () => {
     console.log('[Service] HRM disconnected — scheduling reconnect');
     broadcastDeviceStatus();
+    if (sessionActive) {
+      wsSend({ type: 'coaching_event', event: 'hrm_lost', timestamp: Date.now() });
+      if (activeHRZoneController) {
+        activeHRZoneController.pause(120000);
+        console.log('[HRZone] Paused due to HRM drop (120s)');
+      }
+    }
     scheduleReconnect('hrm');
   });
 }
@@ -627,49 +750,80 @@ function setupFitshowListeners() {
 }
 
 // ── Auto-Reconnect with Exponential Backoff ─────────────────────────────────
+// Reconnect retries forever (no give-up cliff). The first BLE_FAST_RETRY_ATTEMPTS
+// attempts run with no backoff — most transient drops resolve in under a minute.
+// After that, exponential backoff up to BLE_MAX_RECONNECT (60s).
+async function handleReconnectFailure(deviceType, err) {
+  const isGattTimeout = /GATT discovery timeout/i.test(err.message);
+
+  if (deviceType === 'treadmill') {
+    if (isGattTimeout) {
+      ftmsGattTimeoutStreak++;
+      if (ftmsGattTimeoutStreak >= 1 && config.treadmillAddress) {
+        console.log('[BLE] Treadmill GATT timeout — clearing BlueZ cache');
+        await clearBluezDeviceCache(config.treadmillAddress);
+        ftmsGattTimeoutStreak = 0;
+      }
+    } else {
+      ftmsGattTimeoutStreak = 0;
+    }
+  } else {
+    if (isGattTimeout) {
+      hrmGattTimeoutStreak++;
+      if (hrmGattTimeoutStreak >= 1 && config.hrmAddress) {
+        console.log('[BLE] HRM GATT timeout — clearing BlueZ cache');
+        await clearBluezDeviceCache(config.hrmAddress);
+        hrmGattTimeoutStreak = 0;
+      }
+    } else {
+      hrmGattTimeoutStreak = 0;
+    }
+  }
+}
+
 function scheduleReconnect(deviceType) {
   if (deviceType === 'treadmill' && config.treadmillAddress) {
     ftmsReconnectAttempts++;
-    if (ftmsReconnectAttempts > BLE_MAX_ATTEMPTS) {
-      console.log(`[BLE] Treadmill reconnect gave up after ${BLE_MAX_ATTEMPTS} attempts. Will retry on next restart.`);
-      return;
-    }
-    const delay = ftmsReconnectDelay;
-    console.log(`[BLE] Treadmill reconnect in ${delay / 1000}s... (attempt ${ftmsReconnectAttempts}/${BLE_MAX_ATTEMPTS})`);
+    const isFastRetry = ftmsReconnectAttempts <= BLE_FAST_RETRY_ATTEMPTS;
+    const delay = isFastRetry ? 100 : ftmsReconnectDelay;
+    console.log(`[BLE] Treadmill reconnect in ${delay / 1000}s... (attempt ${ftmsReconnectAttempts})`);
     setTimeout(async () => {
       try {
         await reconnectFtms();
         ftmsReconnectDelay = 1000;
         ftmsReconnectAttempts = 0;
+        ftmsGattTimeoutStreak = 0;
       } catch (err) {
         console.error('[BLE] Treadmill reconnect failed:', err.message);
-        ftmsReconnectDelay = Math.min(ftmsReconnectDelay * 2, BLE_MAX_RECONNECT);
+        await handleReconnectFailure('treadmill', err);
+        if (!isFastRetry) {
+          ftmsReconnectDelay = Math.min(ftmsReconnectDelay * 2, BLE_MAX_RECONNECT);
+        }
         scheduleReconnect('treadmill');
       }
     }, delay);
-    ftmsReconnectDelay = Math.min(ftmsReconnectDelay * 2, BLE_MAX_RECONNECT);
   }
 
   if (deviceType === 'hrm' && config.hrmAddress) {
     hrmReconnectAttempts++;
-    if (hrmReconnectAttempts > BLE_MAX_ATTEMPTS) {
-      console.log(`[BLE] HRM reconnect gave up after ${BLE_MAX_ATTEMPTS} attempts. Will retry on next restart.`);
-      return;
-    }
-    const delay = hrmReconnectDelay;
-    console.log(`[BLE] HRM reconnect in ${delay / 1000}s... (attempt ${hrmReconnectAttempts}/${BLE_MAX_ATTEMPTS})`);
+    const isFastRetry = hrmReconnectAttempts <= BLE_FAST_RETRY_ATTEMPTS;
+    const delay = isFastRetry ? 100 : hrmReconnectDelay;
+    console.log(`[BLE] HRM reconnect in ${delay / 1000}s... (attempt ${hrmReconnectAttempts})`);
     setTimeout(async () => {
       try {
         await reconnectHrm();
         hrmReconnectDelay = 1000;
         hrmReconnectAttempts = 0;
+        hrmGattTimeoutStreak = 0;
       } catch (err) {
         console.error('[BLE] HRM reconnect failed:', err.message);
-        hrmReconnectDelay = Math.min(hrmReconnectDelay * 2, BLE_MAX_RECONNECT);
+        await handleReconnectFailure('hrm', err);
+        if (!isFastRetry) {
+          hrmReconnectDelay = Math.min(hrmReconnectDelay * 2, BLE_MAX_RECONNECT);
+        }
         scheduleReconnect('hrm');
       }
     }, delay);
-    hrmReconnectDelay = Math.min(hrmReconnectDelay * 2, BLE_MAX_RECONNECT);
   }
 }
 
@@ -690,10 +844,27 @@ async function reconnectFtms() {
     console.log('[BLE] Discovery error (non-fatal):', e.message);
   }
 
-  const device = await Promise.race([
-    adapter.waitDevice(config.treadmillAddress, 15000),
-    new Promise((_, reject) => setTimeout(() => reject(new Error('Device not found (15s)')), 16000))
-  ]);
+  let device;
+  try {
+    device = await Promise.race([
+      adapter.waitDevice(config.treadmillAddress, 8000),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Device not found (8s)')), 9000))
+    ]);
+  } catch (e) {
+    // Saved address didn't respond — try to rediscover by name (e.g. after factory reset)
+    if (ftmsReconnectAttempts >= 3) {
+      const newAddr = await rediscoverByName(config.treadmillAddress, 'FitShow');
+      if (newAddr) {
+        config.treadmillAddress = newAddr;
+        saveConfig(config);
+        device = await adapter.waitDevice(newAddr, 8000);
+      } else {
+        throw e;
+      }
+    } else {
+      throw e;
+    }
+  }
   await ftms.connect(device);
   setupFtmsListeners();
   try {
@@ -756,15 +927,40 @@ async function reconnectHrm() {
     console.log('[BLE] Discovery error (non-fatal):', e.message);
   }
 
-  const device = await Promise.race([
-    adapter.waitDevice(config.hrmAddress, 15000),
-    new Promise((_, reject) => setTimeout(() => reject(new Error('Device not found (15s)')), 16000))
-  ]);
+  let device;
+  try {
+    device = await Promise.race([
+      adapter.waitDevice(config.hrmAddress, 8000),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Device not found (8s)')), 9000))
+    ]);
+  } catch (e) {
+    // Saved address didn't respond — Polar H10 rotates MAC after hard reset.
+    // Try to rediscover by name after a few failed attempts.
+    if (hrmReconnectAttempts >= 3) {
+      const newAddr = await rediscoverByName(config.hrmAddress, 'Polar');
+      if (newAddr) {
+        config.hrmAddress = newAddr;
+        saveConfig(config);
+        device = await adapter.waitDevice(newAddr, 8000);
+      } else {
+        throw e;
+      }
+    } else {
+      throw e;
+    }
+  }
   const name = await device.getName().catch(() => config.hrmAddress);
   await hrm.connect(device, name);
   setupHrmListeners();
   broadcastDeviceStatus();
   console.log('[BLE] HRM reconnected');
+
+  if (sessionActive) {
+    wsSend({ type: 'coaching_event', event: 'hrm_recovered', timestamp: Date.now() });
+    if (activeHRZoneController && activeHRZoneController.paused) {
+      activeHRZoneController.resume();
+    }
+  }
 }
 
 // ── Workout / Session Management ────────────────────────────────────────────
@@ -826,6 +1022,7 @@ async function handleStartSession(commandId, params) {
     sessionMaxHR = null;
     sessionProfile = null;
     sessionCalories = 0;
+    lastCalorieTickAt = 0;
 
     // Fetch profile for HR zone control and calorie calculation
     const pid = parseInt(params.profileId || params.profile_id);
@@ -951,6 +1148,7 @@ async function handleStopSession(commandId, params) {
   sessionStartTime = null;
   sessionProfile = null;
   sessionCalories = 0;
+  lastCalorieTickAt = 0;
   currentWorkout = null;
   currentSegmentIndex = 0;
   currentTargetSpeed = 0;

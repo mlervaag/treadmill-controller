@@ -40,6 +40,18 @@ let lastManualOverrideTime = 0;
 const MANUAL_OVERRIDE_COOLDOWN = 15000; // 15s pause after manual change
 let treadmillHeartRate = null; // Current HR from treadmill
 let activeHeartRateSource = 'none'; // 'hrm', 'treadmill', or 'none'
+let sessionProfile = null;  // { weight_kg, age, gender } for calorie calculation
+let sessionCalories = 0;    // accumulated kcal from Keytel formula
+
+// Keytel (2005) calorie formula — kcal per minute from heart rate. Industry standard,
+// replaces the treadmill's own calorie reporting which is often grossly inflated.
+function keytelCaloriesPerMinute(hr, weightKg, age, gender) {
+    if (!hr || !weightKg || !age) return 0;
+    if (gender === 'female') {
+        return (-20.4022 + 0.4472 * hr - 0.1263 * weightKg + 0.074 * age) / 4.184;
+    }
+    return (-55.0969 + 0.6309 * hr + 0.1988 * weightKg + 0.2017 * age) / 4.184;
+}
 let driftCheckTimer = null;
 let currentTargetSpeed = null;
 let currentTargetIncline = null;
@@ -303,12 +315,8 @@ function updateStats(data) {
         updateHeartRateSource();
         updateHeartRateDisplay();
     }
-    if (data.total_energy_kcal !== undefined) {
-        const kcal = Math.round(data.total_energy_kcal);
-        document.getElementById('currentCalories').textContent = kcal + ' kcal';
-        document.getElementById('focusCalories').textContent = kcal + ' kcal';
-        sessionData.calories = Math.round(data.total_energy_kcal);
-    }
+    // Calories come from our own Keytel accumulator in updateLocalTime(), not from
+    // the treadmill (FitShow reports ~3x inflated values).
     if (data.power_watts !== undefined) {
         document.getElementById('currentPower').textContent = data.power_watts;
     }
@@ -327,6 +335,16 @@ function updateLocalTime() {
     document.getElementById('currentTime').textContent = timeStr;
     document.getElementById('focusTime').textContent = timeStr;
     document.getElementById('minimalTime').textContent = timeStr;
+
+    // Accumulate calories once per second using Keytel (HR-based, industry standard)
+    const hr = hrmHeartRate || treadmillHeartRate;
+    if (hr && hr > 0 && sessionProfile && sessionProfile.weight_kg && sessionProfile.age) {
+        sessionCalories += keytelCaloriesPerMinute(hr, sessionProfile.weight_kg, sessionProfile.age, sessionProfile.gender) / 60;
+        const kcal = Math.max(0, Math.round(sessionCalories));
+        document.getElementById('currentCalories').textContent = kcal;
+        document.getElementById('focusCalories').textContent = kcal + ' kcal';
+        sessionData.calories = kcal;
+    }
 }
 
 function startLocalTimer() {
@@ -385,8 +403,7 @@ function recordSessionData(data) {
     // Only record valid heart rate (not 0 or 255)
     const validHR = (data.heart_rate && data.heart_rate > 0 && data.heart_rate < 255) ? data.heart_rate : null;
 
-    // Only record calories if present and valid
-    const validCalories = (data.total_energy_kcal && data.total_energy_kcal > 0) ? Math.round(data.total_energy_kcal) : null;
+    const validCalories = sessionCalories > 0 ? Math.round(sessionCalories) : null;
 
     const dataBody = {
         speed_kmh: data.speed_kmh,
@@ -1833,6 +1850,23 @@ async function startSession(workoutId = null, profileId = null) {
         currentSession = data.id;
         sessionStartTime = Date.now();
         sessionData = { distance: 0, time: 0, heartRates: [], calories: 0 };
+        sessionCalories = 0;
+        sessionProfile = null;
+        if (effectiveProfileId) {
+            try {
+                const profRes = await fetch('/api/profiles');
+                const profiles = await profRes.json();
+                const prof = profiles.find(p => p.id === parseInt(effectiveProfileId));
+                if (prof && prof.weight_kg && prof.age) {
+                    sessionProfile = { weight_kg: prof.weight_kg, age: prof.age, gender: prof.gender || 'male' };
+                    console.log(`Session calorie calc: Keytel (${prof.weight_kg}kg, age ${prof.age}, ${sessionProfile.gender})`);
+                } else {
+                    console.warn('Profile missing weight or age — calories will not be computed');
+                }
+            } catch (e) {
+                console.warn('Could not fetch profile for calorie calc:', e);
+            }
+        }
         dataBuffer = []; // Clear any stale buffer
         consecutiveFailures = 0;
         console.log(`Session ${currentSession} started (workout: ${workoutId || 'manual'})`);

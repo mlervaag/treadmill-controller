@@ -1769,6 +1769,14 @@ function handleConnection(ws, req) {
         }
       }
 
+      // --- Coaching events from ble-service (e.g. hrm_lost / hrm_recovered) ---
+      if (data.type === 'coaching_event' && activeCoachingEngine && data.event) {
+        activeCoachingEngine.pushEvent(data.event);
+        if (latestTreadmillState) {
+          activeCoachingEngine.update(latestTreadmillState);
+        }
+      }
+
       // --- Cache device status for new-client hydration ---
       if (data.type === 'device_status') {
         latestDeviceStatus = data;

@@ -140,6 +140,8 @@ strava_auth (id, athlete_id UNIQUE, access_token, refresh_token, expires_at, sco
 - `DELETE /api/strava/disconnect?profileId=X` — Disconnect Strava per profile (or all if no profileId)
 - `POST /api/strava/upload/:sessionId` — Upload session as TCX to Strava. Looks up tokens via session's profile_id
 - WebSocket commands `set_speed` and `set_incline` — manual speed/incline adjustment via ble-service (new, for HR zone control manual override)
+- WebSocket command `ble_force_reset` — full BLE recovery: tear down all GATT connections, clear BlueZ device cache for both saved addresses, power-cycle the adapter, reset retry counters, kick off fresh reconnects
+- WebSocket message `coaching_event` (ble-service → server) — `{ event: 'hrm_lost' | 'hrm_recovered', timestamp }`. Server forwards to active CoachingEngine.pushEvent which queues a high-priority TTS message
 
 ## FTMS Protocol Details
 
@@ -196,6 +198,15 @@ Things that have caused confusion or bugs — read these before making changes:
 16. **Sonestyring only works via native BLE service** — `app.js` browser-based `executeSegment()` does not support HR zone control. iPad/view.html starts sessions via WebSocket → ble-service handles everything.
 17. **`set_speed`/`set_incline` WebSocket commands** are new — added for manual override during HR zone control. They also work for non-HR-controlled sessions. These pause the HR zone controller for 45 seconds.
 18. **BLE service uses node-ble (D-Bus/BlueZ), not noble** — supports multiple simultaneous BLE connections. Requires D-Bus config file at `/etc/dbus-1/system.d/node-ble.conf` (installed by install.sh). If BLE connections fail, check `systemctl status bluetooth` and D-Bus permissions.
+19. **BLE reconnect retries forever** — `BLE_MAX_ATTEMPTS` was removed (2026-05-05). Backoff caps at 60s. There is no "give up" state; if a device is off, the loop just keeps trying every 60s until it answers. First 3 attempts skip backoff entirely (run within ~100ms each) — most transient drops resolve in seconds.
+20. **GATT discovery timeout triggers BlueZ cache clear** — after even one `GATT discovery timeout` failure, ble-service runs `bluetoothctl remove <addr>` to flush BlueZ's stale device cache before the next attempt. Mid-run drops typically recover in 20-30s now.
+21. **Polar H10 MAC rotates on hard reset** — after 3+ failed reconnects, ble-service does a fresh BLE scan and matches by name prefix (`Polar`/`FitShow`). If found at a new address, `ble-config.json` is auto-updated. Without this, a hard-reset H10 would be unreachable until the saved address was manually replaced.
+22. **`ble_force_reset` WebSocket command** — nuclear-option recovery used by view.html's "Tilbakestill BLE" button: disconnects everything, clears BlueZ cache for both addresses, power-cycles adapter, resets backoff counters, attempts fresh connect. Use when the auto-loop seems wedged.
+23. **HR zone controller bypasses accumulation cap when sustained-high** — when HR has been clearly above zoneHigh+hysteresis for ≥90s, the controller skips both the direction-change cooldown and the accumulation cap for downward steps. This lets it descend all the way to `minSpeed` (3 km/h, walking pace) when the runner genuinely needs it.
+24. **HR zone controller boundary timer uses hysteresis** — `boundaryStart` only resets after HR has been ≥3pp below zoneHigh for 5 ticks. Brief dips don't reset the timer, so the 60s "stuck at boundary" escalation actually fires when HR oscillates around the zone ceiling.
+25. **HR zone controller pauses 120s on HRM drop mid-session**, in addition to its existing 300s pause on FTMS drop. On HRM reconnect mid-session, controller auto-resumes; coaching engine speaks "Pulsbeltet er tilbake."
+26. **Calorie accumulation is time-based, not per-FTMS-event** — FTMS data fires at ~3 Hz on our treadmill, so the old per-event accumulation overestimated by ~3x. `lastCalorieTickAt` timestamp drives `dt`-weighted accumulation now (capped at 5s gap to avoid spikes after disconnects).
+27. **Manual ±-buttons in view.html visible during ALL active session segments**, not just HR-controlled ones. Runner can override e.g. cooldown speed.
 
 ## Known Issues
 
