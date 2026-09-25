@@ -183,7 +183,58 @@ const ttsService = new TTSService({
 });
 
 let activeCoachingEngine = null;
+let coachingStartAttempted = false; // reset when the session ends
 const ttsConfigs = new Map(); // Map<ws, { enabled, target, profileId }>
+
+// Foreign keys are not enforced (PRAGMA foreign_keys is off), so ON DELETE CASCADE
+// never fired. Clean up rows orphaned by earlier deletes.
+{
+  const orphanData = db.prepare('DELETE FROM session_data WHERE session_id NOT IN (SELECT id FROM workout_sessions)').run().changes;
+  const orphanSegs = db.prepare('DELETE FROM workout_segments WHERE workout_id NOT IN (SELECT id FROM workouts)').run().changes;
+  if (orphanData || orphanSegs) {
+    console.log(`🧹 Removed orphaned rows: ${orphanData} session_data, ${orphanSegs} workout_segments`);
+  }
+}
+
+// SQLite CURRENT_TIMESTAMP is UTC but has no zone suffix ("YYYY-MM-DD HH:MM:SS").
+// new Date() would parse that as local time, so mark it as UTC explicitly.
+function parseDbTimestamp(value) {
+  if (!value) return new Date(NaN);
+  const str = String(value);
+  if (/[zZ]|[+-]\d\d:?\d\d$/.test(str)) return new Date(str);
+  return new Date(str.replace(' ', 'T') + 'Z');
+}
+
+// Ordered by id (insert order) — timestamp only has 1s resolution
+const selectSessionDataStmt = db.prepare('SELECT * FROM session_data WHERE session_id = ? ORDER BY id ASC');
+function getSessionDataPoints(sessionId) {
+  return selectSessionDataStmt.all(sessionId);
+}
+
+// Hot path: one insert per second during a session
+const insertSessionDataStmt = db.prepare(`
+  INSERT INTO session_data (session_id, speed_kmh, incline_percent, distance_km, heart_rate, calories, segment_index)
+  VALUES (?, ?, ?, ?, ?, ?, ?)
+`);
+
+function getAllWorkouts() {
+  const workouts = db.prepare(`
+    SELECT
+      w.*,
+      COUNT(ws.id) as segment_count,
+      COALESCE(SUM(ws.duration_seconds), 0) as total_duration_seconds,
+      COALESCE(SUM(ws.duration_seconds * ws.speed_kmh / 3600.0), 0) as total_distance_km
+    FROM workouts w
+    LEFT JOIN workout_segments ws ON w.id = ws.workout_id
+    GROUP BY w.id
+    ORDER BY w.created_at DESC
+  `).all();
+  return workouts.map(w => {
+    try { w.tags = JSON.parse(w.tags); } catch { w.tags = []; }
+    if (!Array.isArray(w.tags)) w.tags = [];
+    return w;
+  });
+}
 
 // HR zone eligibility heuristic
 function calculateHRZoneEligible(segments) {
@@ -196,25 +247,7 @@ function calculateHRZoneEligible(segments) {
 
 // API Routes
 app.get('/api/workouts', (req, res) => {
-  const workouts = db.prepare(`
-    SELECT 
-      w.*, 
-      COUNT(ws.id) as segment_count,
-      COALESCE(SUM(ws.duration_seconds), 0) as total_duration_seconds,
-      COALESCE(SUM(ws.duration_seconds * ws.speed_kmh / 3600.0), 0) as total_distance_km
-    FROM workouts w
-    LEFT JOIN workout_segments ws ON w.id = ws.workout_id
-    GROUP BY w.id
-    ORDER BY w.created_at DESC
-  `).all();
-
-  // Parse tags from JSON string
-  const workoutsWithTags = workouts.map(w => {
-    try { w.tags = JSON.parse(w.tags); } catch { w.tags = []; }
-    return { ...w };
-  });
-
-  res.json(workoutsWithTags);
+  res.json(getAllWorkouts());
 });
 
 // Get template workouts - MUST come before /api/workouts/:id
@@ -420,7 +453,10 @@ app.delete('/api/workouts/:id', (req, res) => {
       return res.status(400).json({ error: 'Ugyldig ID' });
     }
 
-    const result = db.prepare('DELETE FROM workouts WHERE id = ?').run(id);
+    const result = db.transaction(() => {
+      db.prepare('DELETE FROM workout_segments WHERE workout_id = ?').run(id);
+      return db.prepare('DELETE FROM workouts WHERE id = ?').run(id);
+    })();
     if (result.changes === 0) {
       return res.status(404).json({ error: 'Treningsøkt ikke funnet' });
     }
@@ -503,7 +539,10 @@ app.delete('/api/sessions/:id', (req, res) => {
       return res.status(400).json({ error: 'Ugyldig ID' });
     }
 
-    const result = db.prepare('DELETE FROM workout_sessions WHERE id = ?').run(id);
+    const result = db.transaction(() => {
+      db.prepare('DELETE FROM session_data WHERE session_id = ?').run(id);
+      return db.prepare('DELETE FROM workout_sessions WHERE id = ?').run(id);
+    })();
     if (result.changes === 0) {
       return res.status(404).json({ error: 'Økt ikke funnet' });
     }
@@ -524,12 +563,14 @@ app.get('/api/sessions', (req, res) => {
   const conditions = [];
   const params = [];
 
+  // Clients send ISO 8601 ("2026-01-01T10:00:00.000Z"); started_at is stored as
+  // "YYYY-MM-DD HH:MM:SS" UTC. datetime() normalizes so string comparison is correct.
   if (startDate) {
-    conditions.push('s.started_at >= ?');
+    conditions.push('s.started_at >= datetime(?)');
     params.push(startDate);
   }
   if (endDate) {
-    conditions.push('s.started_at <= ?');
+    conditions.push('s.started_at <= datetime(?)');
     params.push(endDate);
   }
   if (profileId) {
@@ -671,10 +712,7 @@ app.post('/api/sessions/:id/data', (req, res) => {
     const cal = calories && !isNaN(parseInt(calories)) ? parseInt(calories) : null;
     const segIdx = (segment_index !== undefined && segment_index !== null && !isNaN(parseInt(segment_index))) ? parseInt(segment_index) : null;
 
-    db.prepare(`
-      INSERT INTO session_data (session_id, speed_kmh, incline_percent, distance_km, heart_rate, calories, segment_index)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(id, Math.max(0, speed), Math.max(0, incline), Math.max(0, distance), hr, cal, segIdx);
+    insertSessionDataStmt.run(id, Math.max(0, speed), Math.max(0, incline), Math.max(0, distance), hr, cal, segIdx);
 
     res.json({ success: true });
   } catch (error) {
@@ -733,11 +771,7 @@ app.get('/api/sessions/:id/details', (req, res) => {
       return res.status(404).json({ error: 'Økt ikke funnet' });
     }
 
-    const dataPoints = db.prepare(`
-      SELECT * FROM session_data
-      WHERE session_id = ?
-      ORDER BY timestamp ASC
-    `).all(id);
+    const dataPoints = getSessionDataPoints(id);
 
     res.json({ ...session, dataPoints });
   } catch (error) {
@@ -765,11 +799,7 @@ app.get('/api/sessions/:id/export/json', (req, res) => {
       return res.status(404).json({ error: 'Økt ikke funnet' });
     }
 
-    const dataPoints = db.prepare(`
-      SELECT * FROM session_data
-      WHERE session_id = ?
-      ORDER BY timestamp ASC
-    `).all(id);
+    const dataPoints = getSessionDataPoints(id);
 
     const exportData = { ...session, dataPoints };
 
@@ -795,15 +825,13 @@ app.get('/api/sessions/:id/export/csv', (req, res) => {
       return res.status(404).json({ error: 'Økt ikke funnet' });
     }
 
-    const dataPoints = db.prepare(`
-      SELECT * FROM session_data
-      WHERE session_id = ?
-      ORDER BY timestamp ASC
-    `).all(id);
+    const dataPoints = getSessionDataPoints(id);
 
-    let csv = 'Timestamp,Speed (km/h),Incline (%),Distance (km),Heart Rate (bpm),Calories\n';
+    let csv = 'Timestamp,Speed (km/h),Incline (%),Distance (km),Heart Rate (bpm),Calories,Segment\n';
     dataPoints.forEach(point => {
-      csv += `${point.timestamp},${point.speed_kmh || 0},${point.incline_percent || 0},${point.distance_km || 0},${point.heart_rate || ''},${point.calories || ''}\n`;
+      const ts = parseDbTimestamp(point.timestamp).toISOString();
+      const seg = point.segment_index != null ? point.segment_index + 1 : '';
+      csv += `${ts},${point.speed_kmh || 0},${point.incline_percent || 0},${point.distance_km || 0},${point.heart_rate || ''},${point.calories || ''},${seg}\n`;
     });
 
     res.setHeader('Content-Type', 'text/csv');
@@ -834,11 +862,7 @@ app.get('/api/sessions/:id/export/tcx', (req, res) => {
       return res.status(404).json({ error: 'Økt ikke funnet' });
     }
 
-    const dataPoints = db.prepare(`
-      SELECT * FROM session_data
-      WHERE session_id = ?
-      ORDER BY timestamp ASC
-    `).all(id);
+    const dataPoints = getSessionDataPoints(id);
 
     const tcxContent = generateTCX(session, dataPoints);
 
@@ -1015,11 +1039,7 @@ app.post('/api/strava/upload/:sessionId', async (req, res) => {
 
     const accessToken = await getValidStravaToken(session.profile_id);
 
-    const dataPoints = db.prepare(`
-      SELECT * FROM session_data
-      WHERE session_id = ?
-      ORDER BY timestamp ASC
-    `).all(sessionId);
+    const dataPoints = getSessionDataPoints(sessionId);
 
     if (dataPoints.length === 0) {
       return res.status(400).json({ error: 'Økten har ingen datapunkter å laste opp' });
@@ -1081,7 +1101,10 @@ app.post('/api/strava/upload/:sessionId', async (req, res) => {
       WHERE id = ?
     `).run(sessionId);
 
-    res.status(500).json({ error: error.message });
+    const notConnected = /not connected to Strava/i.test(error.message);
+    res.status(notConnected ? 400 : 500).json({
+      error: notConnected ? 'Profilen er ikke koblet til Strava' : 'Strava-opplasting feilet. Prøv igjen senere.'
+    });
   }
 });
 
@@ -1401,11 +1424,13 @@ async function getValidStravaToken(profileId = null) {
 
 // Strava helper: Generate TCX (Training Center XML) from session data
 function generateTCX(session, dataPoints) {
-  const startTime = new Date(session.started_at).toISOString();
+  const startTime = parseDbTimestamp(session.started_at).toISOString();
 
   let trackpoints = '';
+  let maxHR = 0;
   dataPoints.forEach(point => {
-    const time = new Date(point.timestamp).toISOString();
+    const time = parseDbTimestamp(point.timestamp).toISOString();
+    if (point.heart_rate > maxHR) maxHR = point.heart_rate;
     const distance = (point.distance_km || 0) * 1000; // km to meters
     const speed = (point.speed_kmh || 0) / 3.6; // km/h to m/s
     const hr = point.heart_rate || 0;
@@ -1424,7 +1449,6 @@ function generateTCX(session, dataPoints) {
   });
 
   const avgHR = session.avg_heart_rate || 0;
-  const maxHR = dataPoints.length > 0 ? Math.max(...dataPoints.map(p => p.heart_rate || 0)) : 0;
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <TrainingCenterDatabase xmlns="http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2">
@@ -1486,6 +1510,19 @@ function startCoaching(profileId, workoutId) {
   return engine;
 }
 
+/** Start coaching for the first viewer that has TTS enabled and a profile selected. */
+function startCoachingForViewers(workoutId) {
+  for (const [, config] of ttsConfigs) {
+    if (config.enabled && config.profileId) {
+      activeCoachingEngine = startCoaching(config.profileId, workoutId);
+      if (activeCoachingEngine) {
+        console.log(`🎙️  Coaching started (profile: ${config.profileId}, workout: ${workoutId})`);
+      }
+      return;
+    }
+  }
+}
+
 function deliverTTS(text, filename) {
   let deliveredToViewer = false;
   console.log(`🔊 Delivering TTS: "${text.substring(0, 40)}..." to ${ttsConfigs.size} viewer(s), file=${filename ? 'yes' : 'no'}`);
@@ -1497,7 +1534,7 @@ function deliverTTS(text, filename) {
 
     if (config.target === 'client' || config.target === 'both') {
       if (filename) {
-        ws.send(JSON.stringify({ type: 'tts', url: '/audio/' + filename }));
+        ws.send(JSON.stringify({ type: 'tts', url: '/audio/' + filename, text }));
       } else {
         ws.send(JSON.stringify({ type: 'tts_text', text }));
       }
@@ -1627,13 +1664,7 @@ function handleConnection(ws, req) {
         // list_workouts is handled directly by the server
         if (data.command === 'list_workouts') {
           try {
-            const workouts = db.prepare(`
-              SELECT w.*, COUNT(ws.id) as segment_count,
-                COALESCE(SUM(ws.duration_seconds), 0) as total_duration_seconds
-              FROM workouts w
-              LEFT JOIN workout_segments ws ON w.id = ws.workout_id
-              GROUP BY w.id ORDER BY w.created_at DESC
-            `).all();
+            const workouts = getAllWorkouts();
             ws.send(JSON.stringify({
               type: 'command_response',
               commandId: data.commandId || null,
@@ -1709,15 +1740,8 @@ function handleConnection(ws, req) {
           if (pending.command === 'start_session' && data.success && !activeCoachingEngine) {
             const workoutId = (data.data && data.data.workout_id) ? data.data.workout_id : null;
             if (workoutId) {
-              for (const [, config] of ttsConfigs) {
-                if (config.enabled && config.profileId) {
-                  activeCoachingEngine = startCoaching(config.profileId, workoutId);
-                  if (activeCoachingEngine) {
-                    console.log(`🎙️  Coaching started (profile: ${config.profileId}, workout: ${workoutId})`);
-                  }
-                  break;
-                }
-              }
+              coachingStartAttempted = true;
+              startCoachingForViewers(workoutId);
             }
           }
         }
@@ -1726,11 +1750,12 @@ function handleConnection(ws, req) {
 
       // --- HR zone controller status messages ---
       if (data.type === 'hr_zone_status') {
+        const toValue = data.toValue ? CoachingEngine.formatNumber(data.toValue) : null;
         const ttsMessages = {
-          'decrease_speed': data.toValue ? `Senker farten til ${data.toValue}.` : null,
-          'increase_speed': data.toValue ? `Øker farten til ${data.toValue}.` : null,
-          'decrease_incline': data.toValue ? `Senker stigningen til ${data.toValue} prosent.` : null,
-          'increase_incline': data.toValue ? `Øker stigningen til ${data.toValue} prosent.` : null,
+          'decrease_speed': toValue ? `Senker farten til ${toValue}.` : null,
+          'increase_speed': toValue ? `Øker farten til ${toValue}.` : null,
+          'decrease_incline': toValue ? `Senker stigningen til ${toValue} prosent.` : null,
+          'increase_incline': toValue ? `Øker stigningen til ${toValue} prosent.` : null,
           'hrm_dropout': 'Mistet pulssignal. Holder nåværende fart.',
           'hrm_timeout': 'Sonestyring deaktivert. Ingen pulsdata.',
           'hrm_recovered': 'Pulssignal gjenopprettet. Gjenopptar sonestyring.',
@@ -1757,6 +1782,15 @@ function handleConnection(ws, req) {
       // --- Cache treadmill state for new-client hydration ---
       if (data.type === 'treadmill_state') {
         latestTreadmillState = data.sessionActive ? data : null;
+
+        // Sessions started from the treadmill's own Start button never pass through
+        // a start_session command, so start coaching on the first active state instead.
+        if (!data.sessionActive) {
+          coachingStartAttempted = false;
+        } else if (!activeCoachingEngine && !coachingStartAttempted && data.workout && data.workout.workoutId) {
+          coachingStartAttempted = true;
+          startCoachingForViewers(data.workout.workoutId);
+        }
 
         // Feed to active coaching engine
         if (activeCoachingEngine) {

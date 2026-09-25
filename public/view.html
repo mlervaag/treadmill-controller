@@ -964,28 +964,71 @@
             border-color: rgba(255, 152, 0, 0.3);
         }
         .hr-zone-value { font-weight: bold; }
+        /* Large touch targets — these get tapped mid-run */
         .manual-adjust-controls {
-            display: flex;
-            gap: 16px;
-            justify-content: center;
-            margin: 8px 0;
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
         }
         .adjust-group {
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 8px;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 8px;
         }
         .adjust-btn {
-            padding: 6px 12px;
-            border-radius: 6px;
-            border: 1px solid var(--border-color, #444);
-            background: var(--bg-secondary, #2a2a2a);
-            color: var(--text-primary, #fff);
+            flex-shrink: 0;
+            width: 64px;
+            height: 64px;
+            border-radius: 12px;
+            border: none;
+            background: var(--card-bg-light);
+            color: var(--text-primary);
             cursor: pointer;
-            font-size: 13px;
+            font-size: 32px;
+            font-weight: 600;
+            line-height: 1;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
         }
-        .adjust-btn:active { transform: scale(0.95); }
-        .adjust-label { font-size: 12px; color: var(--text-secondary, #aaa); min-width: 50px; text-align: center; }
+        .adjust-btn:active { transform: scale(0.95); background: var(--primary-color); }
+        .adjust-label {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+        }
+        .adjust-label strong {
+            font-size: 22px;
+            color: var(--text-primary);
+            font-variant-numeric: tabular-nums;
+            letter-spacing: 0;
+        }
+        @media (max-width: 600px) {
+            .adjust-btn { width: 52px; height: 52px; font-size: 26px; }
+        }
+
+        /* Shown when the controller stops sending state mid-session */
+        .stale-banner {
+            background: rgba(255, 149, 0, 0.15);
+            border: 1px solid rgba(255, 149, 0, 0.4);
+            color: var(--warning-color);
+            border-radius: 12px;
+            padding: 10px 14px;
+            font-size: 14px;
+            text-align: center;
+        }
+        .dashboard.stale .dash-value,
+        .dashboard.stale .dash-value-sm { opacity: 0.35; }
         .setting-row { margin-bottom: 8px; }
         .toggle-label {
             display: flex;
@@ -1134,6 +1177,7 @@
              ACTIVE STATE — dashboard with controls
         ============================================================= -->
         <div id="activeDashboard" class="dashboard hidden">
+            <div id="staleBanner" class="stale-banner hidden">Ingen data fra kontrolleren — venter på tilkobling…</div>
             <div class="primary-row">
                 <div class="dash-card">
                     <div class="dash-label">Hastighet</div>
@@ -1212,14 +1256,20 @@
             <!-- Manual speed/incline adjustment controls -->
             <div id="manualAdjustControls" class="manual-adjust-controls" style="display:none;">
                 <div class="adjust-group">
-                    <button class="adjust-btn" onclick="adjustSpeed(-0.5)">- 0.5</button>
-                    <span class="adjust-label">Fart</span>
-                    <button class="adjust-btn" onclick="adjustSpeed(0.5)">+ 0.5</button>
+                    <button class="adjust-btn" onclick="adjustSpeed(-0.5)" aria-label="Senk fart 0,5 km/t">&minus;</button>
+                    <div class="adjust-label">
+                        <span>Fart</span>
+                        <strong id="adjustSpeedValue">--</strong>
+                    </div>
+                    <button class="adjust-btn" onclick="adjustSpeed(0.5)" aria-label="Øk fart 0,5 km/t">+</button>
                 </div>
                 <div class="adjust-group">
-                    <button class="adjust-btn" onclick="adjustIncline(-1)">- 1%</button>
-                    <span class="adjust-label">Stigning</span>
-                    <button class="adjust-btn" onclick="adjustIncline(1)">+ 1%</button>
+                    <button class="adjust-btn" onclick="adjustIncline(-1)" aria-label="Senk stigning 1 prosent">&minus;</button>
+                    <div class="adjust-label">
+                        <span>Stigning</span>
+                        <strong id="adjustInclineValue">--</strong>
+                    </div>
+                    <button class="adjust-btn" onclick="adjustIncline(1)" aria-label="Øk stigning 1 prosent">+</button>
                 </div>
             </div>
 
@@ -1366,7 +1416,33 @@
             $readyState.classList.toggle('hidden', newState !== 'ready');
             $activeDashboard.classList.toggle('hidden', newState !== 'active');
             if (newState === 'ready') updateReadyWarnings();
+            updateWakeLock();
         }
+
+        // -------------------------------------------------------------------
+        // Screen wake lock — keep the display on during a session.
+        // Only available in secure contexts (HTTPS/localhost); silently skipped otherwise.
+        // -------------------------------------------------------------------
+        var wakeLock = null;
+
+        function updateWakeLock() {
+            if (!('wakeLock' in navigator)) return;
+            if (uiState === 'active' && document.visibilityState === 'visible') {
+                if (wakeLock) return;
+                navigator.wakeLock.request('screen').then(function (lock) {
+                    wakeLock = lock;
+                    lock.addEventListener('release', function () { wakeLock = null; });
+                }).catch(function (e) {
+                    console.warn('Wake lock unavailable:', e.message);
+                });
+            } else if (wakeLock) {
+                wakeLock.release().catch(function () {});
+                wakeLock = null;
+            }
+        }
+
+        // The browser drops the lock when the tab is hidden; re-acquire on return
+        document.addEventListener('visibilitychange', updateWakeLock);
 
         // -------------------------------------------------------------------
         // WebSocket connection
@@ -1499,8 +1575,10 @@
                 case 'tts':
                     if (ttsEnabled && (ttsTarget === 'client' || ttsTarget === 'both')) {
                         initAudioContext();
-                        playTTSAudio(data.url);
+                        playTTSAudio(data.url, data.text);
                     }
+                    // Caption too — easy to miss audio over the belt noise
+                    if (data.text) showTTSToast(data.text);
                     break;
 
                 case 'tts_text':
@@ -1768,7 +1846,7 @@
             }
         });
 
-        async function playTTSAudio(url) {
+        async function playTTSAudio(url, text) {
             // Try AudioContext first (works if unlocked by user gesture)
             if (audioCtx) {
                 try {
@@ -1792,7 +1870,7 @@
                 var audio = new Audio(url);
                 audio.play().catch(function (e) {
                     console.warn('Audio element playback also failed:', e);
-                    showTTSToast('Coach: ' + url.split('/').pop().substring(0, 8) + '...');
+                    if (text) showTTSToast(text);
                 });
             } catch (e) {
                 console.warn('TTS playback failed entirely:', e);
@@ -1802,7 +1880,8 @@
         function showTTSToast(text) {
             $ttsToast.textContent = text;
             $ttsToast.classList.add('show');
-            setTimeout(function () { $ttsToast.classList.remove('show'); }, 4000);
+            clearTimeout(showTTSToast.timer);
+            showTTSToast.timer = setTimeout(function () { $ttsToast.classList.remove('show'); }, 6000);
         }
 
         async function loadProfiles() {
@@ -1820,7 +1899,7 @@
             profiles.forEach(function (p) {
                 var opt = document.createElement('option');
                 opt.value = p.id;
-                var label = escapeHtml(p.name) + ' (HR ' + p.max_hr;
+                var label = p.name + ' (HR ' + p.max_hr;
                 if (p.weight_kg) label += ', ' + p.weight_kg + 'kg';
                 label += ')';
                 opt.textContent = label;
@@ -1996,7 +2075,7 @@
                         updateBleControls();
                         setTimeout(function () { if ($scanResults) $scanResults.remove(); $scanResults = null; }, 2000);
                     }).catch(function (err) {
-                        item.innerHTML = icon + ' <strong>' + escapeHtml(d.name) + '</strong> — <span style="color:var(--danger-color)">' + err.message + '</span>';
+                        item.innerHTML = icon + ' <strong>' + escapeHtml(d.name) + '</strong> — <span style="color:var(--danger-color)">' + escapeHtml(err.message) + '</span>';
                         bleBusy = false;
                     });
                 });
@@ -2031,12 +2110,12 @@
         function startStaleCheck() {
             stopStaleCheck();
             staleCheckTimer = setInterval(function () {
-                // Only relevant in active state
-                if (uiState === 'active' && Date.now() - lastStateTimestamp > 10000) {
-                    // Data is stale, but don't switch away — just dim values?
-                    // Keep active state, the user can still stop
-                }
-            }, 5000);
+                // State is broadcast every 2s; flag it (but stay on the dashboard so
+                // the runner can still stop) once nothing has arrived for 10s
+                var stale = uiState === 'active' && Date.now() - lastStateTimestamp > 10000;
+                $activeDashboard.classList.toggle('stale', stale);
+                document.getElementById('staleBanner').classList.toggle('hidden', !stale);
+            }, 2000);
         }
 
         function stopStaleCheck() {
@@ -2284,7 +2363,7 @@
             var w = loadedWorkout;
             var segments = loadedSegments || w.segments || [];
 
-            $readyWorkoutName.textContent = escapeHtml(w.name || '');
+            $readyWorkoutName.textContent = w.name || '';
             $readySegmentCount.textContent = segments.length;
 
             var totalDur = 0;
@@ -2459,7 +2538,6 @@
 
             if (data.heartRate && data.heartRate > 0) {
                 hrEl.textContent = data.heartRate;
-                hrCard.style.display = '';
                 var zone = getHRZone(data.heartRate);
                 if (zone) {
                     hrZoneEl.textContent = zone.name;
@@ -2470,7 +2548,10 @@
                     hrCard.style.borderColor = '';
                 }
             } else {
-                hrCard.style.display = 'none';
+                // Keep the card in the grid (hiding it made the layout jump when the strap drops)
+                hrEl.textContent = '--';
+                hrZoneEl.textContent = '';
+                hrCard.style.borderColor = '';
             }
 
             // Distance
@@ -2496,13 +2577,13 @@
         }
 
         function renderWorkoutProgress(w) {
-            document.getElementById('vWorkoutName').textContent = escapeHtml(w.name || '');
+            document.getElementById('vWorkoutName').textContent = w.name || '';
             document.getElementById('vSegmentBadge').textContent =
                 ((w.currentSegmentIndex || 0) + 1) + ' / ' + (w.totalSegments || 0);
 
             if (w.currentSegment) {
                 document.getElementById('vSegmentName').textContent =
-                    escapeHtml(w.currentSegment.name || '');
+                    w.currentSegment.name || '';
                 document.getElementById('vTargetSpeed').textContent =
                     (w.currentSegment.targetSpeed || 0).toFixed(1);
                 document.getElementById('vTargetIncline').textContent =
@@ -2536,7 +2617,7 @@
                 nextSec.classList.remove('hidden');
                 var durMin = Math.round((w.nextSegment.durationSeconds || 0) / 60);
                 document.getElementById('vNextInfo').textContent =
-                    escapeHtml(w.nextSegment.name || '') + ' | ' +
+                    (w.nextSegment.name || '') + ' | ' +
                     (w.nextSegment.targetSpeed || 0).toFixed(1) + ' km/t | ' +
                     (w.nextSegment.targetIncline || 0).toFixed(1) + '% | ' +
                     durMin + ' min';
@@ -2609,17 +2690,36 @@
         // Manual speed/incline adjustment
         function adjustSpeed(delta) {
             var current = (lastState && lastState.targetSpeed) || (lastState && lastState.speed) || 8;
-            var newSpeed = Math.round((current + delta) * 10) / 10;
-            sendCommand('set_speed', { speed: Math.max(0.1, Math.min(14, newSpeed)) });
+            var newSpeed = Math.max(0.1, Math.min(14, Math.round((current + delta) * 10) / 10));
+            // Optimistic: rapid taps build on the new target instead of the 2s-old broadcast
+            if (lastState) lastState.targetSpeed = newSpeed;
+            updateAdjustLabels(lastState);
+            sendCommand('set_speed', { speed: newSpeed }).catch(function (err) {
+                showToast('Kunne ikke endre fart: ' + err.message);
+            });
         }
         window.adjustSpeed = adjustSpeed;
 
         function adjustIncline(delta) {
-            var current = (lastState && lastState.targetIncline) || (lastState && lastState.incline) || 0;
-            var newIncline = Math.round((current + delta) * 10) / 10;
-            sendCommand('set_incline', { incline: Math.max(0, Math.min(12, newIncline)) });
+            var current = lastState && lastState.targetIncline != null ? lastState.targetIncline
+                : (lastState && lastState.incline) || 0;
+            var newIncline = Math.max(0, Math.min(12, Math.round((current + delta) * 10) / 10));
+            if (lastState) lastState.targetIncline = newIncline;
+            updateAdjustLabels(lastState);
+            sendCommand('set_incline', { incline: newIncline }).catch(function (err) {
+                showToast('Kunne ikke endre stigning: ' + err.message);
+            });
         }
         window.adjustIncline = adjustIncline;
+
+        function updateAdjustLabels(state) {
+            var speed = state && (state.targetSpeed != null ? state.targetSpeed : state.speed);
+            var incline = state && (state.targetIncline != null ? state.targetIncline : state.incline);
+            document.getElementById('adjustSpeedValue').textContent =
+                speed != null ? speed.toFixed(1) : '--';
+            document.getElementById('adjustInclineValue').textContent =
+                incline != null ? incline.toFixed(1) + '%' : '--';
+        }
 
         // Update HR zone display from treadmill_state
         function updateHRZoneDisplay(state) {
@@ -2631,7 +2731,8 @@
             // not just during HR-controlled segments. The runner often wants to
             // override e.g. cooldown speed.
             if (adjustControls) {
-                adjustControls.style.display = state.sessionActive ? 'flex' : 'none';
+                adjustControls.style.display = state.sessionActive ? '' : 'none';
+                updateAdjustLabels(state);
             }
 
             var hzc = state.hrZoneControl;

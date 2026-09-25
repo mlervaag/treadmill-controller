@@ -67,6 +67,7 @@ let segmentStartTime = null;
 let sessionId = null;
 let sessionStartTime = null;
 let sessionActive = false;
+let sessionStopping = false;
 let currentTargetSpeed = 0;
 let currentTargetIncline = 0;
 let activeHRZoneController = null;
@@ -677,9 +678,10 @@ function setupFtmsListeners() {
 
   ftms.on('disconnect', () => {
     console.log('[Service] FTMS disconnected — scheduling reconnect');
-    // Pause segment timer during disconnect to prevent blind advancement
+    // Pause segment timer during disconnect to prevent blind advancement.
+    // Keep segmentStartTime so reconnectFtms() can resume with the remaining time.
     if (sessionActive && segmentTimer) {
-      stopSegmentTimer();
+      pauseSegmentTimer();
       console.log('[Service] Segment timer paused due to disconnect');
       if (activeHRZoneController) {
         activeHRZoneController.pause(300000);
@@ -888,6 +890,7 @@ async function reconnectFtms() {
       if (seg && segmentStartTime) {
         const elapsed = (Date.now() - segmentStartTime) / 1000;
         const remaining = seg.duration_seconds - elapsed;
+        pauseSegmentTimer();
         if (remaining > 0) {
           segmentTimer = setTimeout(() => {
             currentSegmentIndex++;
@@ -1072,13 +1075,29 @@ async function handleStartSession(commandId, params) {
 }
 
 async function handleStopSession(commandId, params) {
-  if (!sessionActive) {
-    if (commandId && !['physical-stop', 'auto-complete', 'auto-skip-end'].includes(commandId)) {
-      sendCommandResponse(commandId, 'stop_session', false, 'No active session');
+  const isInternal = ['physical-stop', 'auto-complete', 'auto-skip-end'].includes(commandId);
+  if (!sessionActive || sessionStopping) {
+    // Our own FTMS stop triggers a 0x02 status → 'physical-stop' while we're still
+    // finishing up; completing the session twice would double-PUT and race the reset.
+    if (commandId && !isInternal) {
+      if (sessionStopping) sendCommandResponse(commandId, 'stop_session', true);
+      else sendCommandResponse(commandId, 'stop_session', false, 'No active session');
     }
     return;
   }
+  sessionStopping = true;
+  try {
+    await finishSession(commandId);
+  } finally {
+    sessionStopping = false;
+  }
 
+  if (commandId && !isInternal) {
+    sendCommandResponse(commandId, 'stop_session', true);
+  }
+}
+
+async function finishSession(commandId) {
   stopSegmentTimer();
   stopDataFlush();
   stopDriftDetection();
@@ -1104,22 +1123,15 @@ async function handleStopSession(commandId, params) {
 
   const elapsed = sessionStartTime ? Math.floor((Date.now() - sessionStartTime) / 1000) : 0;
 
-  // Fetch computed stats from recorded data points
+  // Aggregates computed server-side (avoids pulling every data point over HTTP)
   let distance = 0, avgHr = null, calories = 0;
   try {
-    const statsRes = await fetch(`${httpBase()}/api/sessions/${sessionId}/details`);
+    const statsRes = await fetch(`${httpBase()}/api/sessions/${sessionId}/stats`);
     if (statsRes.ok) {
-      const details = await statsRes.json();
-      const points = details.dataPoints || details.data_points;
-      if (points && points.length > 0) {
-        const lastPoint = points[points.length - 1];
-        distance = lastPoint.distance_km || 0;
-        calories = lastPoint.calories || 0;
-        const hrPoints = points.filter(p => p.heart_rate && p.heart_rate > 0);
-        if (hrPoints.length > 0) {
-          avgHr = Math.round(hrPoints.reduce((s, p) => s + p.heart_rate, 0) / hrPoints.length);
-        }
-      }
+      const stats = await statsRes.json();
+      distance = stats.max_distance || 0;
+      calories = stats.max_calories || 0;
+      avgHr = stats.avg_heart_rate || null;
     }
   } catch (e) {
     console.error('[Session] Failed to fetch stats:', e.message);
@@ -1153,10 +1165,6 @@ async function handleStopSession(commandId, params) {
   currentSegmentIndex = 0;
   currentTargetSpeed = 0;
   currentTargetIncline = 0;
-
-  if (commandId && !['physical-stop', 'auto-complete', 'auto-skip-end'].includes(commandId)) {
-    sendCommandResponse(commandId, 'stop_session', true);
-  }
 }
 
 function handleSkipSegment(commandId, params) {
@@ -1293,11 +1301,15 @@ async function executeSegment(index) {
   }, segment.duration_seconds * 1000);
 }
 
-function stopSegmentTimer() {
+function pauseSegmentTimer() {
   if (segmentTimer) {
     clearTimeout(segmentTimer);
     segmentTimer = null;
   }
+}
+
+function stopSegmentTimer() {
+  pauseSegmentTimer();
   segmentStartTime = null;
 }
 
@@ -1331,8 +1343,9 @@ async function flushDataBuffer() {
     });
   } catch (err) {
     console.error('[Session] Data flush failed:', err.message);
-    // Re-add to buffer for retry
-    dataBuffer.unshift(...toFlush);
+    // Only the latest snapshot is ever sent, so keep just that for retry —
+    // re-adding everything grew the buffer without bound during server outages.
+    if (dataBuffer.length === 0) dataBuffer.push(latest);
   }
 }
 

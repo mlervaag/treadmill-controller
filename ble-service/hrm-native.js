@@ -3,6 +3,7 @@ const { EventEmitter } = require('events');
 const HEART_RATE_SERVICE_UUID = '0000180d-0000-1000-8000-00805f9b34fb';
 const HEART_RATE_MEASUREMENT_UUID = '00002a37-0000-1000-8000-00805f9b34fb';
 const BODY_SENSOR_LOCATION_UUID = '00002a38-0000-1000-8000-00805f9b34fb';
+const HR_STALE_MS = 5000; // HR straps notify ~1 Hz
 
 class HRMNative extends EventEmitter {
   constructor() {
@@ -10,6 +11,7 @@ class HRMNative extends EventEmitter {
     this.device = null;
     this.characteristic = null;
     this.currentHeartRate = null;
+    this.lastHeartRateAt = 0;
     this.deviceName = null;
     this._connected = false;
     this._connectionCheckTimer = null;
@@ -124,6 +126,7 @@ class HRMNative extends EventEmitter {
     }
 
     this.currentHeartRate = heartRate;
+    this.lastHeartRateAt = Date.now();
     this.emit('heartRate', heartRate);
   }
 
@@ -132,7 +135,13 @@ class HRMNative extends EventEmitter {
     return locations[value] || 'Unknown';
   }
 
-  getCurrentHeartRate() { return this.currentHeartRate; }
+  // A strap that silently stops notifying (flat battery, out of range before BlueZ
+  // notices) would otherwise report its last value forever — and the HR zone
+  // controller would keep steering on it. Treat readings older than 5s as missing.
+  getCurrentHeartRate() {
+    if (Date.now() - this.lastHeartRateAt > HR_STALE_MS) return null;
+    return this.currentHeartRate;
+  }
   getDeviceName() { return this.deviceName; }
   isConnected() { return this._connected === true; }
 
