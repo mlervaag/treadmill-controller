@@ -4,6 +4,16 @@ function escapeHtml(str) {
     return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
+// SQLite CURRENT_TIMESTAMP values are UTC without a zone suffix ("YYYY-MM-DD HH:MM:SS").
+// new Date() would treat them as local time, shifting every session by the UTC offset.
+function parseDbDate(value) {
+    if (!value) return new Date(NaN);
+    const str = String(value);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return new Date(str + 'T00:00:00'); // plain date: local day
+    if (/[zZ]|[+-]\d\d:?\d\d$/.test(str)) return new Date(str);
+    return new Date(str.replace(' ', 'T') + 'Z');
+}
+
 // Global state
 let treadmill = null;
 let currentSession = null;
@@ -40,6 +50,9 @@ let lastManualOverrideTime = 0;
 const MANUAL_OVERRIDE_COOLDOWN = 15000; // 15s pause after manual change
 let treadmillHeartRate = null; // Current HR from treadmill
 let activeHeartRateSource = 'none'; // 'hrm', 'treadmill', or 'none'
+let currentSessionProfileId = null; // profile the active session was started with
+let lastDataRecordTime = 0; // FTMS notifies ~3x/s; session_data is sampled at 1 Hz
+const DATA_RECORD_INTERVAL = 1000;
 let sessionProfile = null;  // { weight_kg, age, gender } for calorie calculation
 let sessionCalories = 0;    // accumulated kcal from Keytel formula
 
@@ -213,10 +226,10 @@ async function connectToTreadmill(acceptAllDevices = false) {
         // Set up data callback
         treadmill.onData((data) => {
             updateStats(data);
-            if (currentSession) {
+            // Sample at 1 Hz — server stats (total_seconds, graphs) assume one point per second
+            if (currentSession && Date.now() - lastDataRecordTime >= DATA_RECORD_INTERVAL) {
+                lastDataRecordTime = Date.now();
                 recordSessionData(data);
-            } else {
-                console.warn('Data received but no active session (currentSession is null)');
             }
         });
 
@@ -337,8 +350,8 @@ function updateLocalTime() {
     document.getElementById('minimalTime').textContent = timeStr;
 
     // Accumulate calories once per second using Keytel (HR-based, industry standard)
-    const hr = hrmHeartRate || treadmillHeartRate;
-    if (hr && hr > 0 && sessionProfile && sessionProfile.weight_kg && sessionProfile.age) {
+    const hr = getCurrentHeartRate();
+    if (hr && sessionProfile && sessionProfile.weight_kg && sessionProfile.age) {
         sessionCalories += keytelCaloriesPerMinute(hr, sessionProfile.weight_kg, sessionProfile.age, sessionProfile.gender) / 60;
         const kcal = Math.max(0, Math.round(sessionCalories));
         document.getElementById('currentCalories').textContent = kcal;
@@ -399,9 +412,15 @@ function setViewMode(mode) {
     }
 }
 
+function getCurrentHeartRate() {
+    if (hrmHeartRate !== null && hrmHeartRate > 0) return hrmHeartRate;
+    if (treadmillHeartRate !== null && treadmillHeartRate > 0 && treadmillHeartRate < 255) return treadmillHeartRate;
+    return null;
+}
+
 function recordSessionData(data) {
-    // Only record valid heart rate (not 0 or 255)
-    const validHR = (data.heart_rate && data.heart_rate > 0 && data.heart_rate < 255) ? data.heart_rate : null;
+    // Same priority as the display: HRM first, then the treadmill's own sensor
+    const validHR = getCurrentHeartRate();
 
     const validCalories = sessionCalories > 0 ? Math.round(sessionCalories) : null;
 
@@ -665,12 +684,7 @@ function stopDriftDetection() {
 
 // --- WebSocket State Broadcast for View-Only Clients ---
 function buildCurrentState() {
-    let hr = null;
-    if (hrmHeartRate !== null && hrmHeartRate > 0) {
-        hr = hrmHeartRate;
-    } else if (treadmillHeartRate !== null && treadmillHeartRate > 0 && treadmillHeartRate < 255) {
-        hr = treadmillHeartRate;
-    }
+    const hr = getCurrentHeartRate();
 
     let workoutInfo = null;
     if (currentWorkout && currentWorkout.segments) {
@@ -886,6 +900,32 @@ async function handleRemoteCommand(data) {
                 sendCommandResponse(commandId, command, true);
                 break;
             }
+            // Manual ± from view.html (the native BLE service handles these too)
+            case 'set_speed':
+            case 'set_incline': {
+                if (!treadmill || !treadmill.isConnected()) {
+                    sendCommandResponse(commandId, command, false, 'Treadmill not connected');
+                    return;
+                }
+                const isSpeed = command === 'set_speed';
+                const value = parseFloat(isSpeed ? params.speed : params.incline);
+                const [min, max] = isSpeed ? [0.1, 14.0] : [0, 12];
+                if (isNaN(value) || value < min || value > max) {
+                    sendCommandResponse(commandId, command, false, `Invalid ${isSpeed ? 'speed' : 'incline'}`);
+                    return;
+                }
+                if (isSpeed) {
+                    await treadmill.setSpeed(value);
+                    if (currentTargetSpeed !== null) currentTargetSpeed = value;
+                } else {
+                    await treadmill.setIncline(value);
+                    if (currentTargetIncline !== null) currentTargetIncline = value;
+                }
+                // Keep drift detection from reverting the runner's choice
+                lastManualOverrideTime = Date.now();
+                sendCommandResponse(commandId, command, true);
+                break;
+            }
             default:
                 sendCommandResponse(commandId, command, false, `Unknown command: ${command}`);
         }
@@ -1074,8 +1114,8 @@ function populateFilterTags() {
         const label = document.createElement('label');
         label.className = 'tag-checkbox';
         label.innerHTML = `
-            <input type="checkbox" value="${tag}" onchange="applyFilters()">
-            <span>${tag}</span>
+            <input type="checkbox" value="${escapeHtml(tag)}" onchange="applyFilters()">
+            <span>${escapeHtml(tag)}</span>
         `;
         tagContainer.appendChild(label);
     });
@@ -1237,7 +1277,7 @@ function createWorkoutCard(workout, isTemplate) {
             <span>⏱️ ${totalMinutes}${totalDistanceStr}</span>
         </div>
         <div class="workout-details" id="workoutDetails${workout.id}">
-            <button class="btn-details" onclick="toggleWorkoutDetails(${workout.id})">Vis detaljer</button>
+            <button class="btn-details" onclick="toggleWorkoutDetails(${workout.id}, this)">Vis detaljer</button>
             <div class="workout-segments-preview" id="segmentsPreview${workout.id}"></div>
         </div>
         <div class="workout-actions">
@@ -1250,9 +1290,8 @@ function createWorkoutCard(workout, isTemplate) {
     return card;
 }
 
-async function toggleWorkoutDetails(workoutId) {
+async function toggleWorkoutDetails(workoutId, btn) {
     const previewDiv = document.getElementById(`segmentsPreview${workoutId}`);
-    const btn = event.target;
 
     if (previewDiv.classList.contains('expanded')) {
         previewDiv.classList.remove('expanded');
@@ -1537,7 +1576,8 @@ async function deleteWorkout(id) {
     if (!confirm('Er du sikker på at du vil slette denne økten?')) return;
 
     try {
-        await fetch(`/api/workouts/${id}`, { method: 'DELETE' });
+        const response = await fetch(`/api/workouts/${id}`, { method: 'DELETE' });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
         loadWorkouts();
         showToast('Treningsøkt slettet', 'info');
     } catch (error) {
@@ -1549,7 +1589,8 @@ async function deleteSession(id) {
     if (!confirm('Er du sikker på at du vil slette denne treningsøkten fra historikken?')) return;
 
     try {
-        await fetch(`/api/sessions/${id}`, { method: 'DELETE' });
+        const response = await fetch(`/api/sessions/${id}`, { method: 'DELETE' });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
         loadSessions();
         loadOverallStats();
         showToast('Økt slettet', 'info');
@@ -1848,15 +1889,16 @@ async function startSession(workoutId = null, profileId = null) {
         }
         const data = await response.json();
         currentSession = data.id;
+        currentSessionProfileId = effectiveProfileId ? parseInt(effectiveProfileId) : null;
         sessionStartTime = Date.now();
+        lastDataRecordTime = 0;
         sessionData = { distance: 0, time: 0, heartRates: [], calories: 0 };
         sessionCalories = 0;
         sessionProfile = null;
         if (effectiveProfileId) {
             try {
-                const profRes = await fetch('/api/profiles');
-                const profiles = await profRes.json();
-                const prof = profiles.find(p => p.id === parseInt(effectiveProfileId));
+                const profRes = await fetch(`/api/profiles/${parseInt(effectiveProfileId)}`);
+                const prof = profRes.ok ? await profRes.json() : null;
                 if (prof && prof.weight_kg && prof.age) {
                     sessionProfile = { weight_kg: prof.weight_kg, age: prof.age, gender: prof.gender || 'male' };
                     console.log(`Session calorie calc: Keytel (${prof.weight_kg}kg, age ${prof.age}, ${sessionProfile.gender})`);
@@ -1877,8 +1919,11 @@ async function startSession(workoutId = null, profileId = null) {
     }
 }
 
+let endingSessionId = null; // guards against Stop button + FTMS 0x02 both ending the session
+
 async function endSession() {
-    if (!currentSession) return;
+    if (!currentSession || endingSessionId === currentSession) return;
+    endingSessionId = currentSession;
 
     // Flush any remaining buffered data before closing session
     try {
@@ -1926,8 +1971,10 @@ async function endSession() {
         if (autoSyncCheckbox && autoSyncCheckbox.checked) {
             try {
                 const stravaStatus = await fetch('/api/strava/status').then(r => r.json());
-                const sessionProfileId = getSelectedProfileId();
-                const hasConnection = (stravaStatus.connections || []).some(c => c.profile_id === sessionProfileId);
+                // Use the profile the session was started with (may come from a remote start)
+                const sessionProfileId = currentSessionProfileId;
+                const hasConnection = sessionProfileId !== null &&
+                    (stravaStatus.connections || []).some(c => c.profile_id === sessionProfileId);
                 if (hasConnection) {
                     await uploadToStrava(currentSession);
                 }
@@ -1937,10 +1984,14 @@ async function endSession() {
         }
 
         currentSession = null;
+        currentSessionProfileId = null;
         stopStateBroadcast();
         loadSessions();
+        loadOverallStats();
     } catch (error) {
         console.error('Failed to end session:', error);
+    } finally {
+        endingSessionId = null;
     }
 }
 
@@ -2015,14 +2066,18 @@ function handleTreadmillStatus(status, code, isAppInitiated = false) {
     }
 }
 
-async function loadSessions(startDate = null, endDate = null) {
+// Remembered so profile filter / refresh after delete keeps the chosen date range
+let activeDateRange = { start: null, end: null };
+
+async function loadSessions(startDate = activeDateRange.start, endDate = activeDateRange.end) {
+    activeDateRange = { start: startDate, end: endDate };
     const sessionsList = document.getElementById('sessionsList');
     if (sessionsList) sessionsList.innerHTML = '<div class="loading-state"><span class="spinner"></span> Laster økter...</div>';
 
     try {
         let url = '/api/sessions?limit=50';
-        if (startDate) url += `&startDate=${startDate}`;
-        if (endDate) url += `&endDate=${endDate}`;
+        if (startDate) url += `&startDate=${encodeURIComponent(startDate)}`;
+        if (endDate) url += `&endDate=${encodeURIComponent(endDate)}`;
         if (activeProfileFilterId) url += `&profileId=${activeProfileFilterId}`;
         const response = await fetch(url);
         const data = await response.json();
@@ -2043,7 +2098,7 @@ function displaySessions(sessions) {
     }
 
     sessions.forEach(session => {
-        const date = new Date(session.started_at);
+        const date = parseDbDate(session.started_at);
         const dateStr = date.toLocaleDateString('no-NO', {
             year: 'numeric', month: 'long', day: 'numeric',
             hour: '2-digit', minute: '2-digit'
@@ -2071,7 +2126,7 @@ function displaySessions(sessions) {
                         <option value="">—</option>
                         ${profileOptions}
                     </select>
-                    <button class="btn-expand" onclick="toggleSessionDetails(${session.id})">▼</button>
+                    <button class="btn-expand" onclick="toggleSessionDetails(${session.id}, this)" aria-label="Vis detaljer">▼</button>
                     <button class="btn btn-danger btn-small" onclick="deleteSession(${session.id})">Slett</button>
                 </div>
             </div>
@@ -2171,9 +2226,8 @@ function getSelectedProfileId() {
     return select && select.value ? parseInt(select.value) : null;
 }
 
-async function toggleSessionDetails(sessionId) {
+async function toggleSessionDetails(sessionId, btn) {
     const detailsDiv = document.getElementById(`sessionDetails${sessionId}`);
-    const btn = event.target;
 
     if (detailsDiv.style.display === 'none') {
         detailsDiv.style.display = 'block';
@@ -2435,7 +2489,7 @@ function updatePersonalRecord(recordName, recordData, formatFunc) {
 
     if (recordData) {
         valueElement.textContent = formatFunc(recordData);
-        const date = new Date(recordData.started_at);
+        const date = parseDbDate(recordData.started_at);
         dateElement.textContent = date.toLocaleDateString('no-NO', {
             year: 'numeric',
             month: 'short',
@@ -2457,7 +2511,7 @@ function displayRecentActivity(activities) {
     }
 
     activities.forEach(activity => {
-        const date = new Date(activity.date);
+        const date = parseDbDate(activity.date);
         const card = document.createElement('div');
         card.className = 'activity-day-card';
         card.innerHTML = `
@@ -2522,11 +2576,14 @@ function displayWeeklyTrends(weeklyData) {
         let comparison = '';
         if (index < weeklyData.length - 1) {
             const prevWeek = weeklyData[index + 1];
-            const distanceChange = ((week.total_distance - prevWeek.total_distance) / prevWeek.total_distance) * 100;
-            const changeIcon = distanceChange >= 0 ? '📈' : '📉';
-            comparison = `<div class="trend-comparison ${distanceChange >= 0 ? 'positive' : 'negative'}">
-                ${changeIcon} ${Math.abs(distanceChange).toFixed(0)}% vs forrige uke
-            </div>`;
+            // Skip comparison when the previous period had no distance (avoids Infinity%)
+            if (prevWeek.total_distance > 0) {
+                const distanceChange = ((week.total_distance - prevWeek.total_distance) / prevWeek.total_distance) * 100;
+                const changeIcon = distanceChange >= 0 ? '📈' : '📉';
+                comparison = `<div class="trend-comparison ${distanceChange >= 0 ? 'positive' : 'negative'}">
+                    ${changeIcon} ${Math.abs(distanceChange).toFixed(0)}% vs forrige uke
+                </div>`;
+            }
         }
 
         card.innerHTML = `
@@ -2583,11 +2640,14 @@ function displayMonthlyTrends(monthlyData) {
         let comparison = '';
         if (index < monthlyData.length - 1) {
             const prevMonth = monthlyData[index + 1];
-            const distanceChange = ((month.total_distance - prevMonth.total_distance) / prevMonth.total_distance) * 100;
-            const changeIcon = distanceChange >= 0 ? '📈' : '📉';
-            comparison = `<div class="trend-comparison ${distanceChange >= 0 ? 'positive' : 'negative'}">
-                ${changeIcon} ${Math.abs(distanceChange).toFixed(0)}% vs forrige måned
-            </div>`;
+            // Skip comparison when the previous period had no distance (avoids Infinity%)
+            if (prevMonth.total_distance > 0) {
+                const distanceChange = ((month.total_distance - prevMonth.total_distance) / prevMonth.total_distance) * 100;
+                const changeIcon = distanceChange >= 0 ? '📈' : '📉';
+                comparison = `<div class="trend-comparison ${distanceChange >= 0 ? 'positive' : 'negative'}">
+                    ${changeIcon} ${Math.abs(distanceChange).toFixed(0)}% vs forrige måned
+                </div>`;
+            }
         }
 
         card.innerHTML = `
@@ -2697,12 +2757,7 @@ function updateHeartRateSource() {
 }
 
 function updateHeartRateDisplay() {
-    let displayHR = null;
-    if (hrmHeartRate !== null && hrmHeartRate > 0) {
-        displayHR = hrmHeartRate;
-    } else if (treadmillHeartRate !== null && treadmillHeartRate > 0 && treadmillHeartRate < 255) {
-        displayHR = treadmillHeartRate;
-    }
+    const displayHR = getCurrentHeartRate();
 
     if (hrm && hrm.isConnected()) {
         const hrmHRDisplay = document.getElementById('hrmHeartRate');
@@ -3077,7 +3132,8 @@ function applyCustomDateFilter() {
     const startInput = document.getElementById('dateFilterStart');
     const endInput = document.getElementById('dateFilterEnd');
 
-    const startDate = startInput && startInput.value ? new Date(startInput.value).toISOString() : null;
+    // Date inputs are local calendar days; "YYYY-MM-DD" alone would be parsed as UTC midnight
+    const startDate = startInput && startInput.value ? new Date(startInput.value + 'T00:00:00').toISOString() : null;
     const endDate = endInput && endInput.value ? new Date(endInput.value + 'T23:59:59').toISOString() : null;
 
     // Clear preset button active state
@@ -3091,91 +3147,29 @@ function applyCustomDateFilter() {
 // ========================================
 
 async function exportSession(sessionId, format) {
+    // The server generates all formats (UTC timestamps, schema-valid TCX element order)
+    if (!['json', 'csv', 'tcx'].includes(format)) {
+        showToast('Ukjent eksportformat', 'error');
+        return;
+    }
     try {
-        const response = await fetch(`/api/sessions/${sessionId}/details`);
-        const data = await response.json();
-
-        if (!data.dataPoints || data.dataPoints.length === 0) {
-            showToast('Ingen data tilgjengelig for eksport', 'error');
-            return;
+        const response = await fetch(`/api/sessions/${sessionId}/export/${format}`);
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.error || `HTTP ${response.status}`);
         }
+        const blob = await response.blob();
 
-        let blob, filename;
-
-        if (format === 'json') {
-            blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-            filename = `treningsokt_${sessionId}.json`;
-
-        } else if (format === 'csv') {
-            const headers = ['tidspunkt', 'hastighet_kmh', 'stigning_prosent', 'distanse_km', 'puls', 'kalorier'];
-            const rows = data.dataPoints.map(dp => [
-                dp.recorded_at || '',
-                dp.speed_kmh != null ? dp.speed_kmh : '',
-                dp.incline_percent != null ? dp.incline_percent : '',
-                dp.distance_km != null ? dp.distance_km : '',
-                dp.heart_rate != null ? dp.heart_rate : '',
-                dp.calories != null ? dp.calories : ''
-            ]);
-            const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-            blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' });
-            filename = `treningsokt_${sessionId}.csv`;
-
-        } else if (format === 'tcx') {
-            // Build TCX XML
-            const startTime = data.session && data.session.started_at
-                ? new Date(data.session.started_at).toISOString()
-                : new Date().toISOString();
-
-            let trackpoints = '';
-            data.dataPoints.forEach((dp, i) => {
-                const time = new Date(new Date(startTime).getTime() + i * 1000).toISOString();
-                trackpoints += `
-          <Trackpoint>
-            <Time>${time}</Time>
-            ${dp.heart_rate ? `<HeartRateBpm><Value>${dp.heart_rate}</Value></HeartRateBpm>` : ''}
-            ${dp.distance_km != null ? `<DistanceMeters>${(dp.distance_km * 1000).toFixed(1)}</DistanceMeters>` : ''}
-            <Extensions>
-              <ns3:TPX>
-                ${dp.speed_kmh != null ? `<ns3:Speed>${(dp.speed_kmh / 3.6).toFixed(2)}</ns3:Speed>` : ''}
-              </ns3:TPX>
-            </Extensions>
-          </Trackpoint>`;
-            });
-
-            const tcxContent = `<?xml version="1.0" encoding="UTF-8"?>
-<TrainingCenterDatabase xmlns="http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2"
-  xmlns:ns3="http://www.garmin.com/xmlschemas/ActivityExtension/v2">
-  <Activities>
-    <Activity Sport="Running">
-      <Id>${startTime}</Id>
-      <Lap StartTime="${startTime}">
-        <TotalTimeSeconds>${data.dataPoints.length}</TotalTimeSeconds>
-        <Track>${trackpoints}
-        </Track>
-      </Lap>
-    </Activity>
-  </Activities>
-</TrainingCenterDatabase>`;
-
-            blob = new Blob([tcxContent], { type: 'application/xml' });
-            filename = `treningsokt_${sessionId}.tcx`;
-        } else {
-            showToast('Ukjent eksportformat', 'error');
-            return;
-        }
-
-        // Trigger download
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = filename;
+        a.download = `treningsokt_${sessionId}.${format}`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
 
         showToast(`Eksportert som ${format.toUpperCase()}`, 'success');
-
     } catch (error) {
         console.error('Export failed:', error);
         showToast('Eksport feilet: ' + error.message, 'error');

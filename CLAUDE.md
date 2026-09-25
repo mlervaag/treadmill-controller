@@ -56,7 +56,7 @@ No test suite exists. No linter configured.
 - `public/app.js` — Main application (~3200 lines). Manages UI tabs (Control/Workouts/History), workout execution with segment progression, session recording (1 data point/second), drift detection, Chart.js graphs, sound alerts, Strava integration, profile filter/tagging, date filtering, export, auto BLE reconnect, segment feedback, WebSocket state broadcast.
 - `public/index.html` — Controller UI. Has Bluetooth connect, speed/incline sliders, workout selector, loaded workout card (with profile selector), workout progress, history with profile filter + inline profile editing, per-profile Strava connections, stats views.
 - `public/view.html` — Remote control + dashboard for iPad/iPhone. Three states: idle (workout selector), ready (workout loaded with profile selector + TTS toggle), active (live dashboard + controls + TTS audio playback). Sends commands via WebSocket, receives state broadcasts and TTS audio. Dark theme, responsive, auto-reconnect, HR zone coloring. AudioContext unlocked on user gesture for iOS compatibility. **Has NO session history** — history is only in index.html.
-- `public/sw.js` — Service worker for PWA offline support. Cache-first for static assets, network-first for API.
+- `public/sw.js` — Service worker for PWA offline support. Network-first for all same-origin GETs (cache is only a fallback when the Pi is unreachable); `/audio/` and `/auth/` are never cached.
 - `public/manifest.json` — PWA manifest with Norwegian locale.
 
 **BLE Service** (`ble-service/`): Separate Node.js process on RPi host (not Docker). Uses `node-ble` (D-Bus/BlueZ) for BLE — supports simultaneous connections to treadmill and heart rate monitor. Runs as systemd service (`treadmill-ble.service`). Connects to server via WebSocket on `ws://localhost:3000`. Stores known device addresses in `ble-config.json`.
@@ -65,7 +65,7 @@ No test suite exists. No linter configured.
 
 **Dual HTTP/HTTPS**: server.js listens on HTTP (port 3000, env `HTTP_PORT`) and HTTPS (port 3001 if certs exist, env `HTTPS_PORT`). view.html uses HTTP (no cert warnings on iOS). index.html uses HTTPS for Web Bluetooth.
 
-**WebSocket Hub**: server.js routes commands between viewer clients (view.html) and the active controller (index.html browser or native BLE service). Controllers register with `{ type: "register", role: "controller" }`. Native BLE service takes priority over browser controllers. Protocol: `command` → `remote_command` → `command_response`. Additional message types: `tts_config` (viewer → server, coaching preferences + profileId), `tts` (server → viewer, audio URL), `tts_text` (server → viewer, text-only fallback).
+**WebSocket Hub**: server.js routes commands between viewer clients (view.html) and the active controller (index.html browser or native BLE service). Controllers register with `{ type: "register", role: "controller" }`. Native BLE service takes priority over browser controllers. Protocol: `command` → `remote_command` → `command_response`. Additional message types: `tts_config` (viewer → server, coaching preferences + profileId), `tts` (server → viewer, `{ url, text }` — view.html plays the audio and shows the text as a caption), `tts_text` (server → viewer, text-only fallback).
 
 **Data flow during workout**:
 ```
@@ -189,7 +189,7 @@ Things that have caused confusion or bugs — read these before making changes:
 7. **`PUT /api/sessions/:id` rejects completed sessions (409)** — that's why `PATCH /api/sessions/:id/profile` exists as a separate endpoint.
 8. **Drift detection (8s interval)** can conflict with manual speed adjustments — there's a 15s cooldown (`MANUAL_OVERRIDE_COOLDOWN`) after manual changes.
 9. **Strava upload status stays "uploading"** — no polling for final status from Strava. The upload is async on Strava's side.
-10. **Service worker cache** may serve stale files after deploy — bump version in sw.js or users must manually clear cache.
+10. **Service worker is network-first** — deploys reach clients without a cache bump. Bump `CACHE_NAME` in sw.js only when sw.js itself changes.
 11. **Auto-upload to Strava** checks the `#autoSyncStrava` checkbox AND verifies the session's profile has a Strava connection before uploading.
 12. **`getValidStravaToken(profileId)`** — with profileId: looks up by profile. Without: falls back to most recent connection (backwards compat).
 13. **public/ files are baked into Docker image** — always rebuild Docker after changing frontend files. SCP alone is not enough.
@@ -206,14 +206,21 @@ Things that have caused confusion or bugs — read these before making changes:
 24. **HR zone controller boundary timer uses hysteresis** — `boundaryStart` only resets after HR has been ≥3pp below zoneHigh for 5 ticks. Brief dips don't reset the timer, so the 60s "stuck at boundary" escalation actually fires when HR oscillates around the zone ceiling.
 25. **HR zone controller pauses 120s on HRM drop mid-session**, in addition to its existing 300s pause on FTMS drop. On HRM reconnect mid-session, controller auto-resumes; coaching engine speaks "Pulsbeltet er tilbake."
 26. **Calorie accumulation is time-based, not per-FTMS-event** — FTMS data fires at ~3 Hz on our treadmill, so the old per-event accumulation overestimated by ~3x. `lastCalorieTickAt` timestamp drives `dt`-weighted accumulation now (capped at 5s gap to avoid spikes after disconnects).
-27. **Manual ±-buttons in view.html visible during ALL active session segments**, not just HR-controlled ones. Runner can override e.g. cooldown speed.
+27. **Manual ±-buttons in view.html visible during ALL active session segments**, not just HR-controlled ones. Runner can override e.g. cooldown speed. Both controllers (ble-service and app.js) handle `set_speed`/`set_incline`.
+28. **DB timestamps are UTC without a zone suffix** (`YYYY-MM-DD HH:MM:SS` from `CURRENT_TIMESTAMP`). Always parse with `parseDbTimestamp()` (server.js) / `parseDbDate()` (app.js) — plain `new Date()` treats them as local time. `/api/sessions` date filters are normalized with SQLite `datetime(?)`, so clients can send ISO 8601.
+29. **Foreign keys are NOT enforced** (`PRAGMA foreign_keys` is off), so `ON DELETE CASCADE` never fires. Delete endpoints remove child rows explicitly, and startup purges orphaned `session_data`/`workout_segments`.
+30. **session_data is sampled at 1 Hz in both controllers** — `/stats` uses `COUNT(*)` as `total_seconds` and graphs assume one point per second. app.js throttles FTMS notifications (~3 Hz) to 1 Hz and records the prioritized HR (HRM before treadmill sensor).
+31. **Coaching also starts for treadmill-button starts** — server.js starts the CoachingEngine on the first `treadmill_state` with `sessionActive` + `workout.workoutId` if a viewer has TTS enabled with a profile (`coachingStartAttempted` resets when the session ends).
+32. **ble-service keeps `segmentStartTime` across an FTMS drop** (`pauseSegmentTimer()`), so `reconnectFtms()` can resume the segment with the remaining wall-clock time. `stopSegmentTimer()` clears it and is only for session end / segment change.
+33. **`handleStopSession` is re-entrancy guarded** (`sessionStopping`) — our own FTMS stop triggers status 0x02 → `physical-stop` while the first stop is still finishing.
+34. **HRM readings older than 5s count as missing** (`hrm-native.js getCurrentHeartRate()`), so a strap that silently stops notifying triggers the HR zone controller's dropout handling instead of steering on a frozen value.
+35. **TTS numbers use Norwegian decimal comma** (`CoachingEngine.formatNumber`: 8.5 → "8,5"). Changing message text changes the TTS cache hash (new OpenAI call on first use).
 
 ## Known Issues
 
 - Drift detection can conflict with manual speed adjustments during workout
 - Strava upload status stays as "uploading" — no polling for final status implemented
-- Service worker cache may need manual clear after deploy (version bump in sw.js)
-- `JSON.parse(workout.tags)` in GET /api/workouts lacks try-catch
+- The Treadmill Data parser (`ftms.js` and `ftms-native.js`) does not follow the FTMS spec's flag→field mapping (e.g. bit 0 "More Data" semantics, Expended Energy is bit 7 in the spec but parsed on 0x100). It is empirically tuned to the FitShow treadmill — don't "fix" it without the hardware to verify
 
 ## Documentation Governance
 

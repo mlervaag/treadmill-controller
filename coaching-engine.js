@@ -21,6 +21,13 @@ class CoachingEngine {
     this.lastHrmEventTime = 0; // cooldown for hrm_lost / hrm_recovered events
   }
 
+  /** Norwegian number formatting for TTS: 8.5 → "8,5", 8.0 → "8". */
+  static formatNumber(value) {
+    const n = Math.round(Number(value) * 10) / 10;
+    if (!isFinite(n)) return String(value);
+    return Number.isInteger(n) ? String(n) : String(n).replace('.', ',');
+  }
+
   static getZone(hr, maxHR) {
     if (!hr || hr <= 0 || !maxHR) return null;
     const pct = (hr / maxHR) * 100;
@@ -159,7 +166,8 @@ class CoachingEngine {
       // Halfway
       if (!this.halfwayAnnounced && totalDuration > 0 && elapsed >= totalDuration / 2) {
         const minLeft = Math.round(remaining / 60);
-        this.pendingMessages.push({ priority: 3, text: `Halvveis! ${minLeft} minutter igjen.` });
+        const minStr = minLeft === 1 ? 'minutt' : 'minutter';
+        this.pendingMessages.push({ priority: 3, text: `Halvveis! ${minLeft} ${minStr} igjen.` });
         this.halfwayAnnounced = true;
       }
 
@@ -215,8 +223,8 @@ class CoachingEngine {
       return `Siste segment: ${name}. ${durStr} igjen.`;
     }
 
-    let msg = `Nytt segment: ${name}. ${speed} kilometer i timen`;
-    if (incline > 0) msg += `, ${incline} prosent stigning`;
+    let msg = `Nytt segment: ${name}. ${CoachingEngine.formatNumber(speed)} kilometer i timen`;
+    if (incline > 0) msg += `, ${CoachingEngine.formatNumber(incline)} prosent stigning`;
     msg += `, ${durStr}.`;
     if (targetZone) msg += ` Målsone er ${targetZone}.`;
     return msg;
